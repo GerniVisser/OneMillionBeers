@@ -57,11 +57,11 @@ WhatsApp ──(outbound WebSocket)──> [ Collector Service ] ──> S3-comp
                                       (metadata + photoUrl)
                                             │
                                             ▼
-                                  [ Backend API Service ]
-                                            │
-                                            ▼
-                                       PostgreSQL
-                                       (app data)
+Browser ──(HTTPS)──> [ nginx ] ──/api/──> [ Backend API Service ]
+                         │                          │
+                         └────/──> [ SvelteKit      ▼
+                                     Frontend ]  PostgreSQL
+                                                 (app data)
 ```
 
 ### Services
@@ -91,9 +91,13 @@ All V1 containers run on a single EC2 t3.small instance managed with Docker Comp
 
 Nginx runs as a Docker container. It is the only container with public-facing ports (80 and 443).
 
+Two upstreams: `backend:3000` and `frontend:3001`.
+
 Responsibilities:
 - SSL termination — Node services speak plain HTTP internally
-- Reverse proxy to the Backend API container
+- Route `/api/*` → backend (strips `/api` prefix)
+- Route `/` → SvelteKit frontend node server
+- SSE special handling: `proxy_buffering off`, `proxy_http_version 1.1`, `proxy_read_timeout 3600s` for `/api/v1/global/stream`
 - HTTP → HTTPS redirect
 - The Collector is **not** exposed via Nginx — it has no public interface
 
@@ -634,6 +638,7 @@ EC2 t3.small
 ├── nginx       (ports 80, 443 — only public-facing container)
 ├── certbot     (sidecar to nginx — manages SSL certificates)
 ├── backend     (port 3000 — internal only, not public)
+├── frontend    (port 3001 — internal only, proxied via nginx)
 └── collector   (no port — outbound only)
 
 AWS RDS (PostgreSQL)        (external — primary data store)
@@ -646,12 +651,12 @@ Github Container Registry   (external — Docker image registry)
 On push to `main`, GitHub Actions:
 
 1. Runs full CI suite (type check, lint, format, tests)
-2. Builds Docker images for `backend` and `collector`
+2. Builds Docker images for `backend`, `collector`, and `frontend`
 3. Pushes images to Github Container Registry tagged with git SHA
 4. SSHs into EC2
 5. Pulls new images from Github Container Registry
-6. Restarts containers: `docker compose up -d --no-deps backend collector`
-7. Hits health check endpoints to confirm successful start
+6. Restarts containers: `docker compose up -d --no-deps backend collector frontend`
+7. Hits health check endpoints to confirm successful start (`/api/health` and `/health`)
 
 ## 14. Future Considerations
 

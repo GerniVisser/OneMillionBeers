@@ -1,0 +1,82 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    command: pnpm dev
+    expose:
+      - "3000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
+      LOG_LEVEL: debug
+    volumes:
+      - ./packages/backend/src:/app/src
+    depends_on:
+      - postgres
+
+  collector:
+    build:
+      context: .
+      dockerfile: packages/collector/Dockerfile
+    command: pnpm dev
+    environment:
+      BACKEND_URL: http://backend:3000
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_BUCKET: omb-photos
+      STORAGE_KEY: minioadmin
+      STORAGE_SECRET: minioadmin
+      LOG_LEVEL: debug
+    volumes:
+      - ./packages/collector/src:/app/src
+      - baileys-session:/app/session
+    depends_on:
+      - backend
+      - minio
+
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    command: pnpm dev --host 0.0.0.0
+    expose:
+      - "3001"
+    environment:
+      PORT: "3001"
+    volumes:
+      - ./packages/frontend/src:/app/src
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_DB: omb
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+volumes:
+  postgres-data:
+  baileys-session:

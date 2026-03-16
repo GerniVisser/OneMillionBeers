@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# SvelteKit generated files
+.svelte-kit/
+
 # Environment
 .env
 .env.local

@@ -40,8 +40,9 @@ The repo is a pnpm monorepo. Workspace packages are declared in `pnpm-workspace.
 | `packages/backend` | `@omb/backend` | Fastify REST API, PostgreSQL, all business logic |
 | `packages/collector` | `@omb/collector` | Baileys WhatsApp client, S3 uploads, forwards to backend |
 | `packages/shared` | `@omb/shared` | Zod schemas and inferred TypeScript types — no runtime deps |
+| `packages/frontend` | `@omb/frontend` | SvelteKit SSR web dashboard — public-facing interface |
 
-`@omb/shared` is consumed by the other two packages via the workspace protocol. It is not published to a registry.
+`@omb/shared` is consumed by the other packages via the workspace protocol. It is not published to a registry.
 
 ---
 
@@ -73,9 +74,10 @@ docker compose -f docker-compose.dev.yml up
 
 | Service | Purpose |
 |---|---|
-| `nginx` | Reverse proxy to backend (port 80) |
+| `nginx` | Reverse proxy — proxies `/api/*` to backend, `/` to frontend (port 80) |
 | `backend` | Fastify API with hot reload (internal port 3000) |
 | `collector` | WhatsApp bot with hot reload |
+| `frontend` | SvelteKit dev server with hot reload (internal port 3001) |
 | `postgres` | PostgreSQL (internal port 5432) |
 | `minio` | S3-compatible storage; web console at `http://localhost:9001` |
 
@@ -117,6 +119,13 @@ Both services validate all required variables on startup via Zod and exit immedi
 | `STORAGE_KEY` | `minioadmin` | Storage access key |
 | `STORAGE_SECRET` | `minioadmin` | Storage secret key |
 | `LOG_LEVEL` | `info` | Pino log level |
+
+### Frontend
+
+| Variable | Dev default | Purpose |
+|---|---|---|
+| `ORIGIN` | `https://onemillionbeers.app` | Required by `@sveltejs/adapter-node` in production — sets the canonical origin for CSRF protection |
+| `PORT` | `3001` | Port the SvelteKit node server listens on |
 
 ---
 
@@ -185,8 +194,9 @@ A route is complete when: a Zod schema in `@omb/shared` defines its shape, unit 
 |---|---|
 | `packages/backend/Dockerfile` | Backend API |
 | `packages/collector/Dockerfile` | Collector |
+| `packages/frontend/Dockerfile` | SvelteKit frontend |
 
-`@omb/shared` is not containerised — it is compiled and consumed at build time.
+`@omb/shared` is not containerised — it is compiled and consumed at build time. All Dockerfiles that consume `@omb/shared` use the repo root as build context.
 
 All Dockerfiles use multi-stage builds: a **builder stage** installs all dependencies and compiles TypeScript; the **production stage** copies only compiled JS and production dependencies. Production containers run as a non-root user. `package.json` and `pnpm-lock.yaml` are copied before source to maximise layer caching.
 
@@ -217,11 +227,11 @@ Pipeline fails fast. PRs cannot be merged until CI passes.
 
 Triggers on push to `main` after `ci.yml` passes.
 
-1. Build Docker images for `@omb/backend` and `@omb/collector`
-2. Push both to GitHub Container Registry tagged with the git SHA
+1. Build Docker images for `@omb/backend`, `@omb/collector`, and `@omb/frontend`
+2. Push all three to GitHub Container Registry tagged with the git SHA
 3. SSH into the EC2 instance
-4. Pull new images and restart: `docker compose up -d --no-deps backend collector`
-5. Hit health check endpoints to confirm successful start
+4. Pull new images and restart: `docker compose up -d --no-deps backend collector frontend`
+5. Hit health check endpoints to confirm successful start (`/api/health` and `/health`)
 
 Images are always tagged with the git SHA — `latest` is not used as a deployment tag.
 
@@ -246,6 +256,9 @@ Images are stored in **GitHub Container Registry** (`ghcr.io`). No ECR or Docker
 | Vitest (per package) | `packages/*/vitest.config.ts` |
 | Backend Dockerfile | `packages/backend/Dockerfile` |
 | Collector Dockerfile | `packages/collector/Dockerfile` |
+| Frontend Dockerfile | `packages/frontend/Dockerfile` |
+| SvelteKit config | `packages/frontend/svelte.config.js` |
+| Frontend Vite config | `packages/frontend/vite.config.ts` |
 | Docker Compose (prod) | `docker-compose.yml` |
 | Docker Compose (dev) | `docker-compose.dev.yml` |
 | CI workflow | `.github/workflows/ci.yml` |
