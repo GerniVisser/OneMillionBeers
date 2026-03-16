@@ -1,7 +1,7 @@
 # OneMillionBeers — Backend Technical Specification
 
 > Status: Draft v0.3 — Under Review
-> Last updated: 2026-03-15
+> Last updated: 2026-03-16
 
 ---
 
@@ -28,7 +28,7 @@ This is achieved by:
 
 - **All services are containerised** — any host that can run Docker can run this stack
 - **Inter-service communication is plain HTTP** — services talk over REST regardless of whether they share a host or run on separate machines
-- **External dependencies are abstracted via environment variables** — swapping AWS S3 for Cloudflare R2, or RDS for a self-hosted PostgreSQL, is a config change not a code change
+- **External dependencies are abstracted via environment variables** — swapping AWS S3 for Cloudflare R2, or AWS RDS for a self-hosted PostgreSQL, is a config change not a code change
 - **Infrastructure is the only provider-specific layer** — Terraform targets AWS; the containers it runs are identical everywhere
 
 ### Deployment Flexibility
@@ -37,7 +37,7 @@ The same codebase and containers support multiple deployment topologies without 
 
 | Topology | Description |
 |---|---|
-| **Single host (V1)** | All containers on one EC2 instance, communicate over Docker internal network |
+| **Single host (V1)** | Application containers (nginx, backend, collector) on one EC2 instance; database on AWS RDS; storage on AWS S3 |
 | **Split services** | Each service on its own host, communicate over network — env var change only |
 | **Fully managed** | Services on ECS Fargate, managed DB, managed storage — no code changes |
 | **Different provider** | Deploy to GCP, DigitalOcean, Hetzner etc. — only Terraform changes |
@@ -97,23 +97,14 @@ Responsibilities:
 - HTTP → HTTPS redirect
 - The Collector is **not** exposed via Nginx — it has no public interface
 
-### SSL — Let's Encrypt + Certbot
+### Database — PostgreSQL
 
-Certbot runs as a sidecar container alongside Nginx. Both share a Docker volume where certificates are written by Certbot and read by Nginx. Certbot handles automatic renewal — no host-level cron required.
+The application connects to PostgreSQL via a standard `DATABASE_URL` connection string. The host depends on the environment:
 
-```
-nginx container   ──reads certs──┐
-                                 │ shared Docker volume
-certbot container ──writes certs─┘
-```
+- **Local development:** PostgreSQL runs as a Docker container (see `docker-compose.dev.yml`). Data is persisted to a named Docker volume.
+- **Production (V1):** AWS RDS for PostgreSQL. Data persists independently of the EC2 instance or any container lifecycle. Automated backups and point-in-time recovery are managed by RDS.
 
-### Database — PostgreSQL (container)
-
-PostgreSQL runs as a Docker container on the same EC2 host. Data is persisted to a named Docker volume on the host disk.
-
-This is the V1 trade-off: free, simple, no managed service overhead. The application connects via a standard `DATABASE_URL` connection string — swapping to a managed provider (RDS, Neon, DigitalOcean PostgreSQL) is a one-line config change.
-
-> **Accepted V1 risk:** The database lives on the same host as the application. If the instance is terminated, data is lost. Automated backups are not configured for V1. This must be addressed before any significant public launch.
+No application code is aware of which environment it targets — the connection string is the only difference.
 
 ### File Storage — S3-compatible Object Storage
 
@@ -129,11 +120,11 @@ Photos are uploaded directly to storage by the Collector — the Backend API nev
 - Original images stored as received from WhatsApp (no resizing or compression)
 - Public read access — photos are already shared in a WhatsApp group and the dashboard is public
 
-### Container Registry — ithub Container Registry
+### Container Registry — Github Container Registry
 
 Docker images are built in CI and pushed to Github Container Registry tagged with the git SHA. The EC2 instance pulls from Github Container Registry on deployment.
 
-Migration option: ECR , Docker Hub, or any registry — a config change in the GitHub Actions workflow.
+Migration option: ECR, Docker Hub, or any registry — a config change in the GitHub Actions workflow.
 
 ### Infrastructure as Code — Terraform
 
@@ -141,10 +132,9 @@ Terraform manages all AWS resources:
 - EC2 instance + Elastic IP
 - Security groups
 - S3 bucket + bucket policy
+- RDS instance (PostgreSQL)
 - Github Container Registry repositories (backend + collector)
 - IAM roles
-
-> PostgreSQL is not provisioned via Terraform for V1 — it runs as a container on the EC2 host.
 
 ---
 
@@ -279,7 +269,6 @@ Chosen for native TypeScript support, built-in schema validation that integrates
 
 | Plugin | Purpose |
 |---|---|
-| `@fastify/jwt` | JWT authentication for user sessions |
 | `@fastify/cors` | CORS headers for frontend requests |
 
 ---
@@ -327,7 +316,6 @@ Structured JSON logs written to stdout in both services.
 # Backend API
 # -------------------
 DATABASE_URL=postgres://postgres:postgres@postgres:5432/omb
-JWT_SECRET=changeme
 LOG_LEVEL=info
 
 # -------------------
@@ -484,14 +472,6 @@ GET    /v1/global/feed                Recent beers from all groups worldwide
 GET    /v1/global/leaderboard         Top contributors globally
 ```
 
-#### Authenticated — Account Management
-```
-POST   /v1/auth/claim                 Claim a profile via WhatsApp OTP
-POST   /v1/auth/verify                Verify OTP and issue JWT
-DELETE /v1/logs/:logId                Delete own beer log
-PATCH  /v1/users/me                   Update display name or privacy settings
-```
-
 ### Real-time — Server-Sent Events (SSE)
 
 The global beer counter and live feed update in the browser without polling. SSE is used over WebSockets — the server only pushes data, never receives it over the persistent connection, so WebSockets would be unnecessary complexity.
@@ -551,7 +531,7 @@ Group
 User
 ├── id                UUID, primary key
 ├── phone_hash        TEXT, unique  (SHA-256 of phone number — plaintext never stored)
-├── display_name      TEXT, nullable until claimed
+├── display_name      TEXT, nullable
 ├── slug              TEXT, unique  (URL: /u/[slug])
 ├── created_at        TIMESTAMPTZ
 
@@ -566,27 +546,15 @@ BeerLog
 
 ---
 
-## 11. Authentication & Identity
+## 11. Identity
+
+All data is public. There is no login, no sessions, and no authenticated endpoints.
 
 Users are identified by their WhatsApp phone number. **Phone numbers are hashed (SHA-256) before storage — plaintext is never persisted.**
 
 ### Auto-creation
 
-When a beer log is received, the Collector provides the sender's phone number. The Backend API hashes it and looks up or creates a User record automatically. No signup required — every participant in a connected WhatsApp group gets a profile created on first log.
-
-### Profile Claiming
-
-Users visit the website and claim their auto-created profile to set a display name and manage their data:
-
-```
-1. User enters their phone number on the website
-2. Backend hashes it, looks up the user record
-3. Backend sends a one-time code via WhatsApp to that number (using Baileys)
-4. User enters the code on the website
-5. OTP verified — JWT issued and stored in an httpOnly cookie
-```
-
-No passwords. No email. Phone number is the sole identity mechanism.
+When a beer log is received, the Collector provides the sender's phone number. The Backend API hashes it and looks up or creates a User record automatically. No signup required — every participant in a connected WhatsApp group gets a profile created on their first log.
 
 ---
 
@@ -609,7 +577,6 @@ services:
     expose: ["3000"]
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
-      JWT_SECRET: devsecret
       LOG_LEVEL: debug
     volumes:
       - ./packages/backend/src:/app/src   # hot reload
@@ -667,9 +634,9 @@ EC2 t3.small
 ├── nginx       (ports 80, 443 — only public-facing container)
 ├── certbot     (sidecar to nginx — manages SSL certificates)
 ├── backend     (port 3000 — internal only, not public)
-├── collector   (no port — outbound only)
-└── postgres    (port 5432 — internal only)
+└── collector   (no port — outbound only)
 
+AWS RDS (PostgreSQL)        (external — primary data store)
 AWS S3 bucket               (external — beer photo storage)
 Github Container Registry   (external — Docker image registry)
 ```
@@ -690,15 +657,11 @@ On push to `main`, GitHub Actions:
 
 Features and infrastructure deferred from V1:
 
-- **Badges and gamification** — post-V1 once core logging and profiles are stable
 - **Database backups** — automated backup strategy before public launch push
 - **ECS Fargate migration** — managed containers when single EC2 becomes a bottleneck
-- **Managed PostgreSQL** — RDS, Neon, or similar when data durability requirements increase
 - **CDN** — CloudFront or Cloudflare in front of S3 for global image delivery performance
 - **Read replicas** — for leaderboard and analytics query isolation at scale
 - **Job queue** — pg-boss or BullMQ if background processing needs to move off the request path
 - **Official Meta Cloud API** — replace Baileys if account ban risk becomes unacceptable
 - **Additional collectors** — Telegram, dedicated mobile app — point at the same Backend API
-- **Beer Card generation** — shareable stats image per user profile
 - **Provider migration** — swap Terraform modules; containers and application code unchanged
-- **Profile Claiming** - users can claim a profile by verifying phone number
