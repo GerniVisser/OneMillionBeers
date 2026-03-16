@@ -42,5 +42,7 @@ packages/collector/session/
 *.swp
 *.swo
 
-# Claude — intentionally tracked in version control
-# .claude/
+# Claude
+.claude/
+CLAUDE.md
+*/CLAUDE.md
