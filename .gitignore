@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# pnpm
+.pnpm-store/
+
+# Logs
+*.log
+logs/
+
+# TypeScript
+*.tsbuildinfo
+
+# Docker
+.docker/
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.backup
+infra/*.tfvars
+infra/.terraform.lock.hcl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Baileys session data (persisted via Docker volume in prod)
+packages/collector/session/
+
+# Editor
+.idea/
+*.swp
+*.swo
+
+# Claude
+.claude/
+CLAUDE.md
+*/CLAUDE.md
