@@ -30,27 +30,27 @@ The global counter is live data — it changes every time a beer is logged. SSR 
 
 ## 3. Tech Stack
 
-| Concern | Choice |
-|---|---|
-| Framework | SvelteKit |
-| Adapter | `@sveltejs/adapter-node` |
-| Styling | Tailwind CSS v4 (Vite plugin, CSS-first config) |
-| Charts | Chart.js via `svelte-chartjs` |
-| Real-time | Server-Sent Events (native `EventSource`) |
-| Shared types | `@omb/shared` (workspace protocol) |
-| Build tool | Vite |
+| Concern      | Choice                                          |
+| ------------ | ----------------------------------------------- |
+| Framework    | SvelteKit                                       |
+| Adapter      | `@sveltejs/adapter-node`                        |
+| Styling      | Tailwind CSS v4 (Vite plugin, CSS-first config) |
+| Charts       | Chart.js via `svelte-chartjs`                   |
+| Real-time    | Server-Sent Events (native `EventSource`)       |
+| Shared types | `@omb/shared` (workspace protocol)              |
+| Build tool   | Vite                                            |
 
 ---
 
 ## 4. Page Inventory
 
-| Route | File | Description |
-|---|---|---|
-| `/` | `src/routes/+page.svelte` | Global dashboard — live counter, beer feed, global leaderboard |
-| `/groups/[slug]` | `src/routes/groups/[slug]/+page.svelte` | Group page — stats, photo feed, group leaderboard |
-| `/users/[slug]` | `src/routes/users/[slug]/+page.svelte` | User profile — stats, streaks, activity chart |
-| `/about` | `src/routes/about/+page.svelte` | What OneMillionBeers is, how to join |
-| `/health` | `src/routes/health/+server.ts` | Returns 200 — used by deploy health checks |
+| Route            | File                                    | Description                                                    |
+| ---------------- | --------------------------------------- | -------------------------------------------------------------- |
+| `/`              | `src/routes/+page.svelte`               | Global dashboard — live counter, beer feed, global leaderboard |
+| `/groups/[slug]` | `src/routes/groups/[slug]/+page.svelte` | Group page — stats, photo feed, group leaderboard              |
+| `/users/[slug]`  | `src/routes/users/[slug]/+page.svelte`  | User profile — stats, streaks, activity chart                  |
+| `/about`         | `src/routes/about/+page.svelte`         | What OneMillionBeers is, how to join                           |
+| `/health`        | `src/routes/health/+server.ts`          | Returns 200 — used by deploy health checks                     |
 
 ---
 
@@ -94,12 +94,12 @@ All data fetching happens in SvelteKit `load` functions (`+page.ts` files). The 
 
 ```ts
 // src/lib/api.ts
-const API_BASE = '/api';
+const API_BASE = '/api'
 
 async function fetchJson<T>(fetch: typeof globalThis.fetch, path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  const res = await fetch(`${API_BASE}${path}`)
+  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`)
+  return res.json() as Promise<T>
 }
 ```
 
@@ -130,8 +130,8 @@ The nginx SSE block (`location = /api/v1/global/stream`) sets `proxy_buffering o
 Only required Chart.js components are registered (tree-shaking):
 
 ```ts
-import { Chart, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js';
-Chart.register(CategoryScale, LinearScale, BarElement, Tooltip);
+import { Chart, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js'
+Chart.register(CategoryScale, LinearScale, BarElement, Tooltip)
 ```
 
 `svelte-chartjs` handles the Svelte component wrapper. Chart.js runs client-side only — the component gates rendering with `{#if browser}` from `$app/environment` to avoid SSR issues.
@@ -145,7 +145,7 @@ Tailwind v4 uses a CSS-first configuration — no `tailwind.config.js` file. The
 Custom theme tokens are defined in `src/app.css`:
 
 ```css
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-beer-amber: #f59e0b;
@@ -162,7 +162,7 @@ These are available as Tailwind utilities (`text-beer-amber`, `bg-beer-dark`, et
 `@omb/frontend` imports schemas and inferred types from `@omb/shared` via the workspace protocol:
 
 ```ts
-import type { BeerLogRequest } from '@omb/shared';
+import type { BeerLogRequest } from '@omb/shared'
 ```
 
 The schema-first rule applies: if a type is needed in the frontend, the Zod schema must exist in `@omb/shared` first. API response types that are not yet in `@omb/shared` are defined locally in `src/lib/api.ts` until schemas are added.
@@ -183,10 +183,10 @@ The `/api` prefix is stripped before forwarding to the backend. This means the b
 
 ## 12. Environment Variables
 
-| Variable | Required in | Purpose |
-|---|---|---|
-| `ORIGIN` | Production | Required by `adapter-node` — sets the canonical origin for CSRF protection. Must match the public URL. |
-| `PORT` | Both | Port the SvelteKit node server listens on (default `3001`) |
+| Variable | Required in | Purpose                                                                                                |
+| -------- | ----------- | ------------------------------------------------------------------------------------------------------ |
+| `ORIGIN` | Production  | Required by `adapter-node` — sets the canonical origin for CSRF protection. Must match the public URL. |
+| `PORT`   | Both        | Port the SvelteKit node server listens on (default `3001`)                                             |
 
 In development (Docker Compose), `ORIGIN` is not set — `adapter-node` allows this in non-production mode.
 
@@ -197,6 +197,7 @@ In development (Docker Compose), `ORIGIN` is not set — `adapter-node` allows t
 Frontend tests are explicitly deferred from V1.
 
 **Deferred:**
+
 - **Vitest unit tests** — component logic is thin; defer until there is meaningful logic to test
 - **Playwright E2E tests** — valuable but require a running stack; add alongside test data seeding
 
@@ -206,10 +207,10 @@ Frontend tests are explicitly deferred from V1.
 
 ## 14. V1 Deferrals
 
-| Feature | Notes |
-|---|---|
-| Auth / protected routes | All pages are public at launch |
-| Dark mode | Tailwind supports `dark:` variants; wire up later |
-| Contribution heatmap | Chart.js lacks native heatmap; add ECharts when needed |
-| Caching / CDN | Add when traffic warrants it |
-| Frontend tests | See section 13 |
+| Feature                 | Notes                                                  |
+| ----------------------- | ------------------------------------------------------ |
+| Auth / protected routes | All pages are public at launch                         |
+| Dark mode               | Tailwind supports `dark:` variants; wire up later      |
+| Contribution heatmap    | Chart.js lacks native heatmap; add ECharts when needed |
+| Caching / CDN           | Add when traffic warrants it                           |
+| Frontend tests          | See section 13                                         |

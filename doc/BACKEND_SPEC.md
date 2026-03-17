@@ -35,12 +35,12 @@ This is achieved by:
 
 The same codebase and containers support multiple deployment topologies without modification:
 
-| Topology | Description |
-|---|---|
-| **Single host (V1)** | Application containers (nginx, backend, collector) on one EC2 instance; database on AWS RDS; storage on AWS S3 |
-| **Split services** | Each service on its own host, communicate over network — env var change only |
-| **Fully managed** | Services on ECS Fargate, managed DB, managed storage — no code changes |
-| **Different provider** | Deploy to GCP, DigitalOcean, Hetzner etc. — only Terraform changes |
+| Topology               | Description                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Single host (V1)**   | Application containers (nginx, backend, collector) on one EC2 instance; database on AWS RDS; storage on AWS S3 |
+| **Split services**     | Each service on its own host, communicate over network — env var change only                                   |
+| **Fully managed**      | Services on ECS Fargate, managed DB, managed storage — no code changes                                         |
+| **Different provider** | Deploy to GCP, DigitalOcean, Hetzner etc. — only Terraform changes                                             |
 
 ### MVP First
 
@@ -66,10 +66,10 @@ Browser ──(HTTPS)──> [ nginx ] ──/api/──> [ Backend API Service 
 
 ### Services
 
-| Service | Responsibility |
-|---|---|
-| **Collector** | Maintains Baileys WhatsApp connection, filters photo messages, uploads photos to S3-compatible storage, forwards beer log metadata to Backend API |
-| **Backend API** | Business logic, data persistence, leaderboards, user profiles, REST API — no image handling |
+| Service         | Responsibility                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Collector**   | Maintains Baileys WhatsApp connection, filters photo messages, uploads photos to S3-compatible storage, forwards beer log metadata to Backend API |
+| **Backend API** | Business logic, data persistence, leaderboards, user profiles, REST API — no image handling                                                       |
 
 ### Inter-service Communication
 
@@ -94,6 +94,7 @@ Nginx runs as a Docker container. It is the only container with public-facing po
 Two upstreams: `backend:3000` and `frontend:3001`.
 
 Responsibilities:
+
 - SSL termination — Node services speak plain HTTP internally
 - Route `/api/*` → backend (strips `/api` prefix)
 - Route `/` → SvelteKit frontend node server
@@ -121,6 +122,7 @@ Beer photos are stored in S3-compatible object storage. The application uses the
 Photos are uploaded directly to storage by the Collector — the Backend API never handles image data. The Collector uploads the photo, receives the public URL, and includes it in the metadata sent to the Backend API. Frontend fetches images directly from storage. Traffic never proxies through the application server.
 
 **V1 photo decisions:**
+
 - Original images stored as received from WhatsApp (no resizing or compression)
 - Public read access — photos are already shared in a WhatsApp group and the dashboard is public
 
@@ -133,6 +135,7 @@ Migration option: ECR, Docker Hub, or any registry — a config change in the Gi
 ### Infrastructure as Code — Terraform
 
 Terraform manages all AWS resources:
+
 - EC2 instance + Elastic IP
 - Security groups
 - S3 bucket + bucket policy
@@ -203,6 +206,7 @@ All public endpoints are prefixed with a version: `/v1/`, `/v2/`, etc.
 ### Test-Driven Development
 
 A route is not considered done until:
+
 1. The Zod schema defines its request and response shape
 2. Unit tests cover the business logic
 3. Integration tests validate the full request/response cycle against a real database
@@ -222,9 +226,11 @@ A route is not considered done until:
 ```
 
 **What is never mocked:**
+
 - The database — integration tests use a real PostgreSQL instance
 
 **What is mocked:**
+
 - S3 uploads — mock storage client in tests
 - Baileys — a stub that simulates incoming WhatsApp messages
 
@@ -234,22 +240,22 @@ A route is not considered done until:
 
 The stack prioritises well-known, well-documented, widely adopted tools. Every choice favours community maturity and AI-assistant familiarity.
 
-| Concern | Tool |
-|---|---|
-| Runtime | Node.js LTS |
-| Language | TypeScript |
-| Framework | Fastify |
-| Package manager | pnpm |
-| Database driver | pg (node-postgres) |
-| Validation | Zod |
-| Logging | Pino |
-| Environment config | dotenv |
-| HTTP client | Native fetch (Node 18+) |
-| Linting | ESLint |
-| Formatting | Prettier |
-| Testing | Vitest + Testcontainers |
-| CI/CD | GitHub Actions |
-| WhatsApp client | Baileys |
+| Concern            | Tool                    |
+| ------------------ | ----------------------- |
+| Runtime            | Node.js LTS             |
+| Language           | TypeScript              |
+| Framework          | Fastify                 |
+| Package manager    | pnpm                    |
+| Database driver    | pg (node-postgres)      |
+| Validation         | Zod                     |
+| Logging            | Pino                    |
+| Environment config | dotenv                  |
+| HTTP client        | Native fetch (Node 18+) |
+| Linting            | ESLint                  |
+| Formatting         | Prettier                |
+| Testing            | Vitest + Testcontainers |
+| CI/CD              | GitHub Actions          |
+| WhatsApp client    | Baileys                 |
 
 ---
 
@@ -271,8 +277,8 @@ Used by the Backend API only. The Collector has no HTTP server.
 
 Chosen for native TypeScript support, built-in schema validation that integrates directly with Zod, and a clean plugin architecture.
 
-| Plugin | Purpose |
-|---|---|
+| Plugin          | Purpose                            |
+| --------------- | ---------------------------------- |
 | `@fastify/cors` | CORS headers for frontend requests |
 
 ---
@@ -360,12 +366,14 @@ Testcontainers spins up a real PostgreSQL Docker container for integration test 
 Two workflows:
 
 **`ci.yml`** — runs on every push and pull request:
+
 1. `tsc --noEmit` — type check
 2. `eslint` — lint
 3. `prettier --check` — formatting
 4. `vitest run` — full test suite
 
 **`deploy.yml`** — runs on push to `main` after CI passes:
+
 1. Build Docker images for `backend` and `collector`
 2. Push to Github Container Registry tagged with git SHA
 3. SSH into EC2
@@ -381,6 +389,7 @@ Two workflows:
 Baileys is an unofficial WhatsApp Web client for Node.js. It connects **outbound** to WhatsApp's servers over a persistent WebSocket — WhatsApp never calls the Collector, the Collector calls WhatsApp.
 
 This means:
+
 - No inbound webhook
 - No public URL required
 - No ngrok needed for local development — Baileys connects directly from wherever the process is running
@@ -452,11 +461,13 @@ All endpoints are prefixed with `/v1/`. Breaking changes will introduce `/v2/` w
 ### Endpoints
 
 #### Internal — Collector only (not public, not routed via Nginx)
+
 ```
 POST   /v1/internal/beer-log          Receive a beer log from a collector service
 ```
 
 #### Public — Groups
+
 ```
 GET    /v1/groups/:groupId            Group info and stats
 GET    /v1/groups/:groupId/feed       Paginated beer photo feed
@@ -464,12 +475,14 @@ GET    /v1/groups/:groupId/leaderboard  Ranked member list by beer count
 ```
 
 #### Public — Users
+
 ```
 GET    /v1/users/:userId              Public profile
 GET    /v1/users/:userId/stats        Beer counts, streaks, favourite times
 ```
 
 #### Public — Global
+
 ```
 GET    /v1/global/count               Current global beer total
 GET    /v1/global/feed                Recent beers from all groups worldwide
@@ -571,19 +584,19 @@ No cloud services required. The full stack runs locally via Docker Compose.
 services:
   nginx:
     image: nginx:alpine
-    ports: ["80:80"]
+    ports: ['80:80']
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
 
   backend:
     build: ./packages/backend
     command: pnpm dev
-    expose: ["3000"]
+    expose: ['3000']
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
       LOG_LEVEL: debug
     volumes:
-      - ./packages/backend/src:/app/src   # hot reload
+      - ./packages/backend/src:/app/src # hot reload
     depends_on: [postgres]
 
   collector:
@@ -598,12 +611,12 @@ services:
       LOG_LEVEL: debug
     volumes:
       - ./packages/collector/src:/app/src
-      - baileys-session:/app/session       # persist WhatsApp session
+      - baileys-session:/app/session # persist WhatsApp session
     depends_on: [backend, minio]
 
   postgres:
     image: postgres:16-alpine
-    expose: ["5432"]
+    expose: ['5432']
     environment:
       POSTGRES_DB: omb
       POSTGRES_PASSWORD: postgres
@@ -612,7 +625,7 @@ services:
 
   minio:
     image: minio/minio
-    ports: ["9000:9000", "9001:9001"]     # 9001 is the MinIO web console
+    ports: ['9000:9000', '9001:9001'] # 9001 is the MinIO web console
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin

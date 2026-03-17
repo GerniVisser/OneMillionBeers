@@ -10,11 +10,11 @@ A platform that sits invisibly behind WhatsApp groups. A bot joins the group, si
 
 ## Services
 
-| Package | Description |
-|---|---|
-| `packages/backend` | Fastify REST API — business logic, data persistence, leaderboards, SSE |
+| Package              | Description                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `packages/backend`   | Fastify REST API — business logic, data persistence, leaderboards, SSE                  |
 | `packages/collector` | WhatsApp client (Baileys) — watches for beer photos, uploads to S3, forwards to backend |
-| `packages/shared` | Zod schemas and inferred TypeScript types shared across both services |
+| `packages/shared`    | Zod schemas and inferred TypeScript types shared across both services                   |
 
 ## Tech stack
 

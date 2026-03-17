@@ -35,12 +35,12 @@ pnpm is the package manager, pinned via the `packageManager` field in the root `
 
 The repo is a pnpm monorepo. Workspace packages are declared in `pnpm-workspace.yaml` as `packages/*`.
 
-| Package | Name | Description |
-|---|---|---|
-| `packages/backend` | `@omb/backend` | Fastify REST API, PostgreSQL, all business logic |
-| `packages/collector` | `@omb/collector` | Baileys WhatsApp client, S3 uploads, forwards to backend |
-| `packages/shared` | `@omb/shared` | Zod schemas and inferred TypeScript types — no runtime deps |
-| `packages/frontend` | `@omb/frontend` | SvelteKit SSR web dashboard — public-facing interface |
+| Package              | Name             | Description                                                 |
+| -------------------- | ---------------- | ----------------------------------------------------------- |
+| `packages/backend`   | `@omb/backend`   | Fastify REST API, PostgreSQL, all business logic            |
+| `packages/collector` | `@omb/collector` | Baileys WhatsApp client, S3 uploads, forwards to backend    |
+| `packages/shared`    | `@omb/shared`    | Zod schemas and inferred TypeScript types — no runtime deps |
+| `packages/frontend`  | `@omb/frontend`  | SvelteKit SSR web dashboard — public-facing interface       |
 
 `@omb/shared` is consumed by the other packages via the workspace protocol. It is not published to a registry.
 
@@ -50,15 +50,15 @@ The repo is a pnpm monorepo. Workspace packages are declared in `pnpm-workspace.
 
 All scripts run with `pnpm -r` (recursive) from the repo root.
 
-| Command | What it does |
-|---|---|
-| `pnpm install` | Installs all workspace dependencies using the lockfile |
-| `pnpm -r build` | Compiles TypeScript to JS for all packages |
-| `pnpm -r test` | Runs the Vitest test suite for all packages |
-| `pnpm -r lint` | Runs ESLint across all packages |
-| `pnpm -r format` | Runs Prettier across all source files |
-| `pnpm -r format:check` | Checks formatting without writing (used in CI) |
-| `pnpm -r typecheck` | Runs `tsc --noEmit` across all packages |
+| Command                | What it does                                           |
+| ---------------------- | ------------------------------------------------------ |
+| `pnpm install`         | Installs all workspace dependencies using the lockfile |
+| `pnpm -r build`        | Compiles TypeScript to JS for all packages             |
+| `pnpm -r test`         | Runs the Vitest test suite for all packages            |
+| `pnpm -r lint`         | Runs ESLint across all packages                        |
+| `pnpm -r format`       | Runs Prettier across all source files                  |
+| `pnpm -r format:check` | Checks formatting without writing (used in CI)         |
+| `pnpm -r typecheck`    | Runs `tsc --noEmit` across all packages                |
 
 To target a single package: `pnpm --filter @omb/backend build`.
 
@@ -72,14 +72,14 @@ The full stack runs locally via Docker Compose — no cloud services or tunnelli
 docker compose -f docker-compose.dev.yml up
 ```
 
-| Service | Purpose |
-|---|---|
-| `nginx` | Reverse proxy — proxies `/api/*` to backend, `/` to frontend (port 80) |
-| `backend` | Fastify API with hot reload (internal port 3000) |
-| `collector` | WhatsApp bot with hot reload |
-| `frontend` | SvelteKit dev server with hot reload (internal port 3001) |
-| `postgres` | PostgreSQL (internal port 5432) |
-| `minio` | S3-compatible storage; web console at `http://localhost:9001` |
+| Service     | Purpose                                                                |
+| ----------- | ---------------------------------------------------------------------- |
+| `nginx`     | Reverse proxy — proxies `/api/*` to backend, `/` to frontend (port 80) |
+| `backend`   | Fastify API with hot reload (internal port 3000)                       |
+| `collector` | WhatsApp bot with hot reload                                           |
+| `frontend`  | SvelteKit dev server with hot reload (internal port 3001)              |
+| `postgres`  | PostgreSQL (internal port 5432)                                        |
+| `minio`     | S3-compatible storage; web console at `http://localhost:9001`          |
 
 Hot reload is enabled for `backend` and `collector` by volume-mounting `src/` into the container and using `pnpm dev` inside it.
 
@@ -103,29 +103,29 @@ Both services validate all required variables on startup via Zod and exit immedi
 
 ### Backend
 
-| Variable | Dev default | Purpose |
-|---|---|---|
-| `DATABASE_URL` | `postgres://postgres:postgres@postgres:5432/omb` | PostgreSQL connection string |
-| `JWT_SECRET` | `changeme` | Signs JWT tokens — must be changed in production |
-| `LOG_LEVEL` | `info` | Pino log level (`debug`, `info`, `warn`, `error`) |
+| Variable       | Dev default                                      | Purpose                                           |
+| -------------- | ------------------------------------------------ | ------------------------------------------------- |
+| `DATABASE_URL` | `postgres://postgres:postgres@postgres:5432/omb` | PostgreSQL connection string                      |
+| `JWT_SECRET`   | `changeme`                                       | Signs JWT tokens — must be changed in production  |
+| `LOG_LEVEL`    | `info`                                           | Pino log level (`debug`, `info`, `warn`, `error`) |
 
 ### Collector
 
-| Variable | Dev default | Purpose |
-|---|---|---|
-| `BACKEND_URL` | `http://backend:3000` | Backend API URL |
-| `STORAGE_ENDPOINT` | `http://minio:9000` | S3-compatible storage endpoint |
-| `STORAGE_BUCKET` | `omb-photos` | Bucket for beer photos |
-| `STORAGE_KEY` | `minioadmin` | Storage access key |
-| `STORAGE_SECRET` | `minioadmin` | Storage secret key |
-| `LOG_LEVEL` | `info` | Pino log level |
+| Variable           | Dev default           | Purpose                        |
+| ------------------ | --------------------- | ------------------------------ |
+| `BACKEND_URL`      | `http://backend:3000` | Backend API URL                |
+| `STORAGE_ENDPOINT` | `http://minio:9000`   | S3-compatible storage endpoint |
+| `STORAGE_BUCKET`   | `omb-photos`          | Bucket for beer photos         |
+| `STORAGE_KEY`      | `minioadmin`          | Storage access key             |
+| `STORAGE_SECRET`   | `minioadmin`          | Storage secret key             |
+| `LOG_LEVEL`        | `info`                | Pino log level                 |
 
 ### Frontend
 
-| Variable | Dev default | Purpose |
-|---|---|---|
+| Variable | Dev default                   | Purpose                                                                                            |
+| -------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
 | `ORIGIN` | `https://onemillionbeers.app` | Required by `@sveltejs/adapter-node` in production — sets the canonical origin for CSRF protection |
-| `PORT` | `3001` | Port the SvelteKit node server listens on |
+| `PORT`   | `3001`                        | Port the SvelteKit node server listens on                                                          |
 
 ---
 
@@ -176,10 +176,10 @@ pnpm -r test -- --watch  # watch mode
 
 **Integration tests** for `@omb/backend` use **Testcontainers** to spin up a real PostgreSQL container — the database is never mocked. Docker must be running locally and is available by default on GitHub Actions.
 
-| Dependency | Test approach |
-|---|---|
-| PostgreSQL | Real container via Testcontainers |
-| S3 / MinIO | Mock storage client |
+| Dependency         | Test approach                         |
+| ------------------ | ------------------------------------- |
+| PostgreSQL         | Real container via Testcontainers     |
+| S3 / MinIO         | Mock storage client                   |
 | Baileys (WhatsApp) | Stub that simulates incoming messages |
 
 A route is complete when: a Zod schema in `@omb/shared` defines its shape, unit tests cover the business logic, and an integration test validates the full request/response cycle against a real database.
@@ -190,11 +190,11 @@ A route is complete when: a Zod schema in `@omb/shared` defines its shape, unit 
 
 ### Dockerfiles
 
-| File | Service |
-|---|---|
-| `packages/backend/Dockerfile` | Backend API |
-| `packages/collector/Dockerfile` | Collector |
-| `packages/frontend/Dockerfile` | SvelteKit frontend |
+| File                            | Service            |
+| ------------------------------- | ------------------ |
+| `packages/backend/Dockerfile`   | Backend API        |
+| `packages/collector/Dockerfile` | Collector          |
+| `packages/frontend/Dockerfile`  | SvelteKit frontend |
 
 `@omb/shared` is not containerised — it is compiled and consumed at build time. All Dockerfiles that consume `@omb/shared` use the repo root as build context.
 
@@ -243,26 +243,26 @@ Images are stored in **GitHub Container Registry** (`ghcr.io`). No ECR or Docker
 
 ## 12. Config file locations
 
-| Concern | Config file |
-|---|---|
-| Node version | `.nvmrc` |
-| Package manager | `package.json` (`packageManager` field) |
-| Workspace packages | `pnpm-workspace.yaml` |
-| TypeScript (root) | `tsconfig.json` |
-| TypeScript (per package) | `packages/*/tsconfig.json` |
-| ESLint | `eslint.config.js` |
-| Prettier | `.prettierrc` |
-| Git hooks | `package.json` (`simple-git-hooks` + `lint-staged` fields) |
-| Vitest (per package) | `packages/*/vitest.config.ts` |
-| Backend Dockerfile | `packages/backend/Dockerfile` |
-| Collector Dockerfile | `packages/collector/Dockerfile` |
-| Frontend Dockerfile | `packages/frontend/Dockerfile` |
-| SvelteKit config | `packages/frontend/svelte.config.js` |
-| Frontend Vite config | `packages/frontend/vite.config.ts` |
-| Docker Compose (prod) | `docker-compose.yml` |
-| Docker Compose (dev) | `docker-compose.dev.yml` |
-| CI workflow | `.github/workflows/ci.yml` |
-| Deploy workflow | `.github/workflows/deploy.yml` |
-| Environment variables | `.env.example` |
-| Terraform | `infra/` |
-| Nginx config | `nginx/nginx.conf` |
+| Concern                  | Config file                                                |
+| ------------------------ | ---------------------------------------------------------- |
+| Node version             | `.nvmrc`                                                   |
+| Package manager          | `package.json` (`packageManager` field)                    |
+| Workspace packages       | `pnpm-workspace.yaml`                                      |
+| TypeScript (root)        | `tsconfig.json`                                            |
+| TypeScript (per package) | `packages/*/tsconfig.json`                                 |
+| ESLint                   | `eslint.config.js`                                         |
+| Prettier                 | `.prettierrc`                                              |
+| Git hooks                | `package.json` (`simple-git-hooks` + `lint-staged` fields) |
+| Vitest (per package)     | `packages/*/vitest.config.ts`                              |
+| Backend Dockerfile       | `packages/backend/Dockerfile`                              |
+| Collector Dockerfile     | `packages/collector/Dockerfile`                            |
+| Frontend Dockerfile      | `packages/frontend/Dockerfile`                             |
+| SvelteKit config         | `packages/frontend/svelte.config.js`                       |
+| Frontend Vite config     | `packages/frontend/vite.config.ts`                         |
+| Docker Compose (prod)    | `docker-compose.yml`                                       |
+| Docker Compose (dev)     | `docker-compose.dev.yml`                                   |
+| CI workflow              | `.github/workflows/ci.yml`                                 |
+| Deploy workflow          | `.github/workflows/deploy.yml`                             |
+| Environment variables    | `.env.example`                                             |
+| Terraform                | `infra/`                                                   |
+| Nginx config             | `nginx/nginx.conf`                                         |

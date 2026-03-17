@@ -61,6 +61,7 @@ This shared mission is the heartbeat of the platform. It makes logging a beer fe
 ### Group Page (`onemillionbeers.app/g/[slug]`)
 
 Every connected WhatsApp group gets a public page showing:
+
 - Total beers logged and progress toward a group goal
 - Leaderboard ranked by beers logged
 - Scrollable photo feed of every beer the group has logged
@@ -69,6 +70,7 @@ Every connected WhatsApp group gets a public page showing:
 ### Personal Profile (`onemillionbeers.app/u/[slug]`)
 
 Each participant gets a profile page showing:
+
 - Total beers logged — all time, this month, this year
 - Current streak and longest streak
 - Favourite day and time to drink
