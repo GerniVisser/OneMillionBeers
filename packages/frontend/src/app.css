@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+:root {
+  --color-beer-amber: #f59e0b;
+  --color-beer-dark: #92400e;
+  --color-beer-foam: #fef3c7;
+  --color-beer-head: #fffbeb;
+}

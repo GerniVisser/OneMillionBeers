@@ -1,0 +1,28 @@
+{
+  "name": "@omb/frontend",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 3001",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "eslint src",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sveltejs/adapter-node": "^5.2.11",
+    "@sveltejs/kit": "^2.16.0",
+    "chart.js": "^4.4.7",
+    "svelte": "^5.0.0",
+    "tailwindcss": "^4.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "svelte-check": "^4.1.4",
+    "typescript": "*",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.8"
+  }
+}

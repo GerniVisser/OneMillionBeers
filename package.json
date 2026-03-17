@@ -1,9 +1,43 @@
 {
   "name": "onemillionbeers",
+  "type": "module",
   "private": true,
   "version": "0.0.1",
   "packageManager": "pnpm@10.32.1",
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-svelte": "^2.46.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-svelte": "^3.0.0",
+    "simple-git-hooks": "^2.11.0",
+    "svelte-eslint-parser": "^0.43.0",
+    "typescript": "^5.0.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,svelte}": [
+      "eslint --fix"
+    ],
+    "*.{ts,js,svelte,json,md,css}": [
+      "prettier --write"
+    ]
+  }
 }

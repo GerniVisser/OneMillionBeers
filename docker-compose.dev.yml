@@ -1,10 +1,11 @@
 services:
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./packages/gateway
+      dockerfile: Dockerfile
+      target: dev
     ports:
       - "80:80"
-    volumes:
-      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - backend
       - frontend
@@ -13,14 +14,12 @@ services:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
-    command: pnpm dev
+      target: dev
     expose:
       - "3000"
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
       LOG_LEVEL: debug
-    volumes:
-      - ./packages/backend/src:/app/src
     depends_on:
       - postgres
 
@@ -28,7 +27,7 @@ services:
     build:
       context: .
       dockerfile: packages/collector/Dockerfile
-    command: pnpm dev
+      target: dev
     environment:
       BACKEND_URL: http://backend:3000
       STORAGE_ENDPOINT: http://minio:9000
@@ -37,7 +36,6 @@ services:
       STORAGE_SECRET: minioadmin
       LOG_LEVEL: debug
     volumes:
-      - ./packages/collector/src:/app/src
       - baileys-session:/app/session
     depends_on:
       - backend
@@ -47,13 +45,11 @@ services:
     build:
       context: .
       dockerfile: packages/frontend/Dockerfile
-    command: pnpm dev --host 0.0.0.0
+      target: dev
     expose:
       - "3001"
     environment:
       PORT: "3001"
-    volumes:
-      - ./packages/frontend/src:/app/src
     depends_on:
       - backend
 
