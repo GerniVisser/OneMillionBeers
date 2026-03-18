@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { UuidSchema, IsoDatetimeSchema, PhoneE164Schema } from './primitives.js'
+import { UuidSchema, IsoDatetimeSchema } from './primitives.js'
 import { UserSummarySchema } from './user.js'
 import { GroupSummarySchema } from './group.js'
 
@@ -15,10 +15,11 @@ export type BeerLog = z.infer<typeof BeerLogSchema>
 
 // POST /v1/internal/beer-log (Collector → Backend)
 // groupName included so group name stays current via upsert (no separate sync needed)
+// senderId is an opaque string — the collector hashes whatever identity the platform provides
 export const BeerLogRequestSchema = z.object({
-  whatsappGroupId: z.string().min(1),
+  sourceGroupId: z.string().min(1),
   groupName: z.string().min(1).max(512),
-  senderPhone: PhoneE164Schema,
+  senderId: z.string().min(1),
   timestamp: IsoDatetimeSchema,
   photoUrl: z.string().url(),
 })

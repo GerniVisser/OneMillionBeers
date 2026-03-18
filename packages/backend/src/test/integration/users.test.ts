@@ -23,14 +23,14 @@ beforeEach(async () => {
   await clearTables(pool)
 })
 
-async function seedBeerLog(phone = '+15551234567', ts = '2024-06-01T12:00:00.000Z') {
+async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000Z') {
   return app.inject({
     method: 'POST',
     url: '/v1/internal/beer-log',
     payload: {
-      whatsappGroupId: 'group-wa-1',
+      sourceGroupId: 'group-tg-1',
       groupName: 'Test Group',
-      senderPhone: phone,
+      senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
     },
@@ -51,7 +51,7 @@ describe('GET /v1/users/:userId', () => {
     expect(res.statusCode).toBe(404)
   })
 
-  it('returns user profile without phoneHash', async () => {
+  it('returns user profile without identityHash', async () => {
     await seedBeerLog()
     const userId = await getUserId()
 
@@ -59,7 +59,7 @@ describe('GET /v1/users/:userId', () => {
     expect(res.statusCode).toBe(200)
 
     const body = res.json()
-    expect(body.phoneHash).toBeUndefined()
+    expect(body.identityHash).toBeUndefined()
 
     const parsed = UserProfileResponseSchema.safeParse(body)
     expect(parsed.success).toBe(true)
@@ -76,9 +76,9 @@ describe('GET /v1/users/:userId/stats', () => {
   })
 
   it('returns stats matching UserStatsResponseSchema', async () => {
-    await seedBeerLog('+15551234567', '2024-06-01T12:00:00.000Z')
-    await seedBeerLog('+15551234567', '2024-06-02T12:00:00.000Z')
-    await seedBeerLog('+15551234567', '2024-06-03T12:00:00.000Z')
+    await seedBeerLog('123456789', '2024-06-01T12:00:00.000Z')
+    await seedBeerLog('123456789', '2024-06-02T12:00:00.000Z')
+    await seedBeerLog('123456789', '2024-06-03T12:00:00.000Z')
     const userId = await getUserId()
 
     const res = await app.inject({ method: 'GET', url: `/v1/users/${userId}/stats` })

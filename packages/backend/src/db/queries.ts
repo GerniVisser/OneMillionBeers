@@ -12,23 +12,23 @@ import type {
 
 export async function upsertGroup(
   pool: pg.Pool,
-  whatsappGroupId: string,
+  sourceGroupId: string,
   name: string,
 ): Promise<Group> {
   const slug = toSlug(name)
   const { rows } = await pool.query<Group>(
-    `INSERT INTO groups (whatsapp_group_id, name, slug)
+    `INSERT INTO groups (source_group_id, name, slug)
      VALUES ($1, $2, $3)
-     ON CONFLICT (whatsapp_group_id) DO UPDATE SET name = EXCLUDED.name
-     RETURNING id, whatsapp_group_id AS "whatsappGroupId", name, slug, created_at AS "createdAt"`,
-    [whatsappGroupId, name, slug],
+     ON CONFLICT (source_group_id) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"`,
+    [sourceGroupId, name, slug],
   )
   return rows[0]
 }
 
 export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | null> {
   const { rows } = await pool.query<Group>(
-    `SELECT id, whatsapp_group_id AS "whatsappGroupId", name, slug, created_at AS "createdAt"
+    `SELECT id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"
      FROM groups WHERE id = $1`,
     [id],
   )
@@ -45,28 +45,28 @@ export async function getGroupTotalBeers(pool: pg.Pool, groupId: string): Promis
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-export async function upsertUser(pool: pg.Pool, phoneHash: string): Promise<User> {
-  const slug = `user-${phoneHash.slice(0, 12)}`
+export async function upsertUser(pool: pg.Pool, identityHash: string): Promise<User> {
+  const slug = `user-${identityHash.slice(0, 12)}`
   const { rows } = await pool.query<User>(
-    `INSERT INTO users (phone_hash, slug)
+    `INSERT INTO users (identity_hash, slug)
      VALUES ($1, $2)
-     ON CONFLICT (phone_hash) DO NOTHING
-     RETURNING id, phone_hash AS "phoneHash", display_name AS "displayName", slug, created_at AS "createdAt"`,
-    [phoneHash, slug],
+     ON CONFLICT (identity_hash) DO NOTHING
+     RETURNING id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"`,
+    [identityHash, slug],
   )
   if (rows[0]) return rows[0]
   // Already existed — fetch it
   const { rows: existing } = await pool.query<User>(
-    `SELECT id, phone_hash AS "phoneHash", display_name AS "displayName", slug, created_at AS "createdAt"
-     FROM users WHERE phone_hash = $1`,
-    [phoneHash],
+    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
+     FROM users WHERE identity_hash = $1`,
+    [identityHash],
   )
   return existing[0]
 }
 
 export async function findUserById(pool: pg.Pool, id: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
-    `SELECT id, phone_hash AS "phoneHash", display_name AS "displayName", slug, created_at AS "createdAt"
+    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
      FROM users WHERE id = $1`,
     [id],
   )

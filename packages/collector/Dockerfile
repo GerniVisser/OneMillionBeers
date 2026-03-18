@@ -24,12 +24,11 @@ COPY tsconfig.json ./
 RUN pnpm --filter @omb/shared build
 RUN pnpm --filter @omb/collector build
 
-# Stage 3: Production
+# Stage 4: Production
 FROM node:22-alpine AS prod
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=build /app/packages/collector/dist ./dist
 COPY --from=build /app/packages/collector/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
-EXPOSE 3001
 CMD ["node", "dist/index.js"]

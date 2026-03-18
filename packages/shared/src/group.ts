@@ -3,14 +3,14 @@ import { UuidSchema, IsoDatetimeSchema, SlugSchema } from './primitives.js'
 
 export const GroupSchema = z.object({
   id: UuidSchema,
-  whatsappGroupId: z.string().min(1),
+  sourceGroupId: z.string().min(1),
   name: z.string().min(1).max(512),
   slug: SlugSchema,
   createdAt: IsoDatetimeSchema,
 })
 export type Group = z.infer<typeof GroupSchema>
 
-// Embedded in feed items and leaderboard — excludes whatsappGroupId (internal)
+// Embedded in feed items and leaderboard — excludes sourceGroupId (internal)
 export const GroupSummarySchema = z.object({
   id: UuidSchema,
   name: z.string(),

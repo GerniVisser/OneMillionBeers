@@ -28,14 +28,14 @@ beforeEach(async () => {
   await clearTables(pool)
 })
 
-async function seedBeerLog(phone = '+15551234567', ts = '2024-06-01T12:00:00.000Z') {
+async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000Z') {
   return app.inject({
     method: 'POST',
     url: '/v1/internal/beer-log',
     payload: {
-      whatsappGroupId: 'group-wa-1',
+      sourceGroupId: 'group-tg-1',
       groupName: 'Test Group',
-      senderPhone: phone,
+      senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
     },

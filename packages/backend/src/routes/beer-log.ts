@@ -8,7 +8,7 @@ import {
   getGlobalCount,
   getLatestBeer,
 } from '../db/queries.js'
-import { hashPhone } from '../lib/hash.js'
+import { hashIdentity } from '../lib/hash.js'
 import { broadcast } from '../lib/sse.js'
 
 export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
@@ -18,12 +18,12 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
       return reply.status(400).send({ error: 'Invalid request', issues: parse.error.issues })
     }
 
-    const { whatsappGroupId, groupName, senderPhone, timestamp, photoUrl } = parse.data
+    const { sourceGroupId, groupName, senderId, timestamp, photoUrl } = parse.data
 
-    const phoneHash = hashPhone(senderPhone)
+    const identityHash = hashIdentity(senderId)
     const [group, user] = await Promise.all([
-      upsertGroup(pool, whatsappGroupId, groupName),
-      upsertUser(pool, phoneHash),
+      upsertGroup(pool, sourceGroupId, groupName),
+      upsertUser(pool, identityHash),
     ])
 
     await insertBeerLog(pool, user.id, group.id, photoUrl, timestamp)
