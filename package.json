@@ -13,6 +13,7 @@
     "dev": "pnpm run build:shared && concurrently --names \"shared,backend,frontend,collector\" --prefix-colors \"cyan,yellow,magenta,blue\" --kill-others-on-fail \"pnpm --filter @omb/shared dev\" \"dotenv -e .env.local -- pnpm --filter @omb/backend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/frontend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/collector dev\"",
     "infra:up": "docker compose -f docker-compose.local.yml up -d",
     "infra:down": "docker compose -f docker-compose.local.yml down",
+    "db:seed": "dotenv -e .env.local -- tsx db/seeds/seed.ts",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
@@ -21,17 +22,22 @@
     "prepare": "simple-git-hooks"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.3.0",
+    "@types/pg": "^8.18.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "concurrently": "^9.0.0",
+    "dotenv": "^17.3.1",
+    "dotenv-cli": "^7.0.0",
     "eslint": "^9.0.0",
     "eslint-plugin-svelte": "^2.46.0",
     "lint-staged": "^15.0.0",
+    "pg": "^8.20.0",
     "prettier": "^3.0.0",
     "prettier-plugin-svelte": "^3.0.0",
-    "concurrently": "^9.0.0",
-    "dotenv-cli": "^7.0.0",
     "simple-git-hooks": "^2.11.0",
     "svelte-eslint-parser": "^0.43.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.0.0"
   },
   "simple-git-hooks": {

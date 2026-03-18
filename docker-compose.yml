@@ -28,6 +28,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
     restart: unless-stopped
 
   collector:

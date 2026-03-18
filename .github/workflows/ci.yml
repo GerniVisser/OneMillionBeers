@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared
+        run: pnpm --filter @omb/shared build
+
       - name: Type check
         run: pnpm -r typecheck
 
