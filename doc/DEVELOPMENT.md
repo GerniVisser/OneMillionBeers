@@ -76,6 +76,30 @@ Vitest is the test runner for all packages. Each package has its own `vitest.con
 
 ---
 
+## Branching strategy
+
+The project uses trunk-based development. This suits a small team: it keeps the feedback loop short, eliminates long-lived merge conflicts, and ensures `main` is always in a releasable state.
+
+**The rule:** `main` is production. A commit on `main` is a commitment to ship it.
+
+### Branch naming
+
+| Prefix   | Use for                                   |
+| -------- | ----------------------------------------- |
+| `feat/`  | New functionality                         |
+| `fix/`   | Bug fixes                                 |
+| `chore/` | Tooling, config, dependency updates, docs |
+
+Examples: `feat/beer-count-endpoint`, `fix/s3-upload-retry`, `chore/update-vitest`.
+
+### Deployment trigger
+
+Every merge to `main` triggers a production deploy automatically:
+
+There is no manual deploy step. Keeping `main` green is the team's highest-priority shared obligation.
+
+---
+
 ## CI/CD contract
 
 - CI (`ci.yml`) runs on every push and pull request: typecheck → lint → format check → full test suite (including Testcontainers integration tests)
