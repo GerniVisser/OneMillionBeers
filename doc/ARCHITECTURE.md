@@ -1,5 +1,7 @@
 # OneMillionBeers — Architecture
 
+Last updated: 2026-03-18
+
 ## System overview
 
 ```
@@ -71,6 +73,8 @@ All endpoints are prefixed `/v1/`. Breaking changes introduce `/v2/` without rem
 
 Full endpoint shapes are defined in `packages/shared/src/` (Zod schemas). The schema is the contract — this document does not duplicate it.
 
+A `/health` endpoint is registered at the root (no version prefix) and returns `{ status: "ok" }`. It is used by infrastructure health checks and is not part of the versioned API contract.
+
 ---
 
 ## Architectural decisions
@@ -101,6 +105,12 @@ Baileys is an unofficial WhatsApp Web client connecting outbound over a persiste
 
 **Risk:** Baileys reverse-engineers the WhatsApp Web protocol and is not officially supported by Meta. Accounts using it risk being banned. This is accepted for V1. To be reviewed if the project reaches a scale where the official Meta Cloud API becomes viable.
 
+### Swagger UI — development only
+
+`@fastify/swagger` and `@fastify/swagger-ui` are registered at startup when `NODE_ENV !== 'production'`. In non-production environments the interactive API explorer is available at `/docs` (proxied directly via the dev nginx `location /docs/` block — no `/api/` prefix is needed because Swagger's static assets use absolute paths). The prod nginx config does not expose `/docs/`, and `NODE_ENV=production` must be set in the backend container to prevent the routes from being registered at all.
+
+`@fastify/swagger` generates an OpenAPI spec from Zod schemas via `fastify-type-provider-zod`. Schemas in `@omb/shared` remain the single source of truth — the spec is derived, not hand-authored.
+
 ### Test-driven development (backend)
 
 A route in `@omb/backend` is not considered done until: its Zod schema exists in `@omb/shared`, unit tests cover the business logic, and an integration test validates the full request/response cycle — happy path and error cases — against a real database via Testcontainers. The database is never mocked; mock/prod divergence has caused production failures before.
@@ -127,25 +137,26 @@ Users are auto-created on their first beer log — no signup required. Every par
 
 Treat these as decided unless there is a compelling reason to revisit:
 
-| Concern            | Decision                                    |
-| ------------------ | ------------------------------------------- |
-| Runtime            | Node.js LTS (version in `.nvmrc`)           |
-| Language           | TypeScript                                  |
-| API framework      | Fastify                                     |
-| Package manager    | pnpm workspaces                             |
-| Database           | PostgreSQL — plain SQL, no ORM, `pg` driver |
-| Validation         | Zod (schemas in `@omb/shared`)              |
-| Logging            | Pino (structured JSON to stdout)            |
-| HTTP client        | Native fetch (Node 18+)                     |
-| Testing            | Vitest + Testcontainers                     |
-| WhatsApp client    | Baileys                                     |
-| Object storage     | S3-compatible (MinIO local, AWS S3 prod)    |
-| Frontend framework | SvelteKit + `@sveltejs/adapter-node`        |
-| Styling            | Tailwind CSS v4                             |
-| Charts             | Chart.js via `svelte-chartjs`               |
-| Reverse proxy      | Nginx                                       |
-| SSL                | Let's Encrypt + Certbot sidecar             |
-| CI/CD              | GitHub Actions                              |
-| Container registry | GitHub Container Registry                   |
-| IaC                | Terraform (AWS target)                      |
-| Real-time          | Server-Sent Events                          |
+| Concern            | Decision                                                                     |
+| ------------------ | ---------------------------------------------------------------------------- |
+| Runtime            | Node.js LTS (version in `.nvmrc`)                                            |
+| Language           | TypeScript                                                                   |
+| API framework      | Fastify                                                                      |
+| Package manager    | pnpm workspaces                                                              |
+| Database           | PostgreSQL — plain SQL, no ORM, `pg` driver                                  |
+| Validation         | Zod (schemas in `@omb/shared`)                                               |
+| API docs (dev)     | @fastify/swagger + @fastify/swagger-ui (env-gated; not active in production) |
+| Logging            | Pino (structured JSON to stdout)                                             |
+| HTTP client        | Native fetch (Node 18+)                                                      |
+| Testing            | Vitest + Testcontainers (@testcontainers/postgresql)                         |
+| WhatsApp client    | Baileys                                                                      |
+| Object storage     | S3-compatible (MinIO local, AWS S3 prod)                                     |
+| Frontend framework | SvelteKit + `@sveltejs/adapter-node`                                         |
+| Styling            | Tailwind CSS v4                                                              |
+| Charts             | Chart.js via `svelte-chartjs`                                                |
+| Reverse proxy      | Nginx                                                                        |
+| SSL                | Let's Encrypt + Certbot sidecar                                              |
+| CI/CD              | GitHub Actions                                                               |
+| Container registry | GitHub Container Registry                                                    |
+| IaC                | Terraform (AWS target)                                                       |
+| Real-time          | Server-Sent Events                                                           |

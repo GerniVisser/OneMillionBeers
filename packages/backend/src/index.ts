@@ -1,13 +1,8 @@
-import Fastify from 'fastify'
-import cors from '@fastify/cors'
+import { config } from './config.js'
+import { getPool } from './db/client.js'
+import { buildApp } from './app.js'
 
-const app = Fastify({ logger: true })
+const pool = getPool(config.DATABASE_URL)
+const app = await buildApp(pool, config.LOG_LEVEL)
 
-await app.register(cors)
-
-app.get('/health', async () => {
-  return { status: 'ok' }
-})
-
-const port = Number(process.env.PORT) || 3000
-await app.listen({ port, host: '0.0.0.0' })
+await app.listen({ port: config.PORT, host: '0.0.0.0' })
