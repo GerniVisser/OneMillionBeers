@@ -7,7 +7,7 @@ export const userRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { p
     const { userId } = request.params as { userId: string }
     const user = await findUserById(pool, userId)
     if (!user) return reply.status(404).send({ error: 'User not found' })
-    // phoneHash never exposed publicly
+    // identityHash never exposed publicly
     return reply.send({
       id: user.id,
       displayName: user.displayName,

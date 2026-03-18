@@ -1,18 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { hashPhone } from '../../lib/hash.js'
+import { hashIdentity } from '../../lib/hash.js'
 
-describe('hashPhone', () => {
+describe('hashIdentity', () => {
   it('returns a 64-char hex string', () => {
-    const result = hashPhone('+15551234567')
+    const result = hashIdentity('123456789')
     expect(result).toHaveLength(64)
     expect(result).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('is deterministic', () => {
-    expect(hashPhone('+15551234567')).toBe(hashPhone('+15551234567'))
+    expect(hashIdentity('123456789')).toBe(hashIdentity('123456789'))
   })
 
   it('produces different hashes for different inputs', () => {
-    expect(hashPhone('+15551234567')).not.toBe(hashPhone('+15557654321'))
+    expect(hashIdentity('123456789')).not.toBe(hashIdentity('987654321'))
   })
 })

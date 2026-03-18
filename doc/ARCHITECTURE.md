@@ -5,12 +5,12 @@ Last updated: 2026-03-18
 ## System overview
 
 ```
-WhatsApp ──(outbound WebSocket)──> [ Collector Service ] ──> S3-compatible
-                                            │                    object storage
-                                      HTTP POST                  (beer photos)
-                                      (metadata + photoUrl)
-                                            │
-                                            ▼
+Messaging platform ──> [ Collector Service ] ──> S3-compatible
+ (e.g. Telegram,                │                   object storage
+   WhatsApp)              HTTP POST                  (beer photos)
+                          (metadata + photoUrl)
+                                │
+                                ▼
 Browser ──(HTTPS)──> [ nginx ] ──/api/──> [ Backend API Service ]
                          │                          │
                          └────/──> [ SvelteKit      ▼
@@ -22,12 +22,12 @@ Browser ──(HTTPS)──> [ nginx ] ──/api/──> [ Backend API Service 
 
 ## Service responsibilities
 
-| Service             | Owns                                                                             | Does NOT own                                            |
-| ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Collectors**      | WhatsApp connection, photo upload to storage, forwarding metadata to Backend API | Business logic, database, any data beyond what it sends |
-| **Backend API**     | All business logic, database reads/writes, REST API, SSE stream                  | Image data — photos arrive as a URL only                |
-| **Frontend**        | Display layer, SSR rendering, real-time UI updates                               | Business logic — all data comes from the API            |
-| **Gateway (nginx)** | SSL termination, routing `/api/*` to backend, `/` to frontend                    | Any application logic                                   |
+| Service             | Owns                                                                                                       | Does NOT own                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Collectors**      | Platform connection (e.g. Telegram, WhatsApp), photo upload to storage, forwarding metadata to Backend API | Business logic, database, any data beyond what it sends |
+| **Backend API**     | All business logic, database reads/writes, REST API, SSE stream                                            | Image data — photos arrive as a URL only                |
+| **Frontend**        | Display layer, SSR rendering, real-time UI updates                                                         | Business logic — all data comes from the API            |
+| **Gateway (nginx)** | SSL termination, routing `/api/*` to backend, `/` to frontend                                              | Any application logic                                   |
 
 The Collector is not exposed via nginx — it has no public interface.
 
@@ -35,13 +35,13 @@ The Collector is not exposed via nginx — it has no public interface.
 
 ## Data flow: message ingestion
 
-1. Baileys receives a WhatsApp group message containing a photo
+1. Collector receives a group message containing a photo from the messaging platform
 2. Collector ignores non-group messages, messages without photos
 3. Collector uploads the image buffer directly to S3-compatible storage, receives a public URL
-4. Collector POSTs metadata (WhatsApp group ID, sender phone number, timestamp, photo URL) to `POST /v1/internal/beer-log` on the Backend API — no image data in this call
+4. Collector POSTs metadata (platform group ID, sender identity, timestamp, photo URL) to `POST /v1/internal/beer-log` on the Backend API — no image data in this call
 5. Backend API validates the request (Zod)
-6. Backend API hashes the sender's phone number (SHA-256) and looks up or creates a User record
-7. Backend API looks up or creates a Group record by WhatsApp group ID
+6. Backend API hashes the sender identity (SHA-256) and looks up or creates a User record
+7. Backend API looks up or creates a Group record by platform group ID
 8. Backend API inserts a BeerLog row (including the photo URL from step 4)
 9. Backend API broadcasts the updated count to all connected SSE clients
 10. Backend API returns 201
@@ -52,9 +52,9 @@ The Collector is not exposed via nginx — it has no public interface.
 
 Three entities. See `db/migrations/` for schemas.
 
-**Group** — a WhatsApp group connected to the platform. Has a slug used in public URLs (`/groups/[slug]`). Identified internally by the WhatsApp group ID.
+**Group** — a messaging group connected to the platform. Has a slug used in public URLs (`/groups/[slug]`). Identified internally by the platform-specific group ID (`source_group_id`).
 
-**User** — a participant who has logged at least one beer. Identified by a SHA-256 hash of their phone number — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on first beer log — no signup.
+**User** — a participant who has logged at least one beer. Identified by a SHA-256 hash of their platform identity (e.g. phone number, Telegram user ID) — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on first beer log — no signup.
 
 **BeerLog** — a single beer photo. Belongs to one User and one Group. Stores the public photo URL and two timestamps: when the WhatsApp message was sent, and when the record was inserted.
 
@@ -87,9 +87,9 @@ The real-time stream is unidirectional — the server pushes count and feed upda
 
 All storage calls use the S3 API. The provider is determined entirely by environment variables (see `.env.example`). Swapping AWS S3 for Cloudflare R2 or MinIO is a config change, not a code change. No provider-specific SDK in application code.
 
-### Phone number hashing
+### Identity hashing
 
-Phone numbers are hashed with SHA-256 at the point of ingestion in the Backend API. Plaintext is never written to the database, never logged, and the Collector discards it after forwarding. There is no mechanism to reverse a stored hash to a phone number.
+The sender's platform identity (phone number, numeric user ID, or similar) is hashed with SHA-256 at the point of ingestion in the Backend API. Plaintext is never written to the database, never logged, and the Collector discards it after forwarding. There is no mechanism to reverse a stored hash. The hash is platform-agnostic — the Backend API never knows or cares which messaging platform sent the identity string.
 
 ### Schema-first contract
 
@@ -99,11 +99,11 @@ Zod schemas in `@omb/shared` are defined before routes are built. Both services 
 
 The Backend API has no S3 credentials and no image handling code. The Collector uploads directly to storage and passes only the resulting URL. This keeps the API stateless with respect to file data and eliminates a class of upload failure modes from the API path.
 
-### Baileys for WhatsApp
+### Collector design
 
-Baileys is an unofficial WhatsApp Web client connecting outbound over a persistent WebSocket. It requires no inbound webhook, no public URL, and no tunnelling for local development.
+The Collector is a pluggable component — the messaging platform is a runtime detail, not a structural constraint. The shared pipeline (S3 upload → Backend API POST) is platform-independent. Only the `collectors/<platform>/` directory is platform-specific.
 
-**Risk:** Baileys reverse-engineers the WhatsApp Web protocol and is not officially supported by Meta. Accounts using it risk being banned. This is accepted for V1. To be reviewed if the project reaches a scale where the official Meta Cloud API becomes viable.
+**Collector selection** is done at startup via the `COLLECTOR` environment variable. Each collector is responsible for connecting to its platform, filtering relevant messages, and calling the shared upload and forwarder modules.
 
 ### Swagger UI — development only
 
@@ -129,7 +129,7 @@ SQL is written directly using `pg` (node-postgres). Queries are transparent, deb
 
 All data is public. There is no login, no sessions, and no authenticated endpoints in V1.
 
-Users are auto-created on their first beer log — no signup required. Every participant in a connected WhatsApp group gets a profile the moment they post a photo. User records can be deleted via the API.
+Users are auto-created on their first beer log — no signup required. Every participant in a connected group gets a profile the moment they post a photo. User records can be deleted via the API.
 
 ---
 
@@ -149,7 +149,7 @@ Treat these as decided unless there is a compelling reason to revisit:
 | Logging            | Pino (structured JSON to stdout)                                             |
 | HTTP client        | Native fetch (Node 18+)                                                      |
 | Testing            | Vitest + Testcontainers (@testcontainers/postgresql)                         |
-| WhatsApp client    | Baileys                                                                      |
+| Collector (PoC)    | Telegram Bot API via grammY (WhatsApp/Baileys planned)                       |
 | Object storage     | S3-compatible (MinIO local, AWS S3 prod)                                     |
 | Frontend framework | SvelteKit + `@sveltejs/adapter-node`                                         |
 | Styling            | Tailwind CSS v4                                                              |

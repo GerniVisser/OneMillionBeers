@@ -1,0 +1,23 @@
+import { z } from 'zod'
+
+const ConfigSchema = z.object({
+  COLLECTOR: z.enum(['telegram']).default('telegram'),
+  BACKEND_URL: z.string().url(),
+  STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_BUCKET: z.string().min(1),
+  STORAGE_KEY: z.string().min(1),
+  STORAGE_SECRET: z.string().min(1),
+  STORAGE_REGION: z.string().min(1).default('auto'),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+})
+
+const result = ConfigSchema.safeParse(process.env)
+if (!result.success) {
+  console.error('Invalid environment variables:')
+  for (const issue of result.error.issues) {
+    console.error(`  ${issue.path.join('.')}: ${issue.message}`)
+  }
+  process.exit(1)
+}
+
+export const config = result.data

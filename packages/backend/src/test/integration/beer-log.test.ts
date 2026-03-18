@@ -23,9 +23,9 @@ beforeEach(async () => {
 })
 
 const validPayload = {
-  whatsappGroupId: 'group-wa-1',
+  sourceGroupId: 'group-tg-1',
   groupName: 'Test Group',
-  senderPhone: '+15551234567',
+  senderId: '123456789',
   timestamp: '2024-06-01T12:00:00.000Z',
   photoUrl: 'https://example.com/beer.jpg',
 }
@@ -54,18 +54,18 @@ describe('POST /v1/internal/beer-log', () => {
     expect(logs).toHaveLength(2)
   })
 
-  it('hashes the phone number — never stores plaintext', async () => {
+  it('hashes the sender identity — never stores plaintext', async () => {
     await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
-    const { rows } = await pool.query('SELECT phone_hash FROM users')
-    expect(rows[0].phone_hash).not.toBe(validPayload.senderPhone)
-    expect(rows[0].phone_hash).toMatch(/^[0-9a-f]{64}$/)
+    const { rows } = await pool.query('SELECT identity_hash FROM users')
+    expect(rows[0].identity_hash).not.toBe(validPayload.senderId)
+    expect(rows[0].identity_hash).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('returns 400 on invalid body', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
-      payload: { whatsappGroupId: 'x' },
+      payload: { sourceGroupId: 'x' },
     })
     expect(res.statusCode).toBe(400)
   })

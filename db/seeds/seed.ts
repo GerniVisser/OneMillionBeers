@@ -29,8 +29,8 @@ function toSlug(text: string): string {
     .slice(0, 128)
 }
 
-function phoneHash(phone: string): string {
-  return createHash('sha256').update(phone).digest('hex')
+function identityHash(id: string): string {
+  return createHash('sha256').update(id).digest('hex')
 }
 
 function randomPastDate(daysBack = 180): Date {
@@ -56,12 +56,12 @@ async function seedGroups(client: pg.PoolClient) {
 
     const id = randomUUID()
     const slug = toSlug(name)
-    const whatsappGroupId = `${faker.string.numeric(15)}@g.us`
+    const sourceGroupId = `tg-${faker.string.numeric(10)}`
 
     await client.query(
-      `INSERT INTO groups (id, whatsapp_group_id, name, slug, created_at)
+      `INSERT INTO groups (id, source_group_id, name, slug, created_at)
        VALUES ($1, $2, $3, $4, $5)`,
-      [id, whatsappGroupId, name, slug, randomPastDate(365)],
+      [id, sourceGroupId, name, slug, randomPastDate(365)],
     )
     groups.push({ id, slug })
     console.log(`  group: ${name} (${slug})`)
@@ -75,13 +75,13 @@ async function seedUsers(client: pg.PoolClient) {
 
   for (let i = 0; i < NUM_USERS; i++) {
     const id = randomUUID()
-    const phone = faker.phone.number({ style: 'international' })
-    const hash = phoneHash(phone)
+    const telegramId = faker.string.numeric(10)
+    const hash = identityHash(telegramId)
     const displayName = Math.random() > 0.15 ? faker.person.firstName() : null
     const slug = `user-${id.slice(0, 8)}`
 
     await client.query(
-      `INSERT INTO users (id, phone_hash, display_name, slug, created_at)
+      `INSERT INTO users (id, identity_hash, display_name, slug, created_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [id, hash, displayName, slug, randomPastDate(365)],
     )

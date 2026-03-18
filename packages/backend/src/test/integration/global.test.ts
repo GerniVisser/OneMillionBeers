@@ -28,14 +28,14 @@ beforeEach(async () => {
   await clearTables(pool)
 })
 
-async function seedBeerLog(phone = '+15551234567', ts = '2024-06-01T12:00:00.000Z') {
+async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000Z') {
   return app.inject({
     method: 'POST',
     url: '/v1/internal/beer-log',
     payload: {
-      whatsappGroupId: 'group-wa-1',
+      sourceGroupId: 'group-tg-1',
       groupName: 'Test Group',
-      senderPhone: phone,
+      senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
     },
@@ -63,8 +63,8 @@ describe('GET /v1/global/count', () => {
 
 describe('GET /v1/global/feed', () => {
   it('returns paginated feed', async () => {
-    await seedBeerLog('+15551111111', '2024-06-01T10:00:00.000Z')
-    await seedBeerLog('+15552222222', '2024-06-01T11:00:00.000Z')
+    await seedBeerLog('111111111', '2024-06-01T10:00:00.000Z')
+    await seedBeerLog('222222222', '2024-06-01T11:00:00.000Z')
 
     const res = await app.inject({ method: 'GET', url: '/v1/global/feed?limit=10&offset=0' })
     expect(res.statusCode).toBe(200)
@@ -78,7 +78,7 @@ describe('GET /v1/global/feed', () => {
 
   it('respects limit and offset', async () => {
     for (let i = 0; i < 5; i++) {
-      await seedBeerLog(`+155500000${i}0`, `2024-06-0${i + 1}T12:00:00.000Z`)
+      await seedBeerLog(`user${i}`, `2024-06-0${i + 1}T12:00:00.000Z`)
     }
     const res = await app.inject({ method: 'GET', url: '/v1/global/feed?limit=2&offset=1' })
     const body = res.json()
@@ -90,9 +90,9 @@ describe('GET /v1/global/feed', () => {
 
 describe('GET /v1/global/leaderboard', () => {
   it('returns leaderboard matching LeaderboardResponseSchema', async () => {
-    await seedBeerLog('+15551111111', '2024-06-01T10:00:00.000Z')
-    await seedBeerLog('+15551111111', '2024-06-01T11:00:00.000Z')
-    await seedBeerLog('+15552222222', '2024-06-01T12:00:00.000Z')
+    await seedBeerLog('111111111', '2024-06-01T10:00:00.000Z')
+    await seedBeerLog('111111111', '2024-06-01T11:00:00.000Z')
+    await seedBeerLog('222222222', '2024-06-01T12:00:00.000Z')
 
     const res = await app.inject({ method: 'GET', url: '/v1/global/leaderboard' })
     expect(res.statusCode).toBe(200)
@@ -125,9 +125,9 @@ describe('GET /v1/global/stream', () => {
       method: 'POST',
       url: '/v1/internal/beer-log',
       payload: {
-        whatsappGroupId: 'group-wa-sse',
+        sourceGroupId: 'group-tg-sse',
         groupName: 'SSE Group',
-        senderPhone: '+15553333333',
+        senderId: '333333333',
         timestamp: '2024-06-01T12:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
       },
