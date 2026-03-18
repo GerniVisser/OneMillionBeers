@@ -23,7 +23,6 @@ const validPayload: BeerLogRequest = {
 }
 
 describe('forwardBeerLog', () => {
-   
   let fetchSpy: ReturnType<typeof vi.fn> & { mockRestore: () => void }
 
   beforeEach(() => {
