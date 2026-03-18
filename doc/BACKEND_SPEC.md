@@ -106,7 +106,7 @@ Responsibilities:
 
 The application connects to PostgreSQL via a standard `DATABASE_URL` connection string. The host depends on the environment:
 
-- **Local development:** PostgreSQL runs as a Docker container (see `docker-compose.dev.yml`). Data is persisted to a named Docker volume.
+- **Local development:** PostgreSQL runs as a Docker container. `docker-compose.dev.yml` runs it as part of the full stack; `docker-compose.local.yml` runs it standalone so the backend can connect directly from the host.
 - **Production (V1):** AWS RDS for PostgreSQL. Data persists independently of the EC2 instance or any container lifecycle. Automated backups and point-in-time recovery are managed by RDS.
 
 No application code is aware of which environment it targets — the connection string is the only difference.
@@ -160,6 +160,14 @@ onemillionbeers/
 │   │   ├── src/
 │   │   ├── Dockerfile
 │   │   └── package.json
+│   ├── frontend/             # SvelteKit SSR web dashboard
+│   │   ├── src/
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   ├── gateway/              # nginx reverse proxy (not a JS package)
+│   │   ├── Dockerfile
+│   │   ├── nginx.conf        # production (HTTPS, Let's Encrypt)
+│   │   └── nginx.dev.conf    # development (HTTP only)
 │   └── shared/               # Shared TypeScript types and Zod schemas
 │       └── package.json      # Published internally as @omb/shared
 ├── db/
@@ -168,15 +176,15 @@ onemillionbeers/
 │       ├── 002_create_users.sql
 │       └── 003_create_beer_logs.sql
 ├── infra/                    # Terraform
-├── nginx/
-│   └── nginx.conf
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml
 │       └── deploy.yml
 ├── docker-compose.yml        # Production
-├── docker-compose.dev.yml    # Local development
-├── .env.example              # Documents all required environment variables
+├── docker-compose.dev.yml    # Local development (full Docker stack)
+├── docker-compose.local.yml  # Local development (infra only; services run on host)
+├── .env.example              # Env vars for Docker/production
+├── .env.local.example        # Env vars for local dev (copy to .env.local)
 ├── .nvmrc                    # Node.js version
 └── package.json              # pnpm workspace root
 ```
@@ -577,68 +585,25 @@ When a beer log is received, the Collector provides the sender's phone number. T
 
 ## 12. Local Development
 
-No cloud services required. The full stack runs locally via Docker Compose.
+No cloud services required. Two modes are available — see `doc/TOOLING.md` section 4 for full details.
 
-```yaml
-# docker-compose.dev.yml
-services:
-  nginx:
-    image: nginx:alpine
-    ports: ['80:80']
-    volumes:
-      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+**Hybrid local dev (recommended):** postgres and minio run in Docker; backend and frontend run on the host with native hot reload.
 
-  backend:
-    build: ./packages/backend
-    command: pnpm dev
-    expose: ['3000']
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
-      LOG_LEVEL: debug
-    volumes:
-      - ./packages/backend/src:/app/src # hot reload
-    depends_on: [postgres]
-
-  collector:
-    build: ./packages/collector
-    command: pnpm dev
-    environment:
-      BACKEND_URL: http://backend:3000
-      STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_BUCKET: omb-photos
-      STORAGE_KEY: minioadmin
-      STORAGE_SECRET: minioadmin
-      LOG_LEVEL: debug
-    volumes:
-      - ./packages/collector/src:/app/src
-      - baileys-session:/app/session # persist WhatsApp session
-    depends_on: [backend, minio]
-
-  postgres:
-    image: postgres:16-alpine
-    expose: ['5432']
-    environment:
-      POSTGRES_DB: omb
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-
-  minio:
-    image: minio/minio
-    ports: ['9000:9000', '9001:9001'] # 9001 is the MinIO web console
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-
-volumes:
-  postgres-data:
-  baileys-session:
+```bash
+cp .env.local.example .env.local   # first time only
+pnpm infra:up                       # start postgres + minio in Docker
+pnpm dev                            # start backend + frontend + shared watcher locally
 ```
 
-Start everything: `docker compose -f docker-compose.dev.yml up`
+App available at `http://localhost:3001`. The Vite dev server proxies `/api/*` to the backend at `localhost:3000`, mirroring what nginx does in production. Baileys connects directly outbound to WhatsApp — no tunnelling or ngrok needed.
 
-Baileys connects directly outbound to WhatsApp — no tunnelling or ngrok needed.
+**Full Docker stack:** all services in Docker, exact production topology (nginx, backend, collector, frontend, postgres, minio).
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+App available at `http://localhost` (port 80 via the gateway).
 
 ---
 
@@ -664,11 +629,11 @@ Github Container Registry   (external — Docker image registry)
 On push to `main`, GitHub Actions:
 
 1. Runs full CI suite (type check, lint, format, tests)
-2. Builds Docker images for `backend`, `collector`, and `frontend`
+2. Builds Docker images for `backend`, `collector`, `frontend`, and `gateway`
 3. Pushes images to Github Container Registry tagged with git SHA
 4. SSHs into EC2
 5. Pulls new images from Github Container Registry
-6. Restarts containers: `docker compose up -d --no-deps backend collector frontend`
+6. Restarts containers: `docker compose up -d --no-deps backend collector frontend nginx`
 7. Hits health check endpoints to confirm successful start (`/api/health` and `/health`)
 
 ## 14. Future Considerations

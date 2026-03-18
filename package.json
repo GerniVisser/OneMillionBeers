@@ -9,7 +9,11 @@
   ],
   "scripts": {
     "build": "pnpm -r build",
-    "dev": "pnpm -r --parallel dev",
+    "build:shared": "pnpm --filter @omb/shared build",
+    "dev": "pnpm run build:shared && concurrently --names \"shared,backend,frontend\" --prefix-colors \"cyan,yellow,magenta\" --kill-others-on-fail \"pnpm --filter @omb/shared dev\" \"dotenv -e .env.local -- pnpm --filter @omb/backend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/frontend dev\"",
+    "infra:up": "docker compose -f docker-compose.local.yml up -d",
+    "infra:up:collector": "docker compose -f docker-compose.local.yml --profile collector up -d",
+    "infra:down": "docker compose -f docker-compose.local.yml down",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
@@ -25,6 +29,8 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.0.0",
     "prettier-plugin-svelte": "^3.0.0",
+    "concurrently": "^9.0.0",
+    "dotenv-cli": "^7.0.0",
     "simple-git-hooks": "^2.11.0",
     "svelte-eslint-parser": "^0.43.0",
     "typescript": "^5.0.0"
