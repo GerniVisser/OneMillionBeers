@@ -251,9 +251,7 @@ export async function getUserStats(
 
 // ─── Latest beer for SSE ───────────────────────────────────────────────────────
 
-export async function getLatestBeer(
-  pool: pg.Pool,
-): Promise<{
+export async function getLatestBeer(pool: pg.Pool): Promise<{
   id: string
   photoUrl: string
   loggedAt: string
