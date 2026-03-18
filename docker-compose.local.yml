@@ -19,27 +19,5 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
 
-  collector:
-    profiles:
-      - collector
-    build:
-      context: .
-      dockerfile: packages/collector/Dockerfile
-      target: dev
-    environment:
-      BACKEND_URL: http://host.docker.internal:3000
-      STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_BUCKET: omb-photos
-      STORAGE_KEY: minioadmin
-      STORAGE_SECRET: minioadmin
-      LOG_LEVEL: debug
-    volumes:
-      - baileys-session:/app/session
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    depends_on:
-      - minio
-
 volumes:
   postgres-data:
-  baileys-session:
