@@ -1,5 +1,6 @@
 import { Bot, type Context } from 'grammy'
 import { hydrateFiles, type FileFlavor } from '@grammyjs/files'
+import { autoRetry } from '@grammyjs/auto-retry'
 import { pino } from 'pino'
 import { telegramConfig } from './config.js'
 import { uploadPhoto } from '../../uploader.js'
@@ -12,6 +13,9 @@ const logger = pino({ name: 'telegram', level: config.LOG_LEVEL })
 
 export function createTelegramBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(telegramConfig.TELEGRAM_BOT_TOKEN)
+
+  // Retry Telegram API calls (getFile, etc.) on transient network errors with exponential backoff
+  bot.api.config.use(autoRetry({ maxRetryAttempts: 5, maxDelaySeconds: 60 }))
 
   // Use grammY's own HTTP client for file downloads (avoids opening new TCP connections)
   bot.api.config.use(hydrateFiles(telegramConfig.TELEGRAM_BOT_TOKEN))
@@ -34,19 +38,37 @@ export function createTelegramBot(): Bot<MyContext> {
     const photo = ctx.message.photo.at(-1)!
     const key = `photos/${ctx.chat.id}/${photo.file_unique_id}.jpg`
 
-    // Step 1: Download via grammY's async iterator (yields raw bytes; download() returns a path string)
-    let buffer: Buffer
-    try {
-      const file = await ctx.getFile()
-      const chunks: Uint8Array[] = []
-      for await (const chunk of file) {
-        chunks.push(chunk)
+    // Step 1: Download via grammY's async iterator with retry (ETIMEDOUT is common on Telegram CDN)
+    let buffer: Buffer | undefined
+    const maxAttempts = 3
+    let lastErr: unknown
+    let downloaded = false
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const file = await ctx.getFile()
+        const chunks: Uint8Array[] = []
+        for await (const chunk of file) {
+          chunks.push(chunk)
+        }
+        buffer = Buffer.concat(chunks)
+        downloaded = true
+        break
+      } catch (err) {
+        lastErr = err
+        if (attempt < maxAttempts) {
+          const delay = 1000 * 2 ** (attempt - 1) // 1s, 2s
+          logger.warn(
+            { err, sourceGroupId, fileUniqueId: photo.file_unique_id, attempt, delay },
+            'Download attempt failed — retrying',
+          )
+          await new Promise((r) => setTimeout(r, delay))
+        }
       }
-      buffer = Buffer.concat(chunks)
-    } catch (err) {
+    }
+    if (!downloaded) {
       logger.error(
-        { err, sourceGroupId, fileUniqueId: photo.file_unique_id },
-        'Failed to download photo',
+        { err: lastErr, sourceGroupId, fileUniqueId: photo.file_unique_id },
+        'Failed to download photo after retries',
       )
       return
     }
@@ -54,7 +76,7 @@ export function createTelegramBot(): Bot<MyContext> {
     // Step 2: Upload to S3-compatible storage
     let photoUrl: string
     try {
-      photoUrl = await uploadPhoto(key, buffer)
+      photoUrl = await uploadPhoto(key, buffer!)
     } catch (err) {
       logger.error({ err, key }, 'Failed to upload photo to S3 — discarding')
       return
