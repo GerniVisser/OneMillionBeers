@@ -31,10 +31,12 @@ services:
     environment:
       BACKEND_URL: http://backend:3000
       STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_URL: http://localhost:9000
       STORAGE_BUCKET: omb-photos
       STORAGE_KEY: minioadmin
       STORAGE_SECRET: minioadmin
       LOG_LEVEL: debug
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     volumes:
       - baileys-session:/app/session
     depends_on:
@@ -50,6 +52,7 @@ services:
       - '3001'
     environment:
       PORT: '3001'
+      BACKEND_INTERNAL_URL: http://backend:3000
     depends_on:
       - backend
 

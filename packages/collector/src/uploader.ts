@@ -22,7 +22,7 @@ export async function uploadPhoto(key: string, buffer: Buffer): Promise<string> 
     { abortSignal: AbortSignal.timeout(10_000) },
   )
 
-  // Construct public URL from endpoint + bucket + key
-  const endpoint = config.STORAGE_ENDPOINT.replace(/\/$/, '')
-  return `${endpoint}/${config.STORAGE_BUCKET}/${key}`
+  // Construct public URL from public URL + bucket + key
+  const publicUrl = config.STORAGE_PUBLIC_URL.replace(/\/$/, '')
+  return `${publicUrl}/${config.STORAGE_BUCKET}/${key}`
 }

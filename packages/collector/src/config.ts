@@ -4,6 +4,7 @@ const ConfigSchema = z.object({
   COLLECTOR: z.enum(['telegram']).default('telegram'),
   BACKEND_URL: z.string().url(),
   STORAGE_ENDPOINT: z.string().url(),
+  STORAGE_PUBLIC_URL: z.string().url(),
   STORAGE_BUCKET: z.string().min(1),
   STORAGE_KEY: z.string().min(1),
   STORAGE_SECRET: z.string().min(1),

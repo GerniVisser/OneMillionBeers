@@ -10,6 +10,9 @@ RUN pnpm install --frozen-lockfile
 # Stage 2: Dev
 FROM deps AS dev
 COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/tsconfig.json ./packages/shared/
+COPY tsconfig.json ./
+RUN pnpm --filter @omb/shared build
 COPY packages/collector/src ./packages/collector/src
 WORKDIR /app/packages/collector
 CMD ["pnpm", "dev"]
