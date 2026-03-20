@@ -42,16 +42,16 @@ async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000
   })
 }
 
-async function getGroupId(): Promise<string> {
-  const { rows } = await pool.query('SELECT id FROM groups LIMIT 1')
-  return rows[0].id
+async function getGroupSlug(): Promise<string> {
+  const { rows } = await pool.query('SELECT slug FROM groups LIMIT 1')
+  return rows[0].slug
 }
 
 describe('GET /v1/groups/:groupId', () => {
   it('returns 404 for unknown group', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v1/groups/00000000-0000-0000-0000-000000000000',
+      url: '/v1/groups/no-such-group',
     })
     expect(res.statusCode).toBe(404)
   })
@@ -59,9 +59,9 @@ describe('GET /v1/groups/:groupId', () => {
   it('returns group profile with totalBeers', async () => {
     await seedBeerLog()
     await seedBeerLog()
-    const groupId = await getGroupId()
+    const slug = await getGroupSlug()
 
-    const res = await app.inject({ method: 'GET', url: `/v1/groups/${groupId}` })
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}` })
     expect(res.statusCode).toBe(200)
 
     const parsed = GroupProfileResponseSchema.safeParse(res.json())
@@ -75,11 +75,11 @@ describe('GET /v1/groups/:groupId/feed', () => {
   it('returns paginated feed matching FeedItemSchema', async () => {
     await seedBeerLog('+15551234567', '2024-06-01T10:00:00.000Z')
     await seedBeerLog('+15559999999', '2024-06-01T11:00:00.000Z')
-    const groupId = await getGroupId()
+    const slug = await getGroupSlug()
 
     const res = await app.inject({
       method: 'GET',
-      url: `/v1/groups/${groupId}/feed?limit=10&offset=0`,
+      url: `/v1/groups/${slug}/feed?limit=10&offset=0`,
     })
     expect(res.statusCode).toBe(200)
 
@@ -93,7 +93,7 @@ describe('GET /v1/groups/:groupId/feed', () => {
   it('returns 404 for unknown group', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v1/groups/00000000-0000-0000-0000-000000000000/feed',
+      url: '/v1/groups/no-such-group/feed',
     })
     expect(res.statusCode).toBe(404)
   })
@@ -104,9 +104,9 @@ describe('GET /v1/groups/:groupId/leaderboard', () => {
     await seedBeerLog('+15551234567', '2024-06-01T10:00:00.000Z')
     await seedBeerLog('+15551234567', '2024-06-01T11:00:00.000Z')
     await seedBeerLog('+15559999999', '2024-06-01T12:00:00.000Z')
-    const groupId = await getGroupId()
+    const slug = await getGroupSlug()
 
-    const res = await app.inject({ method: 'GET', url: `/v1/groups/${groupId}/leaderboard` })
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/leaderboard` })
     expect(res.statusCode).toBe(200)
 
     const parsed = LeaderboardResponseSchema.safeParse(res.json())

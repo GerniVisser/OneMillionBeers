@@ -34,11 +34,15 @@ export function createTelegramBot(): Bot<MyContext> {
     const photo = ctx.message.photo.at(-1)!
     const key = `photos/${ctx.chat.id}/${photo.file_unique_id}.jpg`
 
-    // Step 1: Download via grammY's HTTP client (same connection pool as polling)
+    // Step 1: Download via grammY's async iterator (yields raw bytes; download() returns a path string)
     let buffer: Buffer
     try {
       const file = await ctx.getFile()
-      buffer = Buffer.from(await file.download())
+      const chunks: Uint8Array[] = []
+      for await (const chunk of file) {
+        chunks.push(chunk)
+      }
+      buffer = Buffer.concat(chunks)
     } catch (err) {
       logger.error(
         { err, sourceGroupId, fileUniqueId: photo.file_unique_id },

@@ -63,7 +63,9 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     },
     getFile: vi.fn().mockResolvedValue({
       file_path: 'photos/file/path.jpg',
-      download: vi.fn().mockResolvedValue(new Uint8Array(8).buffer),
+      async *[Symbol.asyncIterator]() {
+        yield new Uint8Array([0xff, 0xd8, 0xff, 0xe0]) // fake JPEG header bytes
+      },
     }),
     ...overrides,
   }
@@ -159,7 +161,9 @@ describe('Telegram message handler', () => {
     // Override getFile to return a download() that rejects
     ctx.getFile = vi.fn().mockResolvedValue({
       file_path: 'photos/file/path.jpg',
-      download: vi.fn().mockRejectedValue(new Error('download failed')),
+      async *[Symbol.asyncIterator]() {
+        throw new Error('download failed')
+      },
     })
     await handler(ctx)
 

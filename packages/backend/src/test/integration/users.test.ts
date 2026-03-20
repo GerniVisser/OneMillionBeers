@@ -37,25 +37,25 @@ async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000
   })
 }
 
-async function getUserId(): Promise<string> {
-  const { rows } = await pool.query('SELECT id FROM users LIMIT 1')
-  return rows[0].id
+async function getUserSlugAndId(): Promise<{ slug: string; id: string }> {
+  const { rows } = await pool.query('SELECT id, slug FROM users LIMIT 1')
+  return { id: rows[0].id, slug: rows[0].slug }
 }
 
 describe('GET /v1/users/:userId', () => {
   it('returns 404 for unknown user', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v1/users/00000000-0000-0000-0000-000000000000',
+      url: '/v1/users/no-such-user',
     })
     expect(res.statusCode).toBe(404)
   })
 
   it('returns user profile without identityHash', async () => {
     await seedBeerLog()
-    const userId = await getUserId()
+    const { slug } = await getUserSlugAndId()
 
-    const res = await app.inject({ method: 'GET', url: `/v1/users/${userId}` })
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}` })
     expect(res.statusCode).toBe(200)
 
     const body = res.json()
@@ -70,7 +70,7 @@ describe('GET /v1/users/:userId/stats', () => {
   it('returns 404 for unknown user', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: '/v1/users/00000000-0000-0000-0000-000000000000/stats',
+      url: '/v1/users/no-such-user/stats',
     })
     expect(res.statusCode).toBe(404)
   })
@@ -79,14 +79,14 @@ describe('GET /v1/users/:userId/stats', () => {
     await seedBeerLog('123456789', '2024-06-01T12:00:00.000Z')
     await seedBeerLog('123456789', '2024-06-02T12:00:00.000Z')
     await seedBeerLog('123456789', '2024-06-03T12:00:00.000Z')
-    const userId = await getUserId()
+    const { slug, id } = await getUserSlugAndId()
 
-    const res = await app.inject({ method: 'GET', url: `/v1/users/${userId}/stats` })
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/stats` })
     expect(res.statusCode).toBe(200)
 
     const parsed = UserStatsResponseSchema.safeParse(res.json())
     expect(parsed.success).toBe(true)
     expect(parsed.data?.totalBeers).toBe(3)
-    expect(parsed.data?.userId).toBe(userId)
+    expect(parsed.data?.userId).toBe(id)
   })
 })

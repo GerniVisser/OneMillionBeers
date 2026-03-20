@@ -154,6 +154,9 @@ importers:
 
   packages/frontend:
     dependencies:
+      '@omb/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@sveltejs/adapter-node':
         specifier: ^5.2.11
         version: 5.5.4(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@7.0.0(svelte@5.53.12)(vite@6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@6.4.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)))

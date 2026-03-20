@@ -35,6 +35,15 @@ export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | 
   return rows[0] ?? null
 }
 
+export async function findGroupBySlug(pool: pg.Pool, slug: string): Promise<Group | null> {
+  const { rows } = await pool.query<Group>(
+    `SELECT id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"
+     FROM groups WHERE slug = $1`,
+    [slug],
+  )
+  return rows[0] ?? null
+}
+
 export async function getGroupTotalBeers(pool: pg.Pool, groupId: string): Promise<number> {
   const { rows } = await pool.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM beer_logs WHERE group_id = $1`,
@@ -69,6 +78,15 @@ export async function findUserById(pool: pg.Pool, id: string): Promise<User | nu
     `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
      FROM users WHERE id = $1`,
     [id],
+  )
+  return rows[0] ?? null
+}
+
+export async function findUserBySlug(pool: pg.Pool, slug: string): Promise<User | null> {
+  const { rows } = await pool.query<User>(
+    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
+     FROM users WHERE slug = $1`,
+    [slug],
   )
   return rows[0] ?? null
 }
