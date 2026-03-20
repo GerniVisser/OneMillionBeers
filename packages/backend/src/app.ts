@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
+import rateLimit from '@fastify/rate-limit'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import type pg from 'pg'
@@ -16,6 +17,11 @@ export async function buildApp(
   const app = Fastify({ logger: { level: logLevel } })
 
   await app.register(cors)
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+  })
 
   if (nodeEnv !== 'production') {
     await app.register(swagger, {

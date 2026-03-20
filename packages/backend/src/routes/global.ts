@@ -29,28 +29,32 @@ export const globalRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, {
     return reply.send({ entries })
   })
 
-  app.get('/v1/global/stream', async (request, reply) => {
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    })
+  app.get(
+    '/v1/global/stream',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      })
 
-    // Send current count immediately on connect
-    const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
-    reply.raw.write(
-      `data: ${JSON.stringify({ type: 'count', count, ...(latest ? { latestBeer: latest } : {}) })}\n\n`,
-    )
+      // Send current count immediately on connect
+      const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
+      reply.raw.write(
+        `data: ${JSON.stringify({ type: 'count', count, ...(latest ? { latestBeer: latest } : {}) })}\n\n`,
+      )
 
-    const unsubscribe = subscribe(reply)
+      const unsubscribe = subscribe(reply)
 
-    request.raw.on('close', () => {
-      unsubscribe()
-    })
+      request.raw.on('close', () => {
+        unsubscribe()
+      })
 
-    // Keep connection open — never resolve
-    await new Promise<void>((resolve) => {
-      request.raw.on('close', resolve)
-    })
-  })
+      // Keep connection open — never resolve
+      await new Promise<void>((resolve) => {
+        request.raw.on('close', resolve)
+      })
+    },
+  )
 }

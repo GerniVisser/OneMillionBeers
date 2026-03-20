@@ -12,7 +12,7 @@ import { hashIdentity } from '../lib/hash.js'
 import { broadcast } from '../lib/sse.js'
 
 export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
-  app.post('/v1/internal/beer-log', async (request, reply) => {
+  app.post('/v1/internal/beer-log', { config: { rateLimit: false } }, async (request, reply) => {
     const parse = BeerLogRequestSchema.safeParse(request.body)
     if (!parse.success) {
       return reply.status(400).send({ error: 'Invalid request', issues: parse.error.issues })
