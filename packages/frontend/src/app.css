@@ -1,8 +1,122 @@
 @import 'tailwindcss';
 
-:root {
+@theme {
+  /* Backgrounds */
+  --color-bg-deep: #1c0a00;
+  --color-bg-card: #2d1200;
+  --color-bg-surface: #3d1a00;
+
+  /* Beer palette */
   --color-beer-amber: #f59e0b;
   --color-beer-dark: #92400e;
   --color-beer-foam: #fef3c7;
   --color-beer-head: #fffbeb;
+  --color-accent-glow: #fbbf24;
+  --color-text-muted: #d97706;
+
+  /* Rank colours */
+  --color-rank-gold: #ffd700;
+  --color-rank-silver: #c0c0c0;
+  --color-rank-bronze: #cd7f32;
+
+  /* Fonts */
+  --font-display: 'Bangers', cursive;
+  --font-body: 'Fredoka', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-deep);
+    color: var(--color-beer-foam);
+    font-family: var(--font-body);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-card);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-bg-surface);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-beer-dark);
+  }
+
+  a {
+    color: var(--color-beer-amber);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--color-beer-head);
+  }
+}
+
+@layer utilities {
+  .glow-amber {
+    text-shadow:
+      0 0 10px var(--color-accent-glow),
+      0 0 30px var(--color-beer-amber);
+  }
+
+  .glow-box-amber {
+    box-shadow:
+      0 0 10px var(--color-accent-glow),
+      0 0 30px rgba(251, 191, 36, 0.3);
+  }
+
+  .card {
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-bg-surface);
+    border-radius: 1rem;
+  }
+
+  .card-hover {
+    transition: box-shadow 150ms ease;
+  }
+
+  .card-hover:hover {
+    box-shadow:
+      0 0 0 1px var(--color-beer-dark),
+      0 4px 24px rgba(245, 158, 11, 0.15);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(-100vh) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes digit-flip {
+  0% {
+    transform: rotateX(0deg);
+  }
+  50% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
