@@ -13,6 +13,7 @@ describe('shared config', () => {
   function stubValidEnv() {
     vi.stubEnv('BACKEND_URL', 'http://localhost:3000')
     vi.stubEnv('STORAGE_ENDPOINT', 'http://localhost:9000')
+    vi.stubEnv('STORAGE_PUBLIC_URL', 'http://localhost:9000')
     vi.stubEnv('STORAGE_BUCKET', 'omb-photos')
     vi.stubEnv('STORAGE_KEY', 'key')
     vi.stubEnv('STORAGE_SECRET', 'secret')

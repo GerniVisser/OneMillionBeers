@@ -10,6 +10,7 @@ vi.mock('@aws-sdk/client-s3', () => {
 vi.mock('../config.js', () => ({
   config: {
     STORAGE_ENDPOINT: 'http://localhost:9000',
+    STORAGE_PUBLIC_URL: 'http://localhost:9000',
     STORAGE_BUCKET: 'omb-photos',
     STORAGE_KEY: 'minioadmin',
     STORAGE_SECRET: 'minioadmin',
@@ -69,6 +70,7 @@ describe('uploadPhoto', () => {
     vi.mock('../config.js', () => ({
       config: {
         STORAGE_ENDPOINT: 'http://localhost:9000/',
+        STORAGE_PUBLIC_URL: 'http://localhost:9000/',
         STORAGE_BUCKET: 'omb-photos',
         STORAGE_KEY: 'key',
         STORAGE_SECRET: 'secret',
@@ -95,6 +97,7 @@ describe('uploadPhoto', () => {
     vi.mock('../config.js', () => ({
       config: {
         STORAGE_ENDPOINT: 'http://localhost:9000',
+        STORAGE_PUBLIC_URL: 'http://localhost:9000',
         STORAGE_BUCKET: 'omb-photos',
         STORAGE_KEY: 'key',
         STORAGE_SECRET: 'secret',
