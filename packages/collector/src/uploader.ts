@@ -4,10 +4,11 @@ import { config } from './config.js'
 const client = new S3Client({
   endpoint: config.STORAGE_ENDPOINT,
   region: config.STORAGE_REGION,
-  credentials: {
-    accessKeyId: config.STORAGE_KEY,
-    secretAccessKey: config.STORAGE_SECRET,
-  },
+  // Omit credentials when STORAGE_KEY/SECRET are absent so the AWS SDK
+  // falls back to the EC2 IAM instance profile via the credential chain.
+  ...(config.STORAGE_KEY && config.STORAGE_SECRET
+    ? { credentials: { accessKeyId: config.STORAGE_KEY, secretAccessKey: config.STORAGE_SECRET } }
+    : {}),
   forcePathStyle: true, // required for MinIO and most S3-compatible stores
 })
 

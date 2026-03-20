@@ -83,5 +83,5 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             sleep 10
-            curl --fail https://onemillionbeers.app/api/health
-            curl --fail https://onemillionbeers.app/health
+            curl --fail https://gernivisser.com/api/health
+            curl --fail https://gernivisser.com/health
