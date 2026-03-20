@@ -6,8 +6,8 @@ const ConfigSchema = z.object({
   STORAGE_ENDPOINT: z.string().url(),
   STORAGE_PUBLIC_URL: z.string().url(),
   STORAGE_BUCKET: z.string().min(1),
-  STORAGE_KEY: z.string().min(1),
-  STORAGE_SECRET: z.string().min(1),
+  STORAGE_KEY: z.string().optional(),
+  STORAGE_SECRET: z.string().optional(),
   STORAGE_REGION: z.string().min(1).default('auto'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })

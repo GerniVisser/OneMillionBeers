@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in values (terraform.tfvars is gitignored)
+
+aws_region  = "us-east-1"
+environment = "prod"
+
+# RDS master password — use a strong random value
+db_password = "CHANGE_ME"
+
+# Contents of omb-deploy.pub (generated via: ssh-keygen -t ed25519 -f omb-deploy)
+ec2_public_key = "ssh-ed25519 AAAA... your-key-comment"

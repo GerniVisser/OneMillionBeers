@@ -51,7 +51,7 @@ services:
     expose:
       - '3001'
     environment:
-      ORIGIN: ${ORIGIN:-https://onemillionbeers.app}
+      ORIGIN: ${ORIGIN:-https://gernivisser.com}
       PORT: '3001'
     depends_on:
       - backend
