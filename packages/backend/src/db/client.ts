@@ -6,7 +6,11 @@ let _pool: pg.Pool | null = null
 
 export function getPool(connectionString?: string): pg.Pool {
   if (!_pool) {
-    _pool = new Pool({ connectionString: connectionString ?? process.env.DATABASE_URL })
+    const url = connectionString ?? process.env.DATABASE_URL ?? ''
+    _pool = new Pool({
+      connectionString: url,
+      ...(url.includes('amazonaws.com') ? { ssl: { rejectUnauthorized: false } } : {}),
+    })
   }
   return _pool
 }
