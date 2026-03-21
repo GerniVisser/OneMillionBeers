@@ -27,7 +27,7 @@ COPY tsconfig.json ./
 RUN pnpm --filter @omb/shared build
 RUN pnpm --filter @omb/backend build
 # Prune to prod-only deps — resolves workspace packages into a self-contained dir
-RUN pnpm deploy --filter @omb/backend --prod /deploy/backend
+RUN pnpm deploy --filter @omb/backend --prod --legacy /deploy/backend
 
 # Stage 4: Production
 FROM node:22-alpine AS prod
