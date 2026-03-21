@@ -78,7 +78,7 @@ jobs:
       - name: Deploy to EC2
         uses: MercuryTechnologies/aws-ssm-send-command-action@v0.1.0
         with:
-          instance-id: ${{ secrets.EC2_INSTANCE_ID }}
+          targets: '[{"Key":"InstanceIds","Values":["${{ secrets.EC2_INSTANCE_ID }}"]}]'
           document-name: AWS-RunShellScript
           parameters: |
             {
