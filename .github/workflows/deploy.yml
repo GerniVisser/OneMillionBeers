@@ -76,7 +76,7 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy to EC2
-        uses: MercuryTechnologies/aws-ssm-send-command-action@v0
+        uses: MercuryTechnologies/aws-ssm-send-command-action@v0.1.0
         with:
           instance-id: ${{ secrets.EC2_INSTANCE_ID }}
           document-name: AWS-RunShellScript
