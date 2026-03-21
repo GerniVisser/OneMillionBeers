@@ -15,8 +15,3 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
-
-variable "ec2_public_key" {
-  description = "ED25519 public key for EC2 SSH access (content of omb-deploy.pub)"
-  type        = string
-}
