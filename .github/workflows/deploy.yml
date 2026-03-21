@@ -64,14 +64,8 @@ jobs:
           push: true
           tags: ghcr.io/${{ env.REPO_LC }}/omb-gateway:${{ env.GIT_SHA }}
 
-      - name: Copy docker-compose.yml to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: docker-compose.yml
-          target: /opt/onemillionbeers/
+      - name: Encode docker-compose.yml
+        run: echo "COMPOSE_B64=$(base64 -w0 docker-compose.yml)" >> $GITHUB_ENV
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
@@ -81,7 +75,11 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -euo pipefail
+            mkdir -p /opt/onemillionbeers
             cd /opt/onemillionbeers
+
+            # Write docker-compose.yml inline (avoids a separate SCP connection)
+            echo "${{ env.COMPOSE_B64 }}" | base64 -d > docker-compose.yml
 
             # Pull all /omb/* params from SSM → write fresh .env
             aws ssm get-parameters-by-path \
