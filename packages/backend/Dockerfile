@@ -1,3 +1,8 @@
+# Stage 0: fetch AWS RDS CA bundle (public file, no secrets)
+FROM node:22-alpine AS certs
+RUN wget -qO /rds-ca-bundle.pem \
+    https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
 # Stage 1: Install dependencies
 FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -35,5 +40,6 @@ WORKDIR /app
 COPY --from=build /deploy/backend/node_modules ./node_modules
 COPY --from=build /app/packages/backend/dist ./dist
 COPY --from=build /app/packages/backend/package.json ./package.json
+COPY --from=certs /rds-ca-bundle.pem /app/certs/rds-ca-bundle.pem
 EXPOSE 3000
 CMD ["node", "dist/index.js"]
