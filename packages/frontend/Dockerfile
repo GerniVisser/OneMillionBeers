@@ -16,12 +16,14 @@ CMD ["pnpm", "dev", "--host", "0.0.0.0"]
 FROM deps AS build
 COPY packages/frontend ./packages/frontend
 RUN pnpm --filter @omb/frontend build
+# Prune to prod-only deps — resolves workspace packages into a self-contained dir
+RUN pnpm deploy --filter @omb/frontend --prod --legacy /deploy/frontend
 
-# Stage 3: Production
+# Stage 4: Production
 FROM node:22-alpine AS prod
 WORKDIR /app
+COPY --from=build /deploy/frontend/node_modules ./node_modules
 COPY --from=build /app/packages/frontend/build ./build
 COPY --from=build /app/packages/frontend/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
-EXPOSE 3000
+EXPOSE 3001
 CMD ["node", "build"]
