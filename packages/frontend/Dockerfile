@@ -3,18 +3,24 @@ FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/shared/package.json ./packages/shared/
 COPY packages/frontend/package.json ./packages/frontend/
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Dev
 FROM deps AS dev
+COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/tsconfig.json ./packages/shared/
 COPY packages/frontend ./packages/frontend
 WORKDIR /app/packages/frontend
 CMD ["pnpm", "dev", "--host", "0.0.0.0"]
 
 # Stage 3: Build
 FROM deps AS build
+COPY packages/shared/src ./packages/shared/src
+COPY packages/shared/tsconfig.json ./packages/shared/
 COPY packages/frontend ./packages/frontend
+RUN pnpm --filter @omb/shared build
 RUN pnpm --filter @omb/frontend build
 # Prune to prod-only deps — resolves workspace packages into a self-contained dir
 RUN pnpm deploy --filter @omb/frontend --prod --legacy /deploy/frontend
