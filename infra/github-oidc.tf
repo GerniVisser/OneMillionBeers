@@ -50,6 +50,12 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     ]
     resources = ["*"]
   }
+  statement {
+    sid       = "S3DeployWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.deploy.arn}/*"]
+  }
 }
 
 resource "aws_iam_policy" "github_actions_deploy" {

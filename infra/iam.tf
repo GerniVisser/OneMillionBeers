@@ -39,6 +39,28 @@ resource "aws_iam_role_policy_attachment" "s3_photos" {
   policy_arn = aws_iam_policy.s3_photos.arn
 }
 
+# S3 read access for the deploy bucket (bootstrap files downloaded at deploy time)
+data "aws_iam_policy_document" "s3_deploy_read" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.deploy.arn}/*"]
+  }
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.deploy.arn]
+  }
+}
+
+resource "aws_iam_policy" "s3_deploy_read" {
+  name   = "omb-s3-deploy-read"
+  policy = data.aws_iam_policy_document.s3_deploy_read.json
+}
+
+resource "aws_iam_role_policy_attachment" "s3_deploy_read" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = aws_iam_policy.s3_deploy_read.arn
+}
+
 # SSM Parameter Store — read app secrets at boot
 data "aws_iam_policy_document" "ssm_params" {
   statement {
