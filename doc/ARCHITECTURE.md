@@ -121,7 +121,7 @@ All public endpoints are prefixed with a version (`/v1/`, `/v2/`, etc.). A versi
 
 ### No ORM
 
-SQL is written directly using `pg` (node-postgres). Queries are transparent, debuggable, and fully portable across any PostgreSQL host. Migrations are plain numbered `.sql` files in `db/migrations/`, applied in order.
+SQL is written directly using `pg` (node-postgres). Queries are transparent, debuggable, and fully portable across any PostgreSQL host. Migrations are versioned `.sql` files in `db/migrations/` following Flyway naming convention (`V{n}__{description}.sql`). They are applied at deploy time by a dedicated Flyway Docker image built in CI.
 
 ---
 
@@ -144,6 +144,7 @@ Treat these as decided unless there is a compelling reason to revisit:
 | API framework      | Fastify                                                                      |
 | Package manager    | pnpm workspaces                                                              |
 | Database           | PostgreSQL — plain SQL, no ORM, `pg` driver                                  |
+| DB migrations      | Flyway (Docker, `flyway/flyway:11-alpine`)                                   |
 | Validation         | Zod (schemas in `@omb/shared`)                                               |
 | API docs (dev)     | @fastify/swagger + @fastify/swagger-ui (env-gated; not active in production) |
 | Logging            | Pino (structured JSON to stdout)                                             |
