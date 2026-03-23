@@ -29,10 +29,12 @@ resource "aws_instance" "app" {
   }
 
   # Enforce IMDSv2 — prevents SSRF-via-metadata attacks
+  # Hop limit 2: host (1) + Docker container (2). Limit of 1 blocks containers
+  # from reaching IMDS, preventing the AWS SDK from loading IAM credentials.
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = 2
   }
 
   tags = { Name = "omb-app" }
