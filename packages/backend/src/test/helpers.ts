@@ -27,7 +27,12 @@ export async function clearTables(p: pg.Pool): Promise<void> {
 
 async function runMigrations(p: pg.Pool): Promise<void> {
   const migrationsDir = join(process.cwd(), '../../db/migrations')
-  const files = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort()
+  const files = (await readdir(migrationsDir))
+    .filter((f) => /^V\d+__.*\.sql$/.test(f))
+    .sort((a, b) => {
+      const version = (name: string) => parseInt(name.replace(/^V(\d+)__.*/, '$1'), 10)
+      return version(a) - version(b)
+    })
   for (const file of files) {
     const sql = await readFile(join(migrationsDir, file), 'utf-8')
     await p.query(sql)
