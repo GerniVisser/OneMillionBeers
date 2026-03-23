@@ -34,11 +34,15 @@ services:
   collector:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector:${GIT_SHA}
     environment:
+      COLLECTOR: ${COLLECTOR:-telegram}
       BACKEND_URL: http://backend:3000
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
       STORAGE_BUCKET: ${STORAGE_BUCKET}
       STORAGE_KEY: ${STORAGE_KEY}
       STORAGE_SECRET: ${STORAGE_SECRET}
+      STORAGE_REGION: ${STORAGE_REGION:-auto}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - baileys-session:/app/session
@@ -53,6 +57,7 @@ services:
     environment:
       ORIGIN: ${ORIGIN:-https://gernivisser.com}
       PORT: '3001'
+      BACKEND_INTERNAL_URL: http://backend:3000
     depends_on:
       - backend
     restart: unless-stopped
