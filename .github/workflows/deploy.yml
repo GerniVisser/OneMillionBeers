@@ -65,8 +65,13 @@ jobs:
           push: true
           tags: ghcr.io/${{ env.REPO_LC }}/omb-gateway:${{ env.GIT_SHA }}
 
-      - name: Encode docker-compose.yml
-        run: echo "COMPOSE_B64=$(base64 -w0 docker-compose.yml)" >> $GITHUB_ENV
+      - name: Build and push flyway image
+        uses: docker/build-push-action@v6
+        with:
+          context: db
+          file: db/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -74,6 +79,11 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: GitHubActions-Deploy
           aws-region: us-east-1
+
+      - name: Upload deploy artifacts to S3
+        run: |
+          aws s3 cp docker-compose.yml s3://onemillionbeers-deploy-prod/docker-compose.yml
+          aws s3 cp scripts/prod-db-migrate.sh s3://onemillionbeers-deploy-prod/scripts/prod-db-migrate.sh
 
       - name: Deploy to EC2
         uses: MercuryTechnologies/aws-ssm-send-command-action@v0.1.0
@@ -84,12 +94,16 @@ jobs:
             {
               "commands": [
                 "mkdir -p /opt/onemillionbeers",
-                "echo ${{ env.COMPOSE_B64 }} | base64 -d > /opt/onemillionbeers/docker-compose.yml",
+                "aws s3 cp s3://onemillionbeers-deploy-prod/docker-compose.yml /opt/onemillionbeers/docker-compose.yml",
+                "aws s3 cp s3://onemillionbeers-deploy-prod/scripts/prod-db-migrate.sh /opt/onemillionbeers/prod-db-migrate.sh",
+                "chmod +x /opt/onemillionbeers/prod-db-migrate.sh",
                 "cd /opt/onemillionbeers",
                 "aws ssm get-parameters-by-path --path '/omb/' --with-decryption --region us-east-1 --output json | python3 -c \"import json,sys; [print(p['Name'].rsplit('/',1)[-1]+'='+p['Value']) for p in json.load(sys.stdin)['Parameters']]\" > .env",
                 "chmod 600 .env",
                 "printf 'GIT_SHA=%s\\nGITHUB_REPOSITORY=%s\\n' '${{ env.GIT_SHA }}' '${{ env.REPO_LC }}' > .env.sha",
                 "docker compose --env-file .env --env-file .env.sha pull backend collector frontend nginx",
+                "docker pull ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }}",
+                "FLYWAY_IMAGE=ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }} ./prod-db-migrate.sh",
                 "docker compose --env-file .env --env-file .env.sha up -d --no-deps backend collector frontend nginx"
               ]
             }

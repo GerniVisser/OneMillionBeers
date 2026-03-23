@@ -54,3 +54,25 @@ resource "aws_s3_bucket_versioning" "photos" {
     status = "Disabled"
   }
 }
+
+# --- Deploy artifacts (docker-compose.yml, bootstrap scripts) ---
+
+resource "aws_s3_bucket" "deploy" {
+  bucket = "onemillionbeers-deploy-prod"
+  tags   = { Name = "omb-deploy" }
+}
+
+resource "aws_s3_bucket_public_access_block" "deploy" {
+  bucket                  = aws_s3_bucket.deploy.id
+  block_public_acls       = true
+  ignore_public_acls      = true
+  block_public_policy     = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "deploy" {
+  bucket = aws_s3_bucket.deploy.id
+  versioning_configuration {
+    status = "Disabled"
+  }
+}

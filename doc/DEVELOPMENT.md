@@ -40,6 +40,11 @@ Never duplicate values into docs — read the file that owns them:
 
 ## Non-obvious behaviors
 
+**Database migrations** use Flyway via Docker. Migration files live in `db/migrations/` following Flyway naming convention (`V{n}__{description}.sql`).
+
+- **Local:** run `pnpm db:migrate:build` once (or after adding new migration files) to build the local Flyway image, then `pnpm db:migrate` to apply pending migrations. This calls `scripts/dev-db-migrate.sh`, which handles both Docker-networked and host Postgres.
+- **Production:** `deploy.yml` runs `scripts/prod-db-migrate.sh` automatically via the Flyway container image before bringing up new containers. Migrations are never applied manually to prod.
+
 **Hot reload chain:** Edit `packages/shared/src/` → `tsc --watch` recompiles to `dist/` → `tsx watch` detects the output change → backend restarts automatically. This means shared changes propagate without manual restarts.
 
 **Zod env validation on startup:** Both services validate all required env vars via Zod before doing anything else. The process exits immediately if any are missing or wrongly typed — fail fast, not at runtime.
@@ -102,7 +107,7 @@ There is no manual deploy step. Keeping `main` green is the team's highest-prior
 
 ## CI/CD contract
 
-- CI (`ci.yml`) runs on every push and pull request: typecheck → lint → format check → full test suite (including Testcontainers integration tests)
+- CI (`ci.yml`) runs on every push and pull request: typecheck → lint → format check → full test suite (including Testcontainers integration tests) → Flyway image build validation
 - Deploy (`deploy.yml`) only runs after CI passes on push to `main`
-- Images are built for `backend`, `collector`, `frontend`, and `gateway`; pushed to GitHub Container Registry tagged with the git SHA
-- Deploy SSHs into EC2, pulls new images, restarts containers, and confirms successful start via health check endpoints before the workflow succeeds
+- Images are built for `backend`, `collector`, `frontend`, `gateway`, and `flyway`; pushed to GitHub Container Registry tagged with the git SHA
+- Deploy pulls images, runs Flyway migrations against the production DB, restarts containers, and confirms successful start via health check endpoints before the workflow succeeds

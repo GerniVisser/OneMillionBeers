@@ -12,3 +12,8 @@ output "s3_bucket_name" {
   description = "Photos S3 bucket name"
   value       = aws_s3_bucket.photos.id
 }
+
+output "s3_deploy_bucket_name" {
+  description = "Deploy artifacts S3 bucket name"
+  value       = aws_s3_bucket.deploy.id
+}
