@@ -19,7 +19,7 @@ services:
       options:
         awslogs-region: us-east-1
         awslogs-group: /omb/nginx
-        awslogs-stream-prefix: nginx
+        tag: nginx/{{.ID}}
 
   certbot:
     image: certbot/certbot
@@ -41,7 +41,7 @@ services:
       options:
         awslogs-region: us-east-1
         awslogs-group: /omb/backend
-        awslogs-stream-prefix: backend
+        tag: backend/{{.ID}}
 
   collector:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector:${GIT_SHA}
@@ -66,7 +66,7 @@ services:
       options:
         awslogs-region: us-east-1
         awslogs-group: /omb/collector
-        awslogs-stream-prefix: collector
+        tag: collector/{{.ID}}
 
   frontend:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-frontend:${GIT_SHA}
@@ -84,7 +84,7 @@ services:
       options:
         awslogs-region: us-east-1
         awslogs-group: /omb/frontend
-        awslogs-stream-prefix: frontend
+        tag: frontend/{{.ID}}
 
 volumes:
   baileys-session:
