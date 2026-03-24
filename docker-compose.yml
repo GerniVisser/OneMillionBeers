@@ -14,6 +14,12 @@ services:
     depends_on:
       - backend
       - frontend
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: /omb/nginx
+        awslogs-stream-prefix: nginx
 
   certbot:
     image: certbot/certbot
@@ -30,6 +36,12 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: production
     restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: /omb/backend
+        awslogs-stream-prefix: backend
 
   collector:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector:${GIT_SHA}
@@ -49,6 +61,12 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: /omb/collector
+        awslogs-stream-prefix: collector
 
   frontend:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-frontend:${GIT_SHA}
@@ -61,6 +79,12 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: us-east-1
+        awslogs-group: /omb/frontend
+        awslogs-stream-prefix: frontend
 
 volumes:
   baileys-session:
