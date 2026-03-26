@@ -10,7 +10,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:shared": "pnpm --filter @omb/shared build",
-    "local": "pnpm run build:shared && concurrently --names \"shared,backend,frontend,collector\" --prefix-colors \"cyan,yellow,magenta,blue\" --kill-others-on-fail \"pnpm --filter @omb/shared dev\" \"dotenv -e .env.local -- pnpm --filter @omb/backend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/frontend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/collector dev\"",
+    "local": "pnpm run build:shared && concurrently --names \"shared,backend,frontend,collector-telegram\" --prefix-colors \"cyan,yellow,magenta,blue\" --kill-others-on-fail \"pnpm --filter @omb/shared dev\" \"dotenv -e .env.local -- pnpm --filter @omb/backend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/frontend dev\" \"dotenv -e .env.local -- pnpm --filter @omb/collector-telegram dev\"",
     "infra:up": "docker compose -f docker-compose.local.yml up -d",
     "infra:down": "docker compose -f docker-compose.local.yml down",
     "infra:restart": "docker compose -f docker-compose.local.yml restart",
@@ -22,7 +22,7 @@
     "infra:dev:rebuild": "docker compose -f docker-compose.dev.yml build --no-cache",
     "infra:dev:logs": "docker compose -f docker-compose.dev.yml logs -f",
     "logs:backend": "docker compose -f docker-compose.dev.yml logs -f backend",
-    "logs:collector": "docker compose -f docker-compose.dev.yml logs -f collector",
+    "logs:collector": "docker compose -f docker-compose.dev.yml logs -f collector-telegram",
     "logs:frontend": "docker compose -f docker-compose.dev.yml logs -f frontend",
     "logs:gateway": "docker compose -f docker-compose.dev.yml logs -f nginx",
     "db:migrate:build": "docker build -t omb-flyway:local db/",

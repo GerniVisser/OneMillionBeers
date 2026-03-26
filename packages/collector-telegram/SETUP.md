@@ -51,14 +51,12 @@ The bot needs no special permissions — being a regular member is enough.
 Copy `.env.local.example` to `.env.local` and fill in:
 
 ```bash
-# Collector selection
-COLLECTOR=telegram
-
 # Backend API
 BACKEND_URL=http://localhost:3000
 
 # S3-compatible storage (MinIO runs locally via docker-compose)
 STORAGE_ENDPOINT=http://localhost:9000
+STORAGE_PUBLIC_URL=http://localhost:9000
 STORAGE_BUCKET=omb-photos
 STORAGE_KEY=minioadmin
 STORAGE_SECRET=minioadmin
@@ -101,19 +99,19 @@ mc mb local/omb-photos
 From the repo root:
 
 ```bash
-pnpm --filter @omb/collector dev
+pnpm --filter @omb/collector-telegram dev
 ```
 
 Or run everything together (backend, frontend, collector):
 
 ```bash
-pnpm dev
+pnpm local
 ```
 
 On first run you should see:
 
 ```
-INFO  collector: Starting collector { collector: 'telegram' }
+INFO  collector-telegram: Starting Telegram collector
 ```
 
 Send a photo to the Telegram group — the collector logs a confirmation:

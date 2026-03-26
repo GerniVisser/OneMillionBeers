@@ -43,10 +43,9 @@ services:
         awslogs-group: /omb/backend
         tag: backend/{{.ID}}
 
-  collector:
-    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector:${GIT_SHA}
+  collector-telegram:
+    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector-telegram:${GIT_SHA}
     environment:
-      COLLECTOR: ${COLLECTOR:-telegram}
       BACKEND_URL: http://backend:3000
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
@@ -56,8 +55,6 @@ services:
       STORAGE_REGION: ${STORAGE_REGION:-auto}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    volumes:
-      - baileys-session:/app/session
     depends_on:
       - backend
     restart: unless-stopped
@@ -65,8 +62,8 @@ services:
       driver: awslogs
       options:
         awslogs-region: us-east-1
-        awslogs-group: /omb/collector
-        tag: collector/{{.ID}}
+        awslogs-group: /omb/collector-telegram
+        tag: collector-telegram/{{.ID}}
 
   frontend:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-frontend:${GIT_SHA}
@@ -87,6 +84,5 @@ services:
         tag: frontend/{{.ID}}
 
 volumes:
-  baileys-session:
   certbot-www:
   certbot-certs:

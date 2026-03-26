@@ -1,5 +1,5 @@
 {
-  "name": "@omb/collector",
+  "name": "@omb/collector-telegram",
   "version": "0.0.1",
   "type": "module",
   "scripts": {
@@ -11,9 +11,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.0.0",
     "@grammyjs/auto-retry": "^2.0.2",
     "@grammyjs/files": "^1.2.0",
+    "@omb/collector-core": "workspace:*",
     "@omb/shared": "workspace:*",
     "grammy": "^1.0.0",
     "pino": "^9.6.0",
