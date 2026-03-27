@@ -4,7 +4,6 @@ import type { BeerLogRequest } from '@omb/shared'
 vi.mock('../config.js', () => ({
   config: {
     BACKEND_URL: 'http://localhost:3000',
-    COLLECTOR: 'telegram',
     LOG_LEVEL: 'silent',
     STORAGE_ENDPOINT: 'http://localhost:9000',
     STORAGE_BUCKET: 'omb-photos',

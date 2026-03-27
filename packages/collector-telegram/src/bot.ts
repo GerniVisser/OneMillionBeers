@@ -3,13 +3,11 @@ import { hydrateFiles, type FileFlavor } from '@grammyjs/files'
 import { autoRetry } from '@grammyjs/auto-retry'
 import { pino } from 'pino'
 import { telegramConfig } from './config.js'
-import { uploadPhoto } from '../../uploader.js'
-import { forwardBeerLog } from '../../forwarder.js'
-import { config } from '../../config.js'
+import { uploadPhoto, forwardBeerLog, coreConfig } from '@omb/collector-core'
 
 type MyContext = FileFlavor<Context>
 
-const logger = pino({ name: 'telegram', level: config.LOG_LEVEL })
+const logger = pino({ name: 'telegram', level: coreConfig.LOG_LEVEL })
 
 export function createTelegramBot(): Bot<MyContext> {
   const bot = new Bot<MyContext>(telegramConfig.TELEGRAM_BOT_TOKEN)

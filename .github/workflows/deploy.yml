@@ -40,13 +40,21 @@ jobs:
           push: true
           tags: ghcr.io/${{ env.REPO_LC }}/omb-backend:${{ env.GIT_SHA }}
 
-      - name: Build and push collector image
+      - name: Build and push collector-telegram image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: packages/collector/Dockerfile
+          file: packages/collector-telegram/Dockerfile
           push: true
-          tags: ghcr.io/${{ env.REPO_LC }}/omb-collector:${{ env.GIT_SHA }}
+          tags: ghcr.io/${{ env.REPO_LC }}/omb-collector-telegram:${{ env.GIT_SHA }}
+
+      - name: Build and push collector-whatsapp image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/collector-whatsapp/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.REPO_LC }}/omb-collector-whatsapp:${{ env.GIT_SHA }}
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
@@ -101,10 +109,10 @@ jobs:
                 "aws ssm get-parameters-by-path --path '/omb/' --with-decryption --region us-east-1 --output json | python3 -c \"import json,sys; [print(p['Name'].rsplit('/',1)[-1]+'='+p['Value']) for p in json.load(sys.stdin)['Parameters']]\" > .env",
                 "chmod 600 .env",
                 "printf 'GIT_SHA=%s\\nGITHUB_REPOSITORY=%s\\n' '${{ env.GIT_SHA }}' '${{ env.REPO_LC }}' > .env.sha",
-                "docker compose --env-file .env --env-file .env.sha pull backend collector frontend nginx",
+                "docker compose --env-file .env --env-file .env.sha pull backend collector-telegram collector-whatsapp frontend nginx",
                 "docker pull ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }}",
                 "FLYWAY_IMAGE=ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }} ./prod-db-migrate.sh",
-                "docker compose --env-file .env --env-file .env.sha up -d --no-deps backend collector frontend nginx"
+                "docker compose --env-file .env --env-file .env.sha up -d --no-deps backend collector-telegram collector-whatsapp waha frontend nginx"
               ]
             }
           wait-until-command-executed: true

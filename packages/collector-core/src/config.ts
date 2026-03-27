@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-const ConfigSchema = z.object({
-  COLLECTOR: z.enum(['telegram']).default('telegram'),
+export const CoreConfigSchema = z.object({
   BACKEND_URL: z.string().url(),
   STORAGE_ENDPOINT: z.string().url(),
   STORAGE_PUBLIC_URL: z.string().url(),
@@ -12,7 +11,7 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 })
 
-const result = ConfigSchema.safeParse(process.env)
+const result = CoreConfigSchema.safeParse(process.env)
 if (!result.success) {
   console.error('Invalid environment variables:')
   for (const issue of result.error.issues) {

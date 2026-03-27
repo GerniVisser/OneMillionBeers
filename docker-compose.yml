@@ -14,6 +14,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - collector-whatsapp
     logging:
       driver: awslogs
       options:
@@ -43,10 +44,9 @@ services:
         awslogs-group: /omb/backend
         tag: backend/{{.ID}}
 
-  collector:
-    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector:${GIT_SHA}
+  collector-telegram:
+    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector-telegram:${GIT_SHA}
     environment:
-      COLLECTOR: ${COLLECTOR:-telegram}
       BACKEND_URL: http://backend:3000
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
@@ -56,8 +56,6 @@ services:
       STORAGE_REGION: ${STORAGE_REGION:-auto}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-    volumes:
-      - baileys-session:/app/session
     depends_on:
       - backend
     restart: unless-stopped
@@ -65,8 +63,58 @@ services:
       driver: awslogs
       options:
         awslogs-region: us-east-1
-        awslogs-group: /omb/collector
-        tag: collector/{{.ID}}
+        awslogs-group: /omb/collector-telegram
+        tag: collector-telegram/{{.ID}}
+
+  waha:
+    image: devlikeapro/waha
+    expose:
+      - '3000'
+    restart: unless-stopped
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WHATSAPP_START_SESSION: default
+      WHATSAPP_DOWNLOAD_MEDIA: "true"
+      WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
+      WAHA_WEBHOOK_EVENTS: message,session.status
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /omb/waha
+        awslogs-region: us-east-1
+        tag: "waha/{{.ID}}"
+
+  collector-whatsapp:
+    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector-whatsapp:${GIT_SHA}
+    expose:
+      - '8080'
+    restart: unless-stopped
+    depends_on:
+      - waha
+      - backend
+    environment:
+      BACKEND_URL: http://backend:3000
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
+      STORAGE_BUCKET: ${STORAGE_BUCKET}
+      STORAGE_REGION: ${STORAGE_REGION:-auto}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      COLLECTOR_PORT: "8080"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      STATUS_TOKEN: ${STATUS_TOKEN}
+      ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
+      ALERT_EMAIL: ${ALERT_EMAIL}
+      SES_FROM_EMAIL: ${SES_FROM_EMAIL}
+      AWS_REGION: ${AWS_REGION}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-group: /omb/collector-whatsapp
+        awslogs-region: us-east-1
+        tag: "collector-whatsapp/{{.ID}}"
 
   frontend:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-frontend:${GIT_SHA}
@@ -87,6 +135,5 @@ services:
         tag: frontend/{{.ID}}
 
 volumes:
-  baileys-session:
   certbot-www:
   certbot-certs:

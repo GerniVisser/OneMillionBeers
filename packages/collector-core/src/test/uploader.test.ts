@@ -16,7 +16,6 @@ vi.mock('../config.js', () => ({
     STORAGE_SECRET: 'minioadmin',
     STORAGE_REGION: 'auto',
     BACKEND_URL: 'http://localhost:3000',
-    COLLECTOR: 'telegram',
     LOG_LEVEL: 'silent',
   },
 }))
@@ -76,7 +75,6 @@ describe('uploadPhoto', () => {
         STORAGE_SECRET: 'secret',
         STORAGE_REGION: 'auto',
         BACKEND_URL: 'http://localhost:3000',
-        COLLECTOR: 'telegram',
         LOG_LEVEL: 'silent',
       },
     }))
@@ -103,7 +101,6 @@ describe('uploadPhoto', () => {
         STORAGE_SECRET: 'secret',
         STORAGE_REGION: 'auto',
         BACKEND_URL: 'http://localhost:3000',
-        COLLECTOR: 'telegram',
         LOG_LEVEL: 'silent',
       },
     }))

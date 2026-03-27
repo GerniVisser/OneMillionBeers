@@ -23,10 +23,10 @@ services:
     depends_on:
       - postgres
 
-  collector:
+  collector-telegram:
     build:
       context: .
-      dockerfile: packages/collector/Dockerfile
+      dockerfile: packages/collector-telegram/Dockerfile
       target: dev
     environment:
       BACKEND_URL: http://backend:3000
@@ -37,8 +37,6 @@ services:
       STORAGE_SECRET: minioadmin
       LOG_LEVEL: debug
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-    volumes:
-      - baileys-session:/app/session
     depends_on:
       - backend
       - minio
@@ -92,5 +90,4 @@ services:
 
 volumes:
   postgres-data:
-  baileys-session:
   minio-data:
