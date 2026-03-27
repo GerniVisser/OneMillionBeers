@@ -148,18 +148,24 @@ describe('webhook', () => {
     expect(mockHandleSessionStatusChange).not.toHaveBeenCalled()
   })
 
-  it('discards when media URL origin does not match WAHA_BASE_URL', async () => {
-    const fetchMock = vi.fn()
+  it('rewrites media URL origin to WAHA_BASE_URL before fetching', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => null },
+      arrayBuffer: async () => new ArrayBuffer(8),
+    })
     vi.stubGlobal('fetch', fetchMock)
     const body = makeImagePayload()
     ;(body.payload as Record<string, unknown>).media = {
       mimetype: 'image/jpeg',
-      url: 'http://attacker.com/evil',
+      url: 'http://localhost:3000/api/files/default/abc123.jpeg',
     }
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(body, logger)
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(mockUploadPhoto).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://waha:3000/api/files/default/abc123.jpeg',
+      expect.anything(),
+    )
   })
 
   it('discards when media URL is absent', async () => {

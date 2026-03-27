@@ -58,14 +58,24 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     logger.warn({ chatId }, 'Media URL absent — discarding')
     return
   }
-  if (!mediaUrl.startsWith(config.WAHA_BASE_URL)) {
-    logger.warn({ chatId, mediaUrl }, 'Media URL origin mismatch — discarding')
+
+  // WAHA may return media URLs with its own internal origin (e.g. http://localhost:3000)
+  // rather than the configured WAHA_BASE_URL. Rewrite to always fetch via the configured base.
+  let fetchUrl: string
+  try {
+    const parsed = new URL(mediaUrl)
+    const base = new URL(config.WAHA_BASE_URL)
+    parsed.protocol = base.protocol
+    parsed.host = base.host
+    fetchUrl = parsed.toString()
+  } catch {
+    logger.warn({ chatId, mediaUrl }, 'Media URL invalid — discarding')
     return
   }
 
   let buffer: Buffer
   try {
-    const res = await fetch(mediaUrl, {
+    const res = await fetch(fetchUrl, {
       signal: AbortSignal.timeout(30_000),
       headers: { 'x-api-key': config.WAHA_API_KEY },
     })
