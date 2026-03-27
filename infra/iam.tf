@@ -112,3 +112,21 @@ resource "aws_iam_instance_profile" "ec2" {
   name = "omb-ec2-profile"
   role = aws_iam_role.ec2.name
 }
+
+# SES — send re-auth alert emails from collector-whatsapp
+data "aws_iam_policy_document" "ses_send" {
+  statement {
+    actions   = ["ses:SendEmail", "ses:SendRawEmail"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_policy" "ses_send" {
+  name   = "omb-ses-send"
+  policy = data.aws_iam_policy_document.ses_send.json
+}
+
+resource "aws_iam_role_policy_attachment" "ses_send" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = aws_iam_policy.ses_send.arn
+}
