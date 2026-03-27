@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../../../uploader.js', () => ({ uploadPhoto: vi.fn() }))
-vi.mock('../../../forwarder.js', () => ({ forwardBeerLog: vi.fn() }))
-vi.mock('../../../config.js', () => ({
-  config: {
+vi.mock('@omb/collector-core', () => ({
+  uploadPhoto: vi.fn(),
+  forwardBeerLog: vi.fn(),
+  coreConfig: {
     LOG_LEVEL: 'silent',
-    COLLECTOR: 'telegram',
     BACKEND_URL: 'http://localhost:3000',
     STORAGE_ENDPOINT: 'http://localhost:9000',
     STORAGE_BUCKET: 'omb-photos',
@@ -14,7 +13,8 @@ vi.mock('../../../config.js', () => ({
     STORAGE_REGION: 'auto',
   },
 }))
-vi.mock('../../../collectors/telegram/config.js', () => ({
+
+vi.mock('../config.js', () => ({
   telegramConfig: { TELEGRAM_BOT_TOKEN: 'fake-token' },
 }))
 
@@ -78,10 +78,9 @@ describe('Telegram message handler', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
 
-    const uploader = await import('../../../uploader.js')
-    const forwarder = await import('../../../forwarder.js')
-    uploadPhoto = vi.mocked(uploader.uploadPhoto)
-    forwardBeerLog = vi.mocked(forwarder.forwardBeerLog)
+    const core = await import('@omb/collector-core')
+    uploadPhoto = vi.mocked(core.uploadPhoto)
+    forwardBeerLog = vi.mocked(core.forwardBeerLog)
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -94,7 +93,7 @@ describe('Telegram message handler', () => {
   })
 
   async function getHandler() {
-    const { createTelegramBot } = await import('../../../collectors/telegram/index.js')
+    const { createTelegramBot } = await import('../bot.js')
     const bot = createTelegramBot() as unknown as BotInstance
     return bot._handlers['message:photo'][0]
   }

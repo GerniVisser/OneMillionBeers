@@ -101,9 +101,11 @@ The Backend API has no S3 credentials and no image handling code. The Collector 
 
 ### Collector design
 
-The Collector is a pluggable component — the messaging platform is a runtime detail, not a structural constraint. The shared pipeline (S3 upload → Backend API POST) is platform-independent. Only the `collectors/<platform>/` directory is platform-specific.
+Each collector is a standalone deployable service backed by its own package and Docker image. Shared infrastructure — S3 upload, backend forwarding, base config validation — lives in `@omb/collector-core`. Platform-specific code lives in a dedicated package (e.g. `@omb/collector-telegram`).
 
-**Collector selection** is done at startup via the `COLLECTOR` environment variable. Each collector is responsible for connecting to its platform, filtering relevant messages, and calling the shared upload and forwarder modules.
+There is no `COLLECTOR` env var. The image itself is the collector type. Adding a new messaging platform means creating a new package that depends on `@omb/collector-core`, with its own `Dockerfile` that produces an independent image.
+
+Multiple collectors can run simultaneously as separate services.
 
 ### Swagger UI — development only
 
@@ -150,7 +152,7 @@ Treat these as decided unless there is a compelling reason to revisit:
 | Logging            | Pino (structured JSON to stdout)                                             |
 | HTTP client        | Native fetch (Node 18+)                                                      |
 | Testing            | Vitest + Testcontainers (@testcontainers/postgresql)                         |
-| Collector (PoC)    | Telegram Bot API via grammY (WhatsApp/Baileys planned)                       |
+| Telegram Collector | Telegram Bot API via grammY (`@omb/collector-telegram`)                      |
 | Object storage     | S3-compatible (MinIO local, AWS S3 prod)                                     |
 | Frontend framework | SvelteKit + `@sveltejs/adapter-node`                                         |
 | Styling            | Tailwind CSS v4                                                              |

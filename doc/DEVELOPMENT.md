@@ -20,13 +20,14 @@ Never duplicate values into docs — read the file that owns them:
 
 ## Workspace packages
 
-| Package              | Name             | What it is                                                    | What it is not                                                                 |
-| -------------------- | ---------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `packages/backend`   | `@omb/backend`   | Fastify REST API, all business logic, PostgreSQL              | No image handling, no WhatsApp connection                                      |
-| `packages/collector` | `@omb/collector` | Baileys WhatsApp client, S3 photo upload, metadata forwarding | No business logic, no database access                                          |
-| `packages/frontend`  | `@omb/frontend`  | SvelteKit SSR dashboard                                       | No business logic — thin display layer only                                    |
-| `packages/gateway`   | —                | nginx Dockerfiles and nginx configs                           | Not a JS package — excluded from `pnpm -r` commands                            |
-| `packages/shared`    | `@omb/shared`    | Zod schemas and inferred TypeScript types                     | No runtime deps — consumed via workspace protocol, not published to a registry |
+| Package                       | Name                      | What it is                                                    | What it is not                                                                 |
+| ----------------------------- | ------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `packages/backend`            | `@omb/backend`            | Fastify REST API, all business logic, PostgreSQL              | No image handling, no WhatsApp connection                                      |
+| `packages/collector-core`     | `@omb/collector-core`     | S3 photo upload, backend forwarding, shared Zod env config    | No platform SDK, no entry point — consumed as a library by collector services  |
+| `packages/collector-telegram` | `@omb/collector-telegram` | Telegram bot (grammY), photo handler, entry point, Dockerfile | No business logic, no database access                                          |
+| `packages/frontend`           | `@omb/frontend`           | SvelteKit SSR dashboard                                       | No business logic — thin display layer only                                    |
+| `packages/gateway`            | —                         | nginx Dockerfiles and nginx configs                           | Not a JS package — excluded from `pnpm -r` commands                            |
+| `packages/shared`             | `@omb/shared`             | Zod schemas and inferred TypeScript types                     | No runtime deps — consumed via workspace protocol, not published to a registry |
 
 ---
 
@@ -109,5 +110,5 @@ There is no manual deploy step. Keeping `main` green is the team's highest-prior
 
 - CI (`ci.yml`) runs on every push and pull request: typecheck → lint → format check → full test suite (including Testcontainers integration tests) → Flyway image build validation
 - Deploy (`deploy.yml`) only runs after CI passes on push to `main`
-- Images are built for `backend`, `collector`, `frontend`, `gateway`, and `flyway`; pushed to GitHub Container Registry tagged with the git SHA
+- Images are built for `backend`, `collector-telegram`, `frontend`, `gateway`, and `flyway`; pushed to GitHub Container Registry tagged with the git SHA
 - Deploy pulls images, runs Flyway migrations against the production DB, restarts containers, and confirms successful start via health check endpoints before the workflow succeeds

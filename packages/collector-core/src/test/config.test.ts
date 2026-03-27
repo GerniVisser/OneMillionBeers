@@ -31,12 +31,11 @@ describe('shared config', () => {
     expect(config.LOG_LEVEL).toBe('debug')
   })
 
-  it('defaults COLLECTOR to telegram and LOG_LEVEL to info when not set', async () => {
+  it('defaults LOG_LEVEL to info when not set', async () => {
     stubValidEnv()
 
     const { config } = await import('../config.js')
 
-    expect(config.COLLECTOR).toBe('telegram')
     expect(config.LOG_LEVEL).toBe('info')
   })
 

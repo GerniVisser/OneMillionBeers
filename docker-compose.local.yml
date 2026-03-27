@@ -33,6 +33,19 @@ services:
       exit 0;
       "
 
+  waha:
+    image: devlikeapro/waha
+    network_mode: host
+    environment:
+      PORT: '3100'
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_API_KEY: local-api-key
+      WHATSAPP_START_SESSION: default
+      WHATSAPP_DOWNLOAD_MEDIA: 'true'
+      WAHA_WEBHOOK_URL: http://localhost:8080/webhook
+      WAHA_WEBHOOK_EVENTS: message,message.any,session.status
+      WAHA_PRINT_QR: 'true'
+
 volumes:
   postgres-data:
   minio-data:
