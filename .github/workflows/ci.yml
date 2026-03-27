@@ -39,6 +39,9 @@ jobs:
       - name: Build shared
         run: pnpm --filter @omb/shared build
 
+      - name: Build collector-core
+        run: pnpm --filter @omb/collector-core build
+
       - name: Type check
         run: pnpm -r typecheck
 
