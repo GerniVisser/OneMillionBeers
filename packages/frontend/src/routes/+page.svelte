@@ -3,10 +3,7 @@
   import type { PageData } from './$types'
   import type { FeedItem, SseEvent } from '@omb/shared'
   import { subscribeToStream } from '$lib/sse'
-  import FoamBubbles from '$lib/components/FoamBubbles.svelte'
-  import LiveBadge from '$lib/components/LiveBadge.svelte'
-  import BeerCounter from '$lib/components/BeerCounter.svelte'
-  import ProgressBar from '$lib/components/ProgressBar.svelte'
+  import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
   import LoadMoreButton from '$lib/components/LoadMoreButton.svelte'
   import LeaderboardTable from '$lib/components/LeaderboardTable.svelte'
@@ -19,6 +16,8 @@
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
   let loadingMore = $state(false)
+  // Tracks beers logged since page load via SSE (proxy for "today" until API provides it)
+  let sessionCount = $state(0)
 
   const hasMore = $derived(feedOffset < feedTotal)
 
@@ -28,12 +27,12 @@
       photoUrl: latestBeer.photoUrl,
       loggedAt: latestBeer.loggedAt,
       user: {
-        id: latestBeer.id, // SSE doesn't carry userId — use beer id as fallback key
+        id: latestBeer.id,
         displayName: latestBeer.userName,
         slug: latestBeer.userName?.toLowerCase().replace(/\s+/g, '-') ?? 'anonymous',
       },
       group: {
-        id: latestBeer.id, // fallback key
+        id: latestBeer.id,
         name: latestBeer.groupName,
         slug: latestBeer.groupName.toLowerCase().replace(/\s+/g, '-'),
       },
@@ -43,9 +42,9 @@
   onMount(() =>
     subscribeToStream((event: SseEvent) => {
       liveCount = event.count
+      sessionCount += 1
       if (event.latestBeer) {
         const item = transformSseToFeedItem(event.latestBeer)
-        // Only prepend if not already in the feed (SSR may have already fetched it)
         if (!feedItems.some((f) => f.id === item.id)) {
           feedItems = [item, ...feedItems]
           feedOffset += 1
@@ -80,81 +79,54 @@
   />
 </svelte:head>
 
-<!-- Hero -->
-<section
-  style="
-    position: relative;
-    overflow: hidden;
-    padding: 4rem 1rem 3rem;
-    text-align: center;
-    background: linear-gradient(180deg, #2d1200 0%, var(--color-bg-deep) 100%);
-  "
->
-  <FoamBubbles />
+<div class="page">
+  <HeroCard count={liveCount} {sessionCount} />
 
-  <div style="position: relative; z-index: 1; max-width: 600px; margin: 0 auto;">
-    <div style="margin-bottom: 1rem;">
-      <LiveBadge />
+  <!-- Feed -->
+  <section class="feed-section">
+    <div class="section-header">
+      <h2 class="section-title">Latest Beers</h2>
     </div>
+    <FeedGrid items={feedItems} loading={loadingMore && feedItems.length === 0} />
+    <LoadMoreButton {hasMore} onloadmore={loadMore} />
+  </section>
 
-    <h1
-      style="
-        font-family: var(--font-display);
-        font-size: clamp(2rem, 6vw, 3rem);
-        color: var(--color-beer-head);
-        letter-spacing: 0.05em;
-        margin-bottom: 1.5rem;
-      "
-      class="glow-amber"
-    >
-      One Million Beers
-    </h1>
-
-    <BeerCounter count={liveCount} />
-
-    <div style="margin-top: 2rem;">
-      <ProgressBar count={liveCount} />
-    </div>
-  </div>
-</section>
-
-<!-- Body -->
-<section style="max-width: 1200px; margin: 0 auto; padding: 2rem 1rem 4rem;">
-  <div class="dashboard-grid">
-    <!-- Feed -->
-    <div>
-      <h2
-        style="
-          font-family: var(--font-display);
-          font-size: 1.75rem;
-          color: var(--color-beer-amber);
-          letter-spacing: 0.05em;
-          margin-bottom: 1rem;
-        "
-      >
-        Latest Beers
-      </h2>
-      <FeedGrid items={feedItems} loading={loadingMore && feedItems.length === 0} />
-      <LoadMoreButton {hasMore} onloadmore={loadMore} />
-    </div>
-
-    <!-- Leaderboard -->
-    <div>
-      <LeaderboardTable entries={data.leaderboard.entries} title="Top Drinkers" />
-    </div>
-  </div>
-</section>
+  <!-- Leaderboard -->
+  <section class="leaderboard-section">
+    <LeaderboardTable entries={data.leaderboard.entries} title="Top Drinkers" />
+  </section>
+</div>
 
 <style>
-  .dashboard-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 2rem;
+  .page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 
-  @media (min-width: 1024px) {
-    .dashboard-grid {
-      grid-template-columns: 1fr 320px;
-    }
+  .feed-section {
+    width: 100%;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.875rem;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-beer-foam);
+  }
+
+  .leaderboard-section {
+    width: 100%;
+    margin-top: 0.5rem;
   }
 </style>
