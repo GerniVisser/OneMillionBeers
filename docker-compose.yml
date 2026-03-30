@@ -121,7 +121,7 @@ services:
     expose:
       - '3001'
     environment:
-      ORIGIN: ${ORIGIN:-https://gernivisser.com}
+      ORIGIN: ${ORIGIN:-https://onemillionbeers.co.za}
       PORT: '3001'
       BACKEND_INTERNAL_URL: http://backend:3000
     depends_on:

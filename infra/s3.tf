@@ -40,7 +40,7 @@ resource "aws_s3_bucket_cors_configuration" "photos" {
 
   cors_rule {
     allowed_methods = ["GET"]
-    allowed_origins = ["https://gernivisser.com"]
+    allowed_origins = ["https://onemillionbeers.co.za", "https://www.onemillionbeers.co.za"]
     allowed_headers = ["*"]
     max_age_seconds = 3600
   }

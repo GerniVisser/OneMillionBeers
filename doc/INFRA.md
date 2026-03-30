@@ -56,13 +56,13 @@ Access: security group allows port 5432 from EC2 security group only.
 
 ### Object Storage — S3
 
-| Property     | Value                                                                       |
-| ------------ | --------------------------------------------------------------------------- |
-| Bucket       | `onemillionbeers-photos-prod`                                               |
-| Public read  | Yes — bucket policy grants `s3:GetObject` to `*` (photos are served by URL) |
-| Write access | EC2 IAM instance profile only — no static credentials                       |
-| Versioning   | Disabled (photos are immutable)                                             |
-| CORS         | GET allowed from `https://gernivisser.com`                                  |
+| Property     | Value                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| Bucket       | `onemillionbeers-photos-prod`                                                            |
+| Public read  | Yes — bucket policy grants `s3:GetObject` to `*` (photos are served by URL)              |
+| Write access | EC2 IAM instance profile only — no static credentials                                    |
+| Versioning   | Disabled (photos are immutable)                                                          |
+| CORS         | GET allowed from `https://onemillionbeers.co.za` and `https://www.onemillionbeers.co.za` |
 
 ### Security Groups
 
@@ -169,7 +169,7 @@ Push to main
       4. Write .env.sha (GIT_SHA + GITHUB_REPOSITORY)
       5. docker compose pull
       6. docker compose up -d
-      7. Health check: curl https://gernivisser.com/api/health
+      7. Health check: curl https://onemillionbeers.co.za/api/health
 ```
 
 ### Files on EC2 at /opt/onemillionbeers/
@@ -193,7 +193,7 @@ STORAGE_BUCKET=onemillionbeers-photos-prod
 STORAGE_KEY=        # empty — IAM instance profile provides credentials
 STORAGE_SECRET=     # empty — IAM instance profile provides credentials
 STORAGE_REGION=us-east-1
-ORIGIN=https://gernivisser.com
+ORIGIN=https://onemillionbeers.co.za
 BACKEND_INTERNAL_URL=http://backend:3000
 LOG_LEVEL=info
 ```
@@ -270,7 +270,7 @@ terraform apply
 ```
 
 **5. DNS**
-Point `gernivisser.com` A record → Elastic IP (from `terraform output ec2_public_ip`).
+DNS records for `onemillionbeers.co.za` are managed by `infra/route53.tf` and applied automatically via `terraform apply`.
 
 **6. EC2 bootstrap**
 
@@ -302,7 +302,8 @@ docker compose up -d
 ```bash
 docker compose run --rm certbot certonly --webroot \
   --webroot-path=/var/www/certbot \
-  -d gernivisser.com
+  -d onemillionbeers.co.za \
+  -d www.onemillionbeers.co.za
 ```
 
 **9. GitHub Secrets**
@@ -311,7 +312,7 @@ Set `EC2_HOST` (Elastic IP), `EC2_USER` (`ubuntu`), `EC2_SSH_KEY` (private key P
 **10. Verify**
 
 ```bash
-curl https://gernivisser.com/api/health
+curl https://onemillionbeers.co.za/api/health
 # → {"status":"ok"}
 ```
 
@@ -326,8 +327,9 @@ Push a commit to main → GitHub Actions completes end-to-end.
 - [ ] `terraform apply` completes; outputs show EC2 IP, RDS endpoint, S3 bucket name
 - [ ] SSH to EC2 Elastic IP works with deploy key
 - [ ] `docker compose up -d` brings all 4 containers healthy
-- [ ] `curl https://gernivisser.com/api/health` → `{"status":"ok"}`
-- [ ] `curl https://gernivisser.com/health` → 200
+- [ ] `curl https://onemillionbeers.co.za/api/health` → `{"status":"ok"}`
+- [ ] `curl https://onemillionbeers.co.za/health` → 200
+- [ ] `curl -I https://www.onemillionbeers.co.za` → 301 redirect to apex
 - [ ] GitHub Actions deploy completes end-to-end on test push to main
 - [ ] Beer photo upload → S3 URL publicly accessible in browser
 - [ ] `docker exec backend psql $DATABASE_URL -c "SELECT 1"` succeeds with SSL
