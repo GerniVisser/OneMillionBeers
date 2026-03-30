@@ -1,118 +1,289 @@
 <script lang="ts">
-  import ProgressBar from './ProgressBar.svelte'
+  import { untrack } from 'svelte'
 
   let {
-    count,
-    sessionCount,
-    target = 1_000_000,
+    count = 0,
+    sessionCount = 0,
+    flashCount = 0,
   }: {
     count: number
-    sessionCount: number
-    target?: number
+    sessionCount?: number
+    flashCount?: number
   } = $props()
 
-  const pct = $derived(Math.min((count / target) * 100, 100))
-  const remaining = $derived(Math.max(target - count, 0).toLocaleString())
+  const TARGET = 1_000_000
+  const MILESTONES = [10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000]
 
-  // Percentage vs yesterday — requires API support; shown only when available
-  const vsYesterday: number | null = null
+  const DIGITS = 7
+  const digits = $derived(String(count).padStart(DIGITS, '0').split(''))
+  const pct = $derived(Math.min((count / TARGET) * 100, 100).toFixed(2))
+  const formatted = $derived(count.toLocaleString())
+
+  // Bubbles for background decoration
+  const bubbles = Array.from({ length: 10 }, (_, i) => ({
+    id: i,
+    left: `${8 + i * 9}%`,
+    size: `${6 + (i % 4) * 4}px`,
+    delay: `${i * 0.6}s`,
+    duration: `${5 + (i % 3) * 2}s`,
+    opacity: 0.2 + (i % 3) * 0.1,
+  }))
+
+  // Flash effect on count element
+  let countEl: HTMLElement
+
+  $effect(() => {
+    if (flashCount === 0 || !countEl) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    countEl.animate(
+      [
+        { color: 'var(--color-beer-amber)' },
+        {
+          color: 'var(--color-accent-glow)',
+          textShadow: '0 0 24px var(--color-accent-glow), 0 0 48px rgba(240,168,48,0.35)',
+        },
+        { color: 'var(--color-beer-amber)' },
+      ],
+      { duration: 600, easing: 'ease-out' },
+    )
+  })
+
+  // Milestone banner
+  let milestoneBanner = $state<number | null>(null)
+  let prevCount = $state(untrack(() => count))
+
+  $effect(() => {
+    const crossed = MILESTONES.find((m) => prevCount < m && count >= m)
+    if (crossed) {
+      milestoneBanner = crossed
+      setTimeout(() => {
+        milestoneBanner = null
+      }, 5000)
+    }
+    prevCount = count
+  })
 </script>
 
-<div class="hero card">
-  <div class="hero-grid">
-    <!-- Left: Global Progress -->
-    <div class="hero-left">
-      <span class="stat-label">Global Progress</span>
-      <div class="hero-count">{count.toLocaleString()}</div>
-      <div class="hero-sub">of 1,000,000 beers</div>
+<div class="hero-card">
+  <!-- Foam bubbles background -->
+  <div aria-hidden="true" class="bubbles-wrap">
+    {#each bubbles as b (b.id)}
+      <div
+        class="bubble"
+        style="left: {b.left}; width: {b.size}; height: {b.size}; opacity: {b.opacity}; animation-delay: {b.delay}; animation-duration: {b.duration};"
+      ></div>
+    {/each}
+  </div>
+
+  <div class="hero-content">
+    <!-- Live badge -->
+    <div class="badge-wrap">
+      <span class="live-badge">
+        <span class="live-dot"></span>
+        LIVE
+      </span>
     </div>
 
-    <!-- Right: Today -->
-    <div class="hero-right">
-      <span class="stat-label">Today</span>
-      <div class="hero-today">+{sessionCount.toLocaleString()}</div>
-      {#if vsYesterday !== null}
-        <div class="hero-vs">
-          {vsYesterday >= 0 ? '↑' : '↓'}
-          {Math.abs(vsYesterday)}% vs yesterday
-        </div>
-      {:else if sessionCount > 0}
-        <div class="hero-vs">↑ live right now</div>
-      {/if}
+    <h1 class="hero-title glow-amber">One Million Beers</h1>
+
+    <!-- Counter -->
+    <div aria-live="polite" aria-label="{count} beers logged" class="counter-wrap">
+      <div class="digits" bind:this={countEl}>
+        {#each digits as digit, i (i)}
+          <span class="digit">{digit}</span>
+        {/each}
+      </div>
+      <p class="counter-label">beers and counting</p>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-wrap">
+      <div
+        class="progress-track"
+        role="progressbar"
+        aria-valuenow={count}
+        aria-valuemin={0}
+        aria-valuemax={TARGET}
+        aria-label="Progress to one million beers"
+      >
+        <div class="progress-fill" style="width: {pct}%;"></div>
+      </div>
+      <div class="progress-labels">
+        <span>{formatted} / 1,000,000</span>
+        <span>{pct}%</span>
+      </div>
     </div>
   </div>
 
-  <!-- Full-width progress bar -->
-  <div class="hero-bar">
-    <ProgressBar {count} {target} {remaining} />
-  </div>
+  <!-- Milestone banner -->
+  {#if milestoneBanner}
+    <div class="milestone-banner" role="status">
+      🎉 {milestoneBanner.toLocaleString()} beers!
+    </div>
+  {/if}
 </div>
 
 <style>
-  .hero {
-    padding: 1.375rem 1.5rem 1.25rem;
-    display: flex;
-    flex-direction: column;
+  .hero-card {
+    position: relative;
+    overflow: hidden;
+    padding: 3rem 1rem 2.5rem;
+    text-align: center;
+    background: linear-gradient(180deg, #2d1200 0%, var(--color-bg-deep) 100%);
+    border-radius: 1rem;
+    border: 1px solid var(--color-bg-surface);
   }
 
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 1rem;
-    align-items: start;
+  .bubbles-wrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
   }
 
-  /* Left */
-  .hero-left {
-    display: flex;
-    flex-direction: column;
+  .bubble {
+    position: absolute;
+    bottom: -20px;
+    border-radius: 50%;
+    background: var(--color-beer-amber);
+    animation: float-up 7s ease-in infinite;
   }
 
-  .hero-count {
-    font-family: var(--font-display);
-    font-size: clamp(2.5rem, 10vw, 3.5rem);
-    font-weight: 700;
-    color: var(--color-beer-amber);
-    line-height: 1;
-    margin-top: 0.2rem;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+  @media (prefers-reduced-motion: reduce) {
+    .bubble {
+      animation: none !important;
+    }
   }
 
-  .hero-sub {
-    font-family: var(--font-body);
-    font-size: 0.82rem;
-    color: var(--color-text-muted);
-    margin-top: 0.35rem;
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 500px;
+    margin: 0 auto;
   }
 
-  /* Right */
-  .hero-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+  .badge-wrap {
+    margin-bottom: 1rem;
   }
 
-  .hero-today {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 8vw, 3rem);
-    font-weight: 700;
-    color: var(--color-beer-foam);
-    line-height: 1;
-    margin-top: 0.2rem;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hero-vs {
-    margin-top: 0.35rem;
-    font-family: var(--font-body);
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background-color: var(--color-bg-surface);
+    border: 1px solid var(--color-beer-dark);
+    border-radius: 9999px;
+    padding: 0.25rem 0.75rem;
     font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--color-positive);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--color-beer-amber);
+    text-transform: uppercase;
   }
 
-  /* Bottom bar */
-  .hero-bar {
-    margin-top: 1.25rem;
+  .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-beer-amber);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3rem);
+    color: var(--color-beer-head);
+    letter-spacing: 0.05em;
+    margin-bottom: 1.5rem;
+  }
+
+  .counter-wrap {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .digits {
+    display: inline-flex;
+    gap: 0.125rem;
+  }
+
+  .digit {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 10vw, 6rem);
+    line-height: 1;
+    color: var(--color-beer-amber);
+    display: inline-block;
+  }
+
+  .counter-label {
+    font-family: var(--font-body);
+    color: var(--color-text-muted);
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .progress-wrap {
+    width: 100%;
+  }
+
+  .progress-track {
+    background-color: var(--color-bg-surface);
+    border-radius: 9999px;
+    height: 12px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--color-beer-dark),
+      var(--color-beer-amber),
+      var(--color-accent-glow)
+    );
+    border-radius: 9999px;
+    transition: width 1s ease-out;
+  }
+
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.375rem;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .milestone-banner {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    font-weight: 800;
+    color: var(--color-accent-glow);
+    text-shadow: 0 0 32px var(--color-accent-glow);
+    background: rgba(18, 8, 2, 0.75);
+    border-radius: inherit;
+    animation: count-glow 5s ease-out forwards;
+    backdrop-filter: blur(2px);
+  }
+
+  @keyframes count-glow {
+    0% {
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
 </style>

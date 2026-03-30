@@ -1,7 +1,15 @@
 <script lang="ts">
   import type { FeedItem } from '@omb/shared'
 
-  let { item }: { item: FeedItem } = $props()
+  let {
+    item,
+    isNew = false,
+    onlongpress,
+  }: {
+    item: FeedItem
+    isNew?: boolean
+    onlongpress?: (item: FeedItem) => void
+  } = $props()
 
   function timeAgo(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime()
@@ -16,9 +24,63 @@
 
   const displayName = $derived(item.user.displayName ?? 'Anonymous')
   const ago = $derived(timeAgo(item.loggedAt))
+
+  // Long-press state
+  let pressTimer: ReturnType<typeof setTimeout> | null = null
+  let isPressed = $state(false)
+  let startX = 0
+  let startY = 0
+  let animating = $state(false)
+  $effect(() => {
+    if (isNew) animating = true
+  })
+
+  function handlePointerDown(e: PointerEvent) {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    startX = e.clientX
+    startY = e.clientY
+    isPressed = true
+    pressTimer = setTimeout(() => {
+      isPressed = false
+      onlongpress?.(item)
+    }, 500)
+  }
+
+  function handlePointerMove(e: PointerEvent) {
+    if (!pressTimer) return
+    const dx = e.clientX - startX
+    const dy = e.clientY - startY
+    if (Math.sqrt(dx * dx + dy * dy) > 10) cancelPress()
+  }
+
+  function cancelPress() {
+    if (pressTimer) {
+      clearTimeout(pressTimer)
+      pressTimer = null
+    }
+    isPressed = false
+  }
+
+  function handleAnimationEnd() {
+    animating = false
+  }
 </script>
 
-<article class="beer-card card-hover">
+<div
+  class="beer-card card-hover"
+  class:beer-card-new={animating}
+  class:is-pressed={isPressed}
+  onpointerdown={handlePointerDown}
+  onpointermove={handlePointerMove}
+  onpointerup={cancelPress}
+  onpointercancel={cancelPress}
+  onpointerleave={cancelPress}
+  onanimationend={handleAnimationEnd}
+  role="button"
+  tabindex="0"
+  aria-label="Beer photo by {displayName} — long press to enlarge"
+>
   <div class="photo-wrap">
     <img src={item.photoUrl} alt="Beer logged by {displayName}" loading="lazy" class="photo" />
     <div class="overlay"></div>
@@ -30,7 +92,7 @@
       <span class="meta-time">{ago}</span>
     </div>
   </div>
-</article>
+</div>
 
 <style>
   .beer-card {
@@ -38,12 +100,25 @@
     overflow: hidden;
     background-color: var(--color-bg-card);
     border: 1px solid var(--color-border);
+    cursor: pointer;
+    user-select: none;
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .beer-card.is-pressed {
+    transform: scale(0.97);
+    box-shadow:
+      0 0 0 2px var(--color-beer-amber),
+      0 0 12px rgba(212, 136, 58, 0.4);
   }
 
   .photo-wrap {
     position: relative;
     aspect-ratio: 4 / 5;
     overflow: hidden;
+    touch-action: manipulation;
   }
 
   .photo {
