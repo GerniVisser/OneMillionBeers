@@ -122,5 +122,5 @@ jobs:
       - name: Health check
         run: |
           sleep 15
-          curl --fail https://gernivisser.com/api/health
-          curl --fail https://gernivisser.com/health
+          curl --fail https://onemillionbeers.co.za/api/health
+          curl --fail https://onemillionbeers.co.za/health
