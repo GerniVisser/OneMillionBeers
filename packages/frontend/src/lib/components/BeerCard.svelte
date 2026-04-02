@@ -5,10 +5,12 @@
     item,
     isNew = false,
     onlongpress,
+    onimageload,
   }: {
     item: FeedItem
     isNew?: boolean
     onlongpress?: (item: FeedItem) => void
+    onimageload?: () => void
   } = $props()
 
   function timeAgo(iso: string): string {
@@ -82,7 +84,13 @@
   aria-label="Beer photo by {displayName} — long press to enlarge"
 >
   <div class="photo-wrap">
-    <img src={item.photoUrl} alt="Beer logged by {displayName}" loading="lazy" class="photo" />
+    <img
+      src={item.photoUrl}
+      alt="Beer logged by {displayName}"
+      loading="lazy"
+      class="photo"
+      onload={onimageload}
+    />
     <div class="overlay"></div>
     <div class="meta">
       <div class="meta-left">
@@ -116,7 +124,6 @@
 
   .photo-wrap {
     position: relative;
-    aspect-ratio: 4 / 5;
     overflow: hidden;
     touch-action: manipulation;
   }

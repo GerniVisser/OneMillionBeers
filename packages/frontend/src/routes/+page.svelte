@@ -32,7 +32,17 @@
   let mountTime = $state(Date.now())
   let tick = $state(0) // increments every 60s to refresh rate calculation
 
+  // Scroll state — drives compact header and pending-item buffering
+  let heroRef: HTMLElement | undefined
+  let isScrolled = $state(false)
+  let isNearTop = $state(true)
+
+  // Items that arrive while the user is scrolled down — held back to avoid grid disruption
+  let pendingItems = $state<FeedItem[]>([])
+
   const hasMore = $derived(feedOffset < feedTotal)
+  const TARGET = 1_000_000
+  const pct = $derived(Math.min((liveCount / TARGET) * 100, 100).toFixed(2))
 
   // Beers per hour since page load (re-evaluates on each tick)
   const sseRate = $derived.by(() => {
@@ -59,7 +69,38 @@
     }
   }
 
+  function flushPending() {
+    if (pendingItems.length === 0) return
+    const toFlush = pendingItems
+    pendingItems = []
+    feedItems = [...toFlush, ...feedItems]
+    feedOffset += toFlush.length
+    newestId = toFlush[0].id
+    setTimeout(() => {
+      if (newestId === toFlush[0].id) newestId = ''
+    }, 2000)
+  }
+
+  function handleScroll() {
+    const scrollY = window.scrollY
+    isNearTop = scrollY < 80
+
+    if (heroRef) {
+      const rect = heroRef.getBoundingClientRect()
+      isScrolled = rect.bottom < 20
+    }
+
+    // Auto-flush pending items once user scrolls back near the top
+    if (isNearTop && pendingItems.length > 0) {
+      flushPending()
+    }
+  }
+
   onMount(() => {
+    // Establish initial scroll state immediately
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
     // Rate tick: re-derive sseRate every 60s
     const tickId = setInterval(() => {
       tick++
@@ -72,15 +113,26 @@
 
       if (event.latestBeer) {
         const item = transformSseToFeedItem(event.latestBeer)
-        if (!feedItems.some((f) => f.id === item.id)) {
-          feedItems = [item, ...feedItems]
-          feedOffset += 1
+        const isDupe =
+          feedItems.some((f) => f.id === item.id) || pendingItems.some((p) => p.id === item.id)
+
+        if (!isDupe) {
           feedTotal += 1
-          newestId = item.id
-          setTimeout(() => {
-            if (newestId === item.id) newestId = ''
-          }, 2000)
+
+          if (isNearTop) {
+            // User is at the top — prepend immediately with animation
+            feedItems = [item, ...feedItems]
+            feedOffset += 1
+            newestId = item.id
+            setTimeout(() => {
+              if (newestId === item.id) newestId = ''
+            }, 2000)
+          } else {
+            // User has scrolled — buffer to avoid disrupting their view
+            pendingItems = [item, ...pendingItems]
+          }
         }
+
         const toast: Toast = {
           id: event.latestBeer.id,
           photoUrl: event.latestBeer.photoUrl,
@@ -96,6 +148,7 @@
     })
 
     return () => {
+      window.removeEventListener('scroll', handleScroll)
       clearInterval(tickId)
       unsub()
     }
@@ -140,8 +193,59 @@
   }}
 />
 
+<!-- Compact sticky header — morphs in as the hero scrolls out of view -->
+<div class="compact-header" class:compact-visible={isScrolled} aria-hidden={!isScrolled}>
+  <a href="/" class="compact-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 2h10l1 4H5L6 2Z" fill="var(--color-beer-amber)" opacity="0.9" />
+      <rect
+        x="5"
+        y="6"
+        width="14"
+        height="14"
+        rx="2"
+        fill="var(--color-beer-amber)"
+        opacity="0.15"
+        stroke="var(--color-beer-amber)"
+        stroke-width="1.5"
+      />
+      <path
+        d="M17 10h2a2 2 0 0 1 0 4h-2"
+        stroke="var(--color-beer-amber)"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      />
+    </svg>
+    <span class="compact-logo-text">OneMillionBeers</span>
+  </a>
+  <div class="compact-right">
+    <span class="compact-count">{liveCount.toLocaleString()}</span>
+    <div
+      class="compact-bar-wrap"
+      role="progressbar"
+      aria-valuenow={liveCount}
+      aria-valuemin={0}
+      aria-valuemax={TARGET}
+      aria-label="Progress to one million beers"
+    >
+      <div class="compact-bar-fill" style="width: {pct}%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating pill: notifies user of new beers arriving while they browse -->
+{#if pendingItems.length > 0}
+  <button class="new-beers-pill" class:pill-below-header={isScrolled} onclick={flushPending}>
+    ↑ {pendingItems.length}
+    {pendingItems.length === 1 ? 'new beer' : 'new beers'}
+  </button>
+{/if}
+
 <div class="page">
-  <HeroCard count={liveCount} {sessionCount} {flashCount} />
+  <!-- Hero section — full progress card at top of page -->
+  <div bind:this={heroRef}>
+    <HeroCard count={liveCount} {sessionCount} {flashCount} />
+  </div>
 
   <StatsStrip count={liveCount} {sessionCount} leaderboard={data.leaderboard.entries} {sseRate} />
 
@@ -177,6 +281,134 @@
     gap: 1rem;
   }
 
+  /* ── Compact header ─────────────────────────────────────── */
+  .compact-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1.25rem;
+    background-color: rgba(24, 17, 10, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--color-border);
+    /* Hidden until scrolled */
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition:
+      opacity 260ms ease,
+      transform 260ms ease;
+  }
+
+  .compact-header.compact-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+  }
+
+  .compact-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .compact-logo-text {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-beer-foam);
+    letter-spacing: -0.01em;
+  }
+
+  .compact-logo:hover .compact-logo-text {
+    color: var(--color-beer-amber);
+  }
+
+  .compact-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
+
+  .compact-count {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-beer-amber);
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+
+  .compact-bar-wrap {
+    width: 110px;
+    height: 4px;
+    background-color: var(--color-bg-surface);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  .compact-bar-fill {
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--color-beer-dark),
+      var(--color-beer-amber),
+      var(--color-accent-glow)
+    );
+    border-radius: 9999px;
+    transition: width 1s ease-out;
+  }
+
+  /* ── New beers pill ─────────────────────────────────────── */
+  .new-beers-pill {
+    position: fixed;
+    top: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    z-index: 39;
+    background: var(--color-beer-dark);
+    border: 1px solid var(--color-beer-amber);
+    color: var(--color-beer-head);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.375rem 1rem;
+    border-radius: 9999px;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 16px rgba(212, 136, 58, 0.4);
+    animation: pill-drop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  .new-beers-pill.pill-below-header {
+    top: 3.5rem;
+  }
+
+  .new-beers-pill:hover {
+    background: var(--color-beer-amber);
+    color: var(--color-bg-deep);
+  }
+
+  @keyframes pill-drop {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) translateY(-10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+
+  /* ── Feed section ───────────────────────────────────────── */
   .feed-section {
     width: 100%;
   }

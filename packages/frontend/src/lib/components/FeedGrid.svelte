@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte'
+  import { browser } from '$app/environment'
   import type { FeedItem } from '@omb/shared'
   import BeerCard from './BeerCard.svelte'
 
@@ -13,40 +15,79 @@
     newestId?: string
     onlongpress?: (item: FeedItem) => void
   } = $props()
+
+  let gridEl = $state<HTMLElement | undefined>()
+  let masonry: import('masonry-layout') | undefined
+
+  async function initMasonry() {
+    if (!browser || !gridEl) return
+    const Masonry = (await import('masonry-layout')).default
+    masonry = new Masonry(gridEl, {
+      itemSelector: '.masonry-item',
+      columnWidth: '.masonry-sizer',
+      percentPosition: true,
+      gutter: 10,
+      transitionDuration: '0.2s',
+    })
+  }
+
+  async function relayout() {
+    await tick()
+    masonry?.reloadItems?.()
+    masonry?.layout?.()
+  }
+
+  onMount(() => {
+    initMasonry()
+    return () => {
+      masonry?.destroy?.()
+    }
+  })
+
+  // Re-layout whenever items change (new cards added / images load)
+  $effect(() => {
+    void items
+    relayout()
+  })
 </script>
 
 {#if loading}
   <div class="feed-grid">
     {#each { length: 8 } as _}
-      <div class="skeleton"></div>
+      <div class="masonry-item skeleton"></div>
     {/each}
   </div>
 {:else if items.length === 0}
   <p class="empty">No beers logged yet. Be the first!</p>
 {:else}
-  <div class="feed-grid">
+  <div class="feed-grid" bind:this={gridEl}>
+    <!-- Sizer element controls column width for Masonry -->
+    <div class="masonry-sizer"></div>
     {#each items as item (item.id)}
-      <BeerCard {item} isNew={item.id === newestId} {onlongpress} />
+      <div class="masonry-item">
+        <BeerCard {item} isNew={item.id === newestId} {onlongpress} onimageload={relayout} />
+      </div>
     {/each}
   </div>
 {/if}
 
 <style>
   .feed-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.625rem;
+    /* Masonry uses absolute positioning; position:relative anchors children */
+    position: relative;
+    width: 100%;
+  }
+
+  /* Sizer and items: 2 columns on mobile, 3 on tablet+ */
+  .masonry-sizer,
+  :global(.masonry-item) {
+    width: calc(50% - 5px);
   }
 
   @media (min-width: 480px) {
-    .feed-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .feed-grid {
-      grid-template-columns: repeat(4, 1fr);
+    .masonry-sizer,
+    :global(.masonry-item) {
+      width: calc(33.333% - 7px);
     }
   }
 
@@ -56,6 +97,14 @@
     background-color: var(--color-bg-card);
     border: 1px solid var(--color-border);
     animation: pulse 2s ease-in-out infinite;
+    /* Give skeletons varying heights for a natural pre-load feel */
+  }
+
+  .skeleton:nth-child(3n) {
+    aspect-ratio: 3 / 4;
+  }
+  .skeleton:nth-child(3n + 1) {
+    aspect-ratio: 1 / 1;
   }
 
   @keyframes pulse {
