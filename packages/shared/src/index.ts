@@ -14,9 +14,11 @@ export {
   GroupSchema,
   GroupSummarySchema,
   GroupProfileResponseSchema,
+  GroupListItemSchema,
   type Group,
   type GroupSummary,
   type GroupProfileResponse,
+  type GroupListItem,
 } from './group.js'
 
 export {
@@ -40,12 +42,14 @@ export {
 export {
   PaginationQuerySchema,
   PaginatedResponseSchema,
+  GroupSearchQuerySchema,
   LeaderboardEntrySchema,
   LeaderboardResponseSchema,
   GlobalCountResponseSchema,
   UserStatsResponseSchema,
   SseEventSchema,
   type PaginationQuery,
+  type GroupSearchQuery,
   type LeaderboardEntry,
   type LeaderboardResponse,
   type GlobalCountResponse,

@@ -243,42 +243,62 @@
 
 <div class="page">
   <!-- Hero section — full progress card at top of page -->
-  <div bind:this={heroRef}>
+  <div class="hero-wrap" bind:this={heroRef}>
     <HeroCard count={liveCount} {sessionCount} {flashCount} />
   </div>
 
   <StatsStrip count={liveCount} {sessionCount} leaderboard={data.leaderboard.entries} {sseRate} />
 
-  <!-- Feed -->
-  <section class="feed-section">
-    <div class="section-header">
-      <h2 class="section-title">Latest Beers</h2>
-    </div>
-    <FeedGrid
-      items={feedItems}
-      loading={loadingMore && feedItems.length === 0}
-      {newestId}
-      onlongpress={(item) => {
-        lightboxItem = item
-      }}
-    />
-    <LoadMoreButton {hasMore} onloadmore={loadMore} />
-  </section>
+  <!-- Feed + Leaderboard grid -->
+  <div class="content-grid">
+    <!-- Feed -->
+    <section class="feed-section">
+      <div class="section-header">
+        <h2 class="section-title">Latest Beers</h2>
+      </div>
+      <FeedGrid
+        items={feedItems}
+        loading={loadingMore && feedItems.length === 0}
+        {newestId}
+        onlongpress={(item) => {
+          lightboxItem = item
+        }}
+      />
+      <LoadMoreButton {hasMore} onloadmore={loadMore} />
+    </section>
 
-  <!-- Leaderboard -->
-  <section class="leaderboard-section">
-    <LeaderboardTable entries={data.leaderboard.entries} title="Top Drinkers" />
-  </section>
+    <!-- Leaderboard sidebar -->
+    <aside class="leaderboard-section">
+      <LeaderboardTable entries={data.leaderboard.entries} title="Top Drinkers" />
+    </aside>
+  </div>
 </div>
 
 <style>
   .page {
-    max-width: 700px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 1.25rem 1rem 4rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .hero-wrap {
+    width: 100%;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  @media (min-width: 1024px) {
+    .content-grid {
+      grid-template-columns: 1fr 320px;
+    }
   }
 
   /* ── Compact header ─────────────────────────────────────── */
@@ -429,6 +449,5 @@
 
   .leaderboard-section {
     width: 100%;
-    margin-top: 0.5rem;
   }
 </style>

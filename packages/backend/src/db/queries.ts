@@ -1,6 +1,7 @@
 import type pg from 'pg'
 import type {
   Group,
+  GroupListItem,
   User,
   BeerLog,
   FeedItem,
@@ -50,6 +51,38 @@ export async function getGroupTotalBeers(pool: pg.Pool, groupId: string): Promis
     [groupId],
   )
   return parseInt(rows[0].count, 10)
+}
+
+export async function listGroups(
+  pool: pg.Pool,
+  limit: number,
+  offset: number,
+  search?: string,
+): Promise<{ items: GroupListItem[]; total: number }> {
+  const filter = search ?? null
+  const { rows: countRows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(DISTINCT g.id)::text AS count
+     FROM groups g
+     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')`,
+    [filter],
+  )
+  const total = parseInt(countRows[0].count, 10)
+
+  const { rows } = await pool.query<GroupListItem>(
+    `SELECT
+       g.id,
+       g.name,
+       g.slug,
+       COUNT(DISTINCT bl.user_id)::int AS "memberCount"
+     FROM groups g
+     LEFT JOIN beer_logs bl ON bl.group_id = g.id
+     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')
+     GROUP BY g.id
+     ORDER BY g.name ASC
+     LIMIT $2 OFFSET $3`,
+    [filter, limit, offset],
+  )
+  return { items: rows, total }
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────

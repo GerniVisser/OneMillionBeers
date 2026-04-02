@@ -3,6 +3,7 @@ import type {
   FeedItem,
   LeaderboardResponse,
   GroupProfileResponse,
+  GroupListItem,
   UserProfileResponse,
   UserStatsResponse,
 } from '@omb/shared'
@@ -67,6 +68,18 @@ export function getGlobalFeed(
 
 export function getGlobalLeaderboard(fetch: typeof globalThis.fetch): Promise<LeaderboardResponse> {
   return get<LeaderboardResponse>(fetch, '/global/leaderboard')
+}
+
+export function getGroups(
+  fetch: typeof globalThis.fetch,
+  params?: { search?: string; limit?: number; offset?: number },
+): Promise<PaginatedResponse<GroupListItem>> {
+  const p: Record<string, string | number> = {
+    limit: params?.limit ?? 20,
+    offset: params?.offset ?? 0,
+  }
+  if (params?.search) p.search = params.search
+  return get<PaginatedResponse<GroupListItem>>(fetch, '/groups', p)
 }
 
 export function getGroupProfile(

@@ -9,6 +9,12 @@ export const PaginationQuerySchema = z.object({
 })
 export type PaginationQuery = z.infer<typeof PaginationQuerySchema>
 
+// GET /v1/groups — pagination + optional name search
+export const GroupSearchQuerySchema = PaginationQuerySchema.extend({
+  search: z.string().optional(),
+})
+export type GroupSearchQuery = z.infer<typeof GroupSearchQuerySchema>
+
 // Generic paginated response wrapper — used as PaginatedResponseSchema(FeedItemSchema)
 export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
   z.object({
