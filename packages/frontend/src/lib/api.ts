@@ -6,6 +6,10 @@ import type {
   GroupListItem,
   UserProfileResponse,
   UserStatsResponse,
+  GroupStatsResponse,
+  GroupActivityResponse,
+  GroupHourlyResponse,
+  GroupMonthlyResponse,
 } from '@omb/shared'
 
 const API_BASE = '/api/v1'
@@ -105,6 +109,34 @@ export function getGroupLeaderboard(
   slug: string,
 ): Promise<LeaderboardResponse> {
   return get<LeaderboardResponse>(fetch, `/groups/${slug}/leaderboard`)
+}
+
+export function getGroupStats(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupStatsResponse> {
+  return get<GroupStatsResponse>(fetch, `/groups/${slug}/stats`)
+}
+
+export function getGroupActivity(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupActivityResponse> {
+  return get<GroupActivityResponse>(fetch, `/groups/${slug}/activity`)
+}
+
+export function getGroupHourly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupHourlyResponse> {
+  return get<GroupHourlyResponse>(fetch, `/groups/${slug}/hourly`)
+}
+
+export function getGroupMonthly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupMonthlyResponse> {
+  return get<GroupMonthlyResponse>(fetch, `/groups/${slug}/monthly`)
 }
 
 export function getUserProfile(

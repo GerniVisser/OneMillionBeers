@@ -40,6 +40,23 @@ export {
 } from './beer.js'
 
 export {
+  GroupStatsResponseSchema,
+  GroupActivityResponseSchema,
+  GroupHourlyResponseSchema,
+  GroupMonthlyResponseSchema,
+  ActivityDaySchema,
+  HourBucketSchema,
+  MonthBucketSchema,
+  type GroupStatsResponse,
+  type ActivityDay,
+  type GroupActivityResponse,
+  type HourBucket,
+  type GroupHourlyResponse,
+  type MonthBucket,
+  type GroupMonthlyResponse,
+} from './group-stats.js'
+
+export {
   PaginationQuerySchema,
   PaginatedResponseSchema,
   GroupSearchQuerySchema,

@@ -9,6 +9,10 @@ import {
   PaginatedResponseSchema,
   FeedItemSchema,
   LeaderboardResponseSchema,
+  GroupStatsResponseSchema,
+  GroupActivityResponseSchema,
+  GroupHourlyResponseSchema,
+  GroupMonthlyResponseSchema,
 } from '@omb/shared'
 
 let pool: pg.Pool
@@ -194,5 +198,163 @@ describe('GET /v1/groups/:groupId/leaderboard', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data?.entries[0].beerCount).toBe(2)
     expect(parsed.data?.entries[0].rank).toBe(1)
+  })
+})
+
+describe('GET /v1/groups/:groupId/stats', () => {
+  it('returns 404 for unknown group', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-such-group/stats' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns zero stats for a group with no beers', async () => {
+    await seedBeerLog()
+    const slug = await getGroupSlug()
+    await pool.query('DELETE FROM beer_logs')
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/stats` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupStatsResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.totalBeers).toBe(0)
+    expect(parsed.data?.activeMemberCount).toBe(0)
+    expect(parsed.data?.daysActive).toBe(0)
+    expect(parsed.data?.peakDay).toBeNull()
+  })
+
+  it('returns correct stats for seeded beer logs', async () => {
+    await seedBeerLog('+15551111111', '2024-06-01T10:00:00.000Z')
+    await seedBeerLog('+15551111111', '2024-06-01T11:00:00.000Z')
+    await seedBeerLog('+15552222222', '2024-06-01T12:00:00.000Z')
+    const slug = await getGroupSlug()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/stats` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupStatsResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.totalBeers).toBe(3)
+    expect(parsed.data?.activeMemberCount).toBe(2)
+    expect(parsed.data?.daysActive).toBe(1)
+    expect(parsed.data?.peakDay?.count).toBe(3)
+  })
+})
+
+describe('GET /v1/groups/:groupId/activity', () => {
+  it('returns 404 for unknown group', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-such-group/activity' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns empty days for group with no beers', async () => {
+    await seedBeerLog()
+    const slug = await getGroupSlug()
+    await pool.query('DELETE FROM beer_logs')
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/activity` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupActivityResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.days).toHaveLength(0)
+  })
+
+  it('aggregates daily counts correctly', async () => {
+    // Use recent dates so they fall within the 365-day window
+    const day1 = new Date()
+    day1.setDate(day1.getDate() - 10)
+    const day2 = new Date()
+    day2.setDate(day2.getDate() - 9)
+    const ts1a = new Date(day1)
+    ts1a.setUTCHours(10, 0, 0, 0)
+    const ts1b = new Date(day1)
+    ts1b.setUTCHours(14, 0, 0, 0)
+    const ts2 = new Date(day2)
+    ts2.setUTCHours(9, 0, 0, 0)
+    const dateStr1 = day1.toISOString().slice(0, 10)
+    const dateStr2 = day2.toISOString().slice(0, 10)
+
+    await seedBeerLog('+15551111111', ts1a.toISOString())
+    await seedBeerLog('+15552222222', ts1b.toISOString())
+    await seedBeerLog('+15551111111', ts2.toISOString())
+    const slug = await getGroupSlug()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/activity` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupActivityResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    const days = parsed.data!.days
+    expect(days.find((d) => d.date === dateStr1)?.count).toBe(2)
+    expect(days.find((d) => d.date === dateStr2)?.count).toBe(1)
+  })
+})
+
+describe('GET /v1/groups/:groupId/hourly', () => {
+  it('returns 404 for unknown group', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-such-group/hourly' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('always returns 24 hour buckets', async () => {
+    await seedBeerLog('+15551111111', '2024-06-01T10:00:00.000Z')
+    const slug = await getGroupSlug()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/hourly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupHourlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.hours).toHaveLength(24)
+  })
+
+  it('counts beers at the correct hour', async () => {
+    await seedBeerLog('+15551111111', '2024-06-01T14:00:00.000Z')
+    await seedBeerLog('+15552222222', '2024-06-01T14:30:00.000Z')
+    const slug = await getGroupSlug()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/hourly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupHourlyResponseSchema.safeParse(res.json())
+    expect(parsed.data?.hours[14].count).toBe(2)
+    expect(parsed.data?.hours[0].count).toBe(0)
+  })
+})
+
+describe('GET /v1/groups/:groupId/monthly', () => {
+  it('returns 404 for unknown group', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-such-group/monthly' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns empty months for group with no beers', async () => {
+    await seedBeerLog()
+    const slug = await getGroupSlug()
+    await pool.query('DELETE FROM beer_logs')
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/monthly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupMonthlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.months).toHaveLength(0)
+  })
+
+  it('aggregates monthly counts correctly', async () => {
+    await seedBeerLog('+15551111111', '2024-06-01T10:00:00.000Z')
+    await seedBeerLog('+15552222222', '2024-06-15T10:00:00.000Z')
+    await seedBeerLog('+15551111111', '2024-07-01T10:00:00.000Z')
+    const slug = await getGroupSlug()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/monthly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupMonthlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    const months = parsed.data!.months
+    expect(months.find((m) => m.month === '2024-06')?.count).toBe(2)
+    expect(months.find((m) => m.month === '2024-07')?.count).toBe(1)
   })
 })

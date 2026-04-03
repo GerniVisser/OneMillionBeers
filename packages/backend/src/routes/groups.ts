@@ -7,6 +7,10 @@ import {
   getGroupTotalBeers,
   getGroupFeed,
   getGroupLeaderboard,
+  getGroupStats,
+  getGroupActivity,
+  getGroupHourly,
+  getGroupMonthly,
 } from '../db/queries.js'
 
 export const groupRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
@@ -46,5 +50,41 @@ export const groupRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { 
 
     const entries = await getGroupLeaderboard(pool, group.id)
     return reply.send({ entries })
+  })
+
+  app.get('/v1/groups/:groupId/stats', async (request, reply) => {
+    const { groupId } = request.params as { groupId: string }
+    const group = await findGroupBySlug(pool, groupId)
+    if (!group) return reply.status(404).send({ error: 'Group not found' })
+
+    const stats = await getGroupStats(pool, group.id)
+    return reply.send(stats)
+  })
+
+  app.get('/v1/groups/:groupId/activity', async (request, reply) => {
+    const { groupId } = request.params as { groupId: string }
+    const group = await findGroupBySlug(pool, groupId)
+    if (!group) return reply.status(404).send({ error: 'Group not found' })
+
+    const days = await getGroupActivity(pool, group.id)
+    return reply.send({ days })
+  })
+
+  app.get('/v1/groups/:groupId/hourly', async (request, reply) => {
+    const { groupId } = request.params as { groupId: string }
+    const group = await findGroupBySlug(pool, groupId)
+    if (!group) return reply.status(404).send({ error: 'Group not found' })
+
+    const hours = await getGroupHourly(pool, group.id)
+    return reply.send({ hours })
+  })
+
+  app.get('/v1/groups/:groupId/monthly', async (request, reply) => {
+    const { groupId } = request.params as { groupId: string }
+    const group = await findGroupBySlug(pool, groupId)
+    if (!group) return reply.status(404).send({ error: 'Group not found' })
+
+    const months = await getGroupMonthly(pool, group.id)
+    return reply.send({ months })
   })
 }
