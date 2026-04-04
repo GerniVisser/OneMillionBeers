@@ -57,6 +57,17 @@ export {
 } from './group-stats.js'
 
 export {
+  GlobalStatsResponseSchema,
+  GlobalActivityResponseSchema,
+  GlobalHourlyResponseSchema,
+  GlobalMonthlyResponseSchema,
+  type GlobalStatsResponse,
+  type GlobalActivityResponse,
+  type GlobalHourlyResponse,
+  type GlobalMonthlyResponse,
+} from './global-stats.js'
+
+export {
   PaginationQuerySchema,
   PaginatedResponseSchema,
   GroupSearchQuerySchema,

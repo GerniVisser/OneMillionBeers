@@ -5,6 +5,10 @@ import {
   getGlobalCount,
   getGlobalFeed,
   getGlobalLeaderboard,
+  getGlobalStats,
+  getGlobalActivity,
+  getGlobalHourly,
+  getGlobalMonthly,
   getLatestBeer,
 } from '../db/queries.js'
 import { subscribe } from '../lib/sse.js'
@@ -27,6 +31,26 @@ export const globalRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, {
   app.get('/v1/global/leaderboard', async (_request, reply) => {
     const entries = await getGlobalLeaderboard(pool)
     return reply.send({ entries })
+  })
+
+  app.get('/v1/global/stats', async (_request, reply) => {
+    const stats = await getGlobalStats(pool)
+    return reply.send(stats)
+  })
+
+  app.get('/v1/global/activity', async (_request, reply) => {
+    const days = await getGlobalActivity(pool)
+    return reply.send({ days })
+  })
+
+  app.get('/v1/global/hourly', async (_request, reply) => {
+    const hours = await getGlobalHourly(pool)
+    return reply.send({ hours })
+  })
+
+  app.get('/v1/global/monthly', async (_request, reply) => {
+    const months = await getGlobalMonthly(pool)
+    return reply.send({ months })
   })
 
   app.get(

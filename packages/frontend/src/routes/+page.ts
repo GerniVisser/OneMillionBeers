@@ -1,15 +1,28 @@
 import type { PageLoad } from './$types'
-import { getGlobalCount, getGlobalFeed, getGlobalLeaderboard } from '$lib/api'
+import {
+  getGlobalCount,
+  getGlobalFeed,
+  getGlobalStats,
+  getGlobalActivity,
+  getGlobalHourly,
+  getGlobalMonthly,
+} from '$lib/api'
 
 export const load: PageLoad = async ({ fetch }) => {
-  const [countData, feedData, leaderboard] = await Promise.all([
+  const [countData, feedData, stats, activity, hourly, monthly] = await Promise.all([
     getGlobalCount(fetch),
     getGlobalFeed(fetch, { limit: 20, offset: 0 }),
-    getGlobalLeaderboard(fetch),
+    getGlobalStats(fetch),
+    getGlobalActivity(fetch),
+    getGlobalHourly(fetch),
+    getGlobalMonthly(fetch),
   ])
   return {
     count: countData.count,
     feed: feedData,
-    leaderboard,
+    stats,
+    activity,
+    hourly,
+    monthly,
   }
 }
