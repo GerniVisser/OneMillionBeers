@@ -2,18 +2,13 @@
   import { browser } from '$app/environment'
   import { onMount, onDestroy } from 'svelte'
   import type { HourBucket } from '@omb/shared'
+  import { chartTooltip, chartScaleColor, chartGridColor } from '$lib/chartTheme'
+  import { formatHour } from '$lib/utils'
 
   let { hours }: { hours: HourBucket[] } = $props()
 
   let canvas = $state<HTMLCanvasElement>(null!)
   let chart: import('chart.js').Chart | null = null
-
-  function formatHour(h: number): string {
-    if (h === 0) return '12am'
-    if (h < 12) return `${h}am`
-    if (h === 12) return '12pm'
-    return `${h - 12}pm`
-  }
 
   const peakHour = $derived(
     hours.length > 0 ? hours.reduce((a, b) => (b.count > a.count ? b : a)).hour : -1,
@@ -51,11 +46,7 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#241808',
-            borderColor: '#4a3418',
-            borderWidth: 1,
-            titleColor: '#fdf4e4',
-            bodyColor: '#a08860',
+            ...chartTooltip,
             callbacks: {
               label: (ctx) => `${ctx.parsed.y} beer${ctx.parsed.y === 1 ? '' : 's'}`,
             },
@@ -64,7 +55,7 @@
         scales: {
           x: {
             ticks: {
-              color: '#a08860',
+              color: chartScaleColor,
               font: { size: 10 },
               maxRotation: 45,
               autoSkip: true,
@@ -73,8 +64,8 @@
             grid: { display: false },
           },
           y: {
-            ticks: { color: '#a08860', font: { size: 11 } },
-            grid: { color: 'rgba(74, 52, 24, 0.3)' },
+            ticks: { color: chartScaleColor, font: { size: 11 } },
+            grid: { color: chartGridColor },
             beginAtZero: true,
           },
         },

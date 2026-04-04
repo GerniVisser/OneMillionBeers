@@ -2,6 +2,7 @@
   import { browser } from '$app/environment'
   import { onMount, onDestroy } from 'svelte'
   import type { MonthBucket } from '@omb/shared'
+  import { chartTooltip, chartScaleColor, chartGridColor } from '$lib/chartTheme'
 
   let { months }: { months: MonthBucket[] } = $props()
 
@@ -79,11 +80,7 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#241808',
-            borderColor: '#4a3418',
-            borderWidth: 1,
-            titleColor: '#fdf4e4',
-            bodyColor: '#a08860',
+            ...chartTooltip,
             callbacks: {
               label: (ctx) => `${ctx.parsed.y} beer${ctx.parsed.y === 1 ? '' : 's'}`,
             },
@@ -92,17 +89,17 @@
         scales: {
           x: {
             ticks: {
-              color: '#a08860',
+              color: chartScaleColor,
               font: { size: 10 },
               maxRotation: 45,
               autoSkip: true,
               maxTicksLimit: 12,
             },
-            grid: { color: 'rgba(74, 52, 24, 0.3)' },
+            grid: { color: chartGridColor },
           },
           y: {
-            ticks: { color: '#a08860', font: { size: 11 } },
-            grid: { color: 'rgba(74, 52, 24, 0.3)' },
+            ticks: { color: chartScaleColor, font: { size: 11 } },
+            grid: { color: chartGridColor },
             beginAtZero: true,
           },
         },

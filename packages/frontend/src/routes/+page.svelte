@@ -15,7 +15,9 @@
   import ActivityBarChart from '$lib/components/ActivityBarChart.svelte'
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
+  import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import type { Toast } from '$lib/components/BeerToast.svelte'
+  import { formatDate, getWeekdayBreakdown, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -49,40 +51,11 @@
   const hasMore = $derived(feedOffset < feedTotal)
 
   // Derived stats from activity data — no extra endpoint needed
-  const weekdayData = $derived.by(() => {
-    const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const counts = new Array(7).fill(0)
-    for (const d of data.activity.days) {
-      const dt = new Date(d.date + 'T12:00:00')
-      counts[dt.getDay()] += d.count
-    }
-    const max = Math.max(...counts, 1)
-    return names.map((name, i) => ({ name, count: counts[i], pct: counts[i] / max }))
-  })
-
+  const weekdayData = $derived(getWeekdayBreakdown(data.activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
-
-  const peakHour = $derived.by(() => {
-    const max = data.hourly.hours.reduce((a, b) => (b.count > a.count ? b : a), {
-      hour: -1,
-      count: 0,
-    })
-    if (max.count === 0) return null
-    const h = max.hour
-    if (h === 0) return '12am'
-    if (h < 12) return `${h}am`
-    if (h === 12) return '12pm'
-    return `${h - 12}pm`
-  })
-
-  function formatDate(dateStr: string) {
-    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
+  const peakHour = $derived(getPeakHour(data.hourly.hours))
 
   function transformSseToFeedItem(latestBeer: NonNullable<SseEvent['latestBeer']>): FeedItem {
     return {
@@ -408,21 +381,7 @@
                   : ''}
               </h3>
               {#if weekdayData.some((d) => d.count > 0)}
-                <div class="weekday-bars">
-                  {#each weekdayData as day}
-                    <div class="weekday-row">
-                      <span class="weekday-label">{day.name}</span>
-                      <div class="weekday-track">
-                        <div
-                          class="weekday-fill"
-                          class:weekday-fill--peak={day === peakWeekday && day.count > 0}
-                          style="width:{day.pct * 100}%"
-                        ></div>
-                      </div>
-                      <span class="weekday-count">{day.count.toLocaleString()}</span>
-                    </div>
-                  {/each}
-                </div>
+                <WeekdayBars days={weekdayData} peakDay={peakWeekday} />
               {:else}
                 <p class="empty-msg">No data yet.</p>
               {/if}
@@ -676,53 +635,6 @@
       flex: 1;
       min-width: 0;
     }
-  }
-
-  /* ── Weekday bars ───────────────────────────────── */
-  .weekday-bars {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-    margin-top: 0.25rem;
-  }
-
-  .weekday-row {
-    display: grid;
-    grid-template-columns: 30px 1fr 48px;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .weekday-label {
-    font-size: 0.72rem;
-    color: var(--color-text-muted);
-    font-weight: 500;
-  }
-
-  .weekday-track {
-    background: var(--color-bg-surface);
-    border-radius: 4px;
-    height: 8px;
-    overflow: hidden;
-  }
-
-  .weekday-fill {
-    height: 100%;
-    background: var(--color-beer-dark);
-    border-radius: 4px;
-    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  .weekday-fill--peak {
-    background: var(--color-beer-amber);
-    box-shadow: 0 0 8px rgba(189, 109, 9, 0.6);
-  }
-
-  .weekday-count {
-    font-size: 0.72rem;
-    color: var(--color-text-muted);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
   }
 
   /* ── Empty / fallback ───────────────────────────── */

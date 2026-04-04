@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getGroups } from '$lib/api'
+  import { getInitials } from '$lib/utils'
   import type { GroupListItem } from '@omb/shared'
 
   interface Props {
@@ -69,15 +70,6 @@
       open = false
       inputRef?.blur()
     }
-  }
-
-  function getInitials(name: string): string {
-    return name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((w) => w[0]?.toUpperCase() ?? '')
-      .join('')
   }
 </script>
 
