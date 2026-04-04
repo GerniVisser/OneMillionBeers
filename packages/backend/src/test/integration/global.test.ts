@@ -5,6 +5,10 @@ import { startDb, stopDb, clearTables } from '../helpers.js'
 import type { FastifyInstance } from 'fastify'
 import {
   GlobalCountResponseSchema,
+  GlobalStatsResponseSchema,
+  GlobalActivityResponseSchema,
+  GlobalHourlyResponseSchema,
+  GlobalMonthlyResponseSchema,
   PaginatedResponseSchema,
   FeedItemSchema,
   LeaderboardResponseSchema,
@@ -146,4 +150,115 @@ describe('GET /v1/global/stream', () => {
     expect(text).toContain('"type":"count"')
     expect(text).toContain('"count":1')
   }, 30000)
+})
+
+describe('GET /v1/global/stats', () => {
+  it('returns zeros and null peakDay when no beers', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/stats' })
+    expect(res.statusCode).toBe(200)
+    const parsed = GlobalStatsResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.totalBeers).toBe(0)
+    expect(parsed.data?.activeMemberCount).toBe(0)
+    expect(parsed.data?.activeGroupCount).toBe(0)
+    expect(parsed.data?.peakDay).toBeNull()
+  })
+
+  it('returns correct aggregates after seeding', async () => {
+    await seedBeerLog('111111111', '2024-06-01T12:00:00.000Z')
+    await seedBeerLog('222222222', '2024-06-01T13:00:00.000Z')
+    // Second group via different sourceGroupId
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: {
+        sourceGroupId: 'group-tg-2',
+        groupName: 'Second Group',
+        senderId: '333333333',
+        timestamp: '2024-06-01T14:00:00.000Z',
+        photoUrl: 'https://example.com/beer.jpg',
+      },
+    })
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/stats' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.totalBeers).toBe(3)
+    expect(body.activeMemberCount).toBe(3)
+    expect(body.activeGroupCount).toBe(2)
+    expect(body.daysActive).toBe(1)
+    expect(body.peakDay).not.toBeNull()
+    expect(body.peakDay.count).toBe(3)
+  })
+})
+
+describe('GET /v1/global/activity', () => {
+  it('returns empty days when no beers', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/activity' })
+    expect(res.statusCode).toBe(200)
+    const parsed = GlobalActivityResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.days).toHaveLength(0)
+  })
+
+  it('returns activity days after seeding within 365 days', async () => {
+    const now = new Date()
+    const d1 = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    const d2 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString()
+    await seedBeerLog('111111111', d1)
+    await seedBeerLog('222222222', d1)
+    await seedBeerLog('333333333', d2)
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/activity' })
+    const body = res.json()
+    expect(body.days.length).toBeGreaterThanOrEqual(2)
+    const totalCount = body.days.reduce((s: number, d: { count: number }) => s + d.count, 0)
+    expect(totalCount).toBe(3)
+  })
+})
+
+describe('GET /v1/global/hourly', () => {
+  it('always returns 24 buckets even when no beers', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/hourly' })
+    expect(res.statusCode).toBe(200)
+    const parsed = GlobalHourlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.hours).toHaveLength(24)
+    expect(parsed.data?.hours.every((h) => h.count === 0)).toBe(true)
+  })
+
+  it('counts beer in the correct hour bucket', async () => {
+    // Seed at a known hour (12:00 UTC)
+    await seedBeerLog('111111111', '2024-06-01T12:30:00.000Z')
+    await seedBeerLog('222222222', '2024-06-01T12:45:00.000Z')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/hourly' })
+    const body = res.json()
+    const hourBucket = body.hours.find((h: { hour: number }) => h.hour === 12)
+    expect(hourBucket?.count).toBe(2)
+  })
+})
+
+describe('GET /v1/global/monthly', () => {
+  it('returns empty months when no beers', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/monthly' })
+    expect(res.statusCode).toBe(200)
+    const parsed = GlobalMonthlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.months).toHaveLength(0)
+  })
+
+  it('aggregates beers by month', async () => {
+    await seedBeerLog('111111111', '2024-05-15T12:00:00.000Z')
+    await seedBeerLog('222222222', '2024-05-20T12:00:00.000Z')
+    await seedBeerLog('333333333', '2024-06-10T12:00:00.000Z')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/monthly' })
+    const body = res.json()
+    expect(body.months.length).toBeGreaterThanOrEqual(2)
+    const mayBucket = body.months.find((m: { month: string }) => m.month === '2024-05')
+    const juneBucket = body.months.find((m: { month: string }) => m.month === '2024-06')
+    expect(mayBucket?.count).toBe(2)
+    expect(juneBucket?.count).toBe(1)
+  })
 })

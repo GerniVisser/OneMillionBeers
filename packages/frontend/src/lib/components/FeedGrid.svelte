@@ -1,59 +1,110 @@
 <script lang="ts">
+  import { onMount, tick } from 'svelte'
+  import { browser } from '$app/environment'
   import type { FeedItem } from '@omb/shared'
   import BeerCard from './BeerCard.svelte'
 
-  let { items = [], loading = false }: { items: FeedItem[]; loading?: boolean } = $props()
+  let {
+    items = [],
+    loading = false,
+    newestId = '',
+    onlongpress,
+  }: {
+    items?: FeedItem[]
+    loading?: boolean
+    newestId?: string
+    onlongpress?: (item: FeedItem) => void
+  } = $props()
 
-  const SKELETON_COUNT = 8
+  let gridEl = $state<HTMLElement | undefined>()
+  let masonry: import('masonry-layout') | undefined
+
+  async function initMasonry() {
+    if (!browser || !gridEl) return
+    const Masonry = (await import('masonry-layout')).default
+    masonry = new Masonry(gridEl, {
+      itemSelector: '.masonry-item',
+      columnWidth: '.masonry-sizer',
+      percentPosition: true,
+      gutter: 10,
+      transitionDuration: '0.2s',
+    })
+  }
+
+  async function relayout() {
+    await tick()
+    masonry?.reloadItems?.()
+    masonry?.layout?.()
+  }
+
+  onMount(() => {
+    initMasonry()
+    return () => {
+      masonry?.destroy?.()
+    }
+  })
+
+  // Re-layout whenever items change (new cards added / images load)
+  $effect(() => {
+    void items
+    relayout()
+  })
 </script>
 
-<div
-  style="
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  "
-  class="feed-grid"
->
-  {#if loading}
-    {#each Array(SKELETON_COUNT) as _, i (i)}
-      <div
-        class="card"
-        style="
-          border-radius: 1rem;
-          overflow: hidden;
-          animation: pulse 2s ease-in-out infinite;
-        "
-      >
-        <div style="aspect-ratio: 1; background-color: var(--color-bg-surface);"></div>
-        <div style="padding: 0.75rem;">
-          <div
-            style="height: 12px; background-color: var(--color-bg-surface); border-radius: 6px; margin-bottom: 6px; width: 60%;"
-          ></div>
-          <div
-            style="height: 10px; background-color: var(--color-bg-surface); border-radius: 6px; width: 40%;"
-          ></div>
-        </div>
+{#if loading}
+  <div class="feed-grid">
+    {#each { length: 8 } as _}
+      <div class="masonry-item skeleton"></div>
+    {/each}
+  </div>
+{:else if items.length === 0}
+  <p class="empty">No beers logged yet. Be the first!</p>
+{:else}
+  <div class="feed-grid" bind:this={gridEl}>
+    <!-- Sizer element controls column width for Masonry -->
+    <div class="masonry-sizer"></div>
+    {#each items as item (item.id)}
+      <div class="masonry-item">
+        <BeerCard {item} isNew={item.id === newestId} {onlongpress} onimageload={relayout} />
       </div>
     {/each}
-  {:else}
-    {#each items as item (item.id)}
-      <BeerCard {item} />
-    {/each}
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
-  @media (min-width: 640px) {
-    .feed-grid {
-      grid-template-columns: repeat(3, 1fr);
+  .feed-grid {
+    /* Masonry uses absolute positioning; position:relative anchors children */
+    position: relative;
+    width: 100%;
+  }
+
+  /* Sizer and items: 2 columns on mobile, 3 on tablet+ */
+  .masonry-sizer,
+  :global(.masonry-item) {
+    width: calc(50% - 5px);
+  }
+
+  @media (min-width: 480px) {
+    .masonry-sizer,
+    :global(.masonry-item) {
+      width: calc(33.333% - 7px);
     }
   }
 
-  @media (min-width: 1024px) {
-    .feed-grid {
-      grid-template-columns: repeat(4, 1fr);
-    }
+  .skeleton {
+    aspect-ratio: 4 / 5;
+    border-radius: 0.75rem;
+    background-color: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    animation: pulse 2s ease-in-out infinite;
+    /* Give skeletons varying heights for a natural pre-load feel */
+  }
+
+  .skeleton:nth-child(3n) {
+    aspect-ratio: 3 / 4;
+  }
+  .skeleton:nth-child(3n + 1) {
+    aspect-ratio: 1 / 1;
   }
 
   @keyframes pulse {
@@ -62,7 +113,14 @@
       opacity: 1;
     }
     50% {
-      opacity: 0.5;
+      opacity: 0.4;
     }
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    padding: 2rem 0;
   }
 </style>

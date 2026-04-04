@@ -23,3 +23,12 @@ export const GroupProfileResponseSchema = GroupSchema.extend({
   totalBeers: z.number().int().nonnegative(),
 })
 export type GroupProfileResponse = z.infer<typeof GroupProfileResponseSchema>
+
+// GET /v1/groups — list item (summary + derived member count)
+export const GroupListItemSchema = z.object({
+  id: UuidSchema,
+  name: z.string(),
+  slug: SlugSchema,
+  memberCount: z.number().int().nonnegative(),
+})
+export type GroupListItem = z.infer<typeof GroupListItemSchema>

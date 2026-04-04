@@ -2,17 +2,21 @@
 
 @theme {
   /* Backgrounds */
-  --color-bg-deep: #1c0a00;
-  --color-bg-card: #2d1200;
-  --color-bg-surface: #3d1a00;
+  --color-bg-deep: #18110a;
+  --color-bg-card: #241808;
+  --color-bg-surface: #301f0a;
+  --color-border: #4a3418;
+  --color-border-muted: #2e1e0a;
 
   /* Beer palette */
-  --color-beer-amber: #f59e0b;
-  --color-beer-dark: #92400e;
-  --color-beer-foam: #fef3c7;
-  --color-beer-head: #fffbeb;
-  --color-accent-glow: #fbbf24;
-  --color-text-muted: #d97706;
+  --color-beer-amber: #bd6d09;
+  --color-beer-dark: #8a5e22;
+  --color-beer-foam: #f5ead8;
+  --color-beer-head: #fdf4e4;
+  --color-accent-glow: #f0a830;
+  --color-text-muted: #a08860;
+  --color-cream-faint: #6a5640;
+  --color-positive: #4eb86a;
 
   /* Rank colours */
   --color-rank-gold: #ffd700;
@@ -20,8 +24,8 @@
   --color-rank-bronze: #cd7f32;
 
   /* Fonts */
-  --font-display: 'Bangers', cursive;
-  --font-body: 'Fredoka', sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
 }
 
 @layer base {
@@ -68,13 +72,13 @@
   .glow-box-amber {
     box-shadow:
       0 0 10px var(--color-accent-glow),
-      0 0 30px rgba(251, 191, 36, 0.3);
+      0 0 30px rgba(200, 132, 42, 0.3);
   }
 
   .card {
     background-color: var(--color-bg-card);
-    border: 1px solid var(--color-bg-surface);
-    border-radius: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
   }
 
   .card-hover {
@@ -84,7 +88,18 @@
   .card-hover:hover {
     box-shadow:
       0 0 0 1px var(--color-beer-dark),
-      0 4px 24px rgba(245, 158, 11, 0.15);
+      0 4px 24px rgba(200, 132, 42, 0.12);
+  }
+
+  /* Small-caps section label */
+  .stat-label {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
   }
 }
 
@@ -99,18 +114,6 @@
   }
 }
 
-@keyframes digit-flip {
-  0% {
-    transform: rotateX(0deg);
-  }
-  50% {
-    transform: rotateX(90deg);
-  }
-  100% {
-    transform: rotateX(0deg);
-  }
-}
-
 @keyframes pulse-dot {
   0%,
   100% {
@@ -118,5 +121,62 @@
   }
   50% {
     opacity: 0.3;
+  }
+}
+
+/* ── New-beer effects ─────────────────────────────────────── */
+@keyframes beer-card-pop {
+  0% {
+    transform: scale(0.85) translateY(-8px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes lightbox-in {
+  0% {
+    transform: scale(0.9) translateY(12px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  0% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.beer-card-new {
+  animation: beer-card-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beer-card-new {
+    animation: none !important;
   }
 }

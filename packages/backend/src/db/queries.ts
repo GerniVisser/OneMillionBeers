@@ -1,11 +1,17 @@
 import type pg from 'pg'
 import type {
   Group,
+  GroupListItem,
   User,
   BeerLog,
   FeedItem,
   LeaderboardEntry,
   UserStatsResponse,
+  GroupStatsResponse,
+  GlobalStatsResponse,
+  ActivityDay,
+  HourBucket,
+  MonthBucket,
 } from '@omb/shared'
 
 // ─── Groups ─────────────────────────────────────────────────────────────────
@@ -50,6 +56,110 @@ export async function getGroupTotalBeers(pool: pg.Pool, groupId: string): Promis
     [groupId],
   )
   return parseInt(rows[0].count, 10)
+}
+
+export async function listGroups(
+  pool: pg.Pool,
+  limit: number,
+  offset: number,
+  search?: string,
+): Promise<{ items: GroupListItem[]; total: number }> {
+  const filter = search ?? null
+  const { rows: countRows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(DISTINCT g.id)::text AS count
+     FROM groups g
+     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')`,
+    [filter],
+  )
+  const total = parseInt(countRows[0].count, 10)
+
+  const { rows } = await pool.query<GroupListItem>(
+    `SELECT
+       g.id,
+       g.name,
+       g.slug,
+       COUNT(DISTINCT bl.user_id)::int AS "memberCount"
+     FROM groups g
+     LEFT JOIN beer_logs bl ON bl.group_id = g.id
+     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')
+     GROUP BY g.id
+     ORDER BY g.name ASC
+     LIMIT $2 OFFSET $3`,
+    [filter, limit, offset],
+  )
+  return { items: rows, total }
+}
+
+export async function getGroupStats(pool: pg.Pool, groupId: string): Promise<GroupStatsResponse> {
+  const { rows: aggRows } = await pool.query<{
+    totalBeers: number
+    activeMemberCount: number
+    daysActive: number
+    firstLog: string | null
+  }>(
+    `SELECT
+       COUNT(*)::int AS "totalBeers",
+       COUNT(DISTINCT user_id)::int AS "activeMemberCount",
+       COUNT(DISTINCT logged_at::date)::int AS "daysActive",
+       MIN(logged_at)::text AS "firstLog"
+     FROM beer_logs WHERE group_id = $1`,
+    [groupId],
+  )
+  const agg = aggRows[0]
+
+  const { rows: peakRows } = await pool.query<{ date: string; count: number }>(
+    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs WHERE group_id = $1
+     GROUP BY 1 ORDER BY 2 DESC LIMIT 1`,
+    [groupId],
+  )
+
+  const totalBeers = agg.totalBeers
+  const daysActive = agg.daysActive
+  const avgPerDay = daysActive > 0 ? Math.round((totalBeers / daysActive) * 10) / 10 : 0
+  const peakDay = peakRows[0] ?? null
+
+  return {
+    totalBeers,
+    activeMemberCount: agg.activeMemberCount,
+    daysActive,
+    avgPerDay,
+    peakDay,
+  }
+}
+
+export async function getGroupActivity(pool: pg.Pool, groupId: string): Promise<ActivityDay[]> {
+  const { rows } = await pool.query<{ date: string; count: number }>(
+    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs
+     WHERE group_id = $1 AND logged_at >= NOW() - INTERVAL '182 days'
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [groupId],
+  )
+  return rows
+}
+
+export async function getGroupHourly(pool: pg.Pool, groupId: string): Promise<HourBucket[]> {
+  const { rows } = await pool.query<{ hour: number; count: number }>(
+    `SELECT EXTRACT(HOUR FROM logged_at)::int AS hour, COUNT(*)::int AS count
+     FROM beer_logs WHERE group_id = $1
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [groupId],
+  )
+  // Fill in any missing hours with 0
+  const map = new Map(rows.map((r) => [r.hour, r.count]))
+  return Array.from({ length: 24 }, (_, h) => ({ hour: h, count: map.get(h) ?? 0 }))
+}
+
+export async function getGroupMonthly(pool: pg.Pool, groupId: string): Promise<MonthBucket[]> {
+  const { rows } = await pool.query<{ month: string; count: number }>(
+    `SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') AS month,
+            COUNT(*)::int AS count
+     FROM beer_logs WHERE group_id = $1
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [groupId],
+  )
+  return rows
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -239,6 +349,77 @@ export async function getGlobalCount(pool: pg.Pool): Promise<number> {
     `SELECT COUNT(*)::text AS count FROM beer_logs`,
   )
   return parseInt(rows[0].count, 10)
+}
+
+// ─── Global Stats ─────────────────────────────────────────────────────────────
+
+export async function getGlobalStats(pool: pg.Pool): Promise<GlobalStatsResponse> {
+  const { rows: aggRows } = await pool.query<{
+    totalBeers: number
+    activeMemberCount: number
+    activeGroupCount: number
+    daysActive: number
+    firstLog: string | null
+  }>(
+    `SELECT
+       COUNT(*)::int                        AS "totalBeers",
+       COUNT(DISTINCT user_id)::int         AS "activeMemberCount",
+       COUNT(DISTINCT group_id)::int        AS "activeGroupCount",
+       COUNT(DISTINCT logged_at::date)::int AS "daysActive",
+       MIN(logged_at)::text                 AS "firstLog"
+     FROM beer_logs`,
+  )
+  const agg = aggRows[0]
+
+  const { rows: peakRows } = await pool.query<{ date: string; count: number }>(
+    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs
+     GROUP BY 1 ORDER BY 2 DESC LIMIT 1`,
+  )
+
+  const totalBeers = agg.totalBeers
+  const daysActive = agg.daysActive
+  const avgPerDay = daysActive > 0 ? Math.round((totalBeers / daysActive) * 10) / 10 : 0
+  const peakDay = peakRows[0] ?? null
+
+  return {
+    totalBeers,
+    activeMemberCount: agg.activeMemberCount,
+    activeGroupCount: agg.activeGroupCount,
+    daysActive,
+    avgPerDay,
+    peakDay,
+  }
+}
+
+export async function getGlobalActivity(pool: pg.Pool): Promise<ActivityDay[]> {
+  const { rows } = await pool.query<{ date: string; count: number }>(
+    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs
+     WHERE logged_at >= NOW() - INTERVAL '365 days'
+     GROUP BY 1 ORDER BY 1 ASC`,
+  )
+  return rows
+}
+
+export async function getGlobalHourly(pool: pg.Pool): Promise<HourBucket[]> {
+  const { rows } = await pool.query<{ hour: number; count: number }>(
+    `SELECT EXTRACT(HOUR FROM logged_at)::int AS hour, COUNT(*)::int AS count
+     FROM beer_logs
+     GROUP BY 1 ORDER BY 1 ASC`,
+  )
+  const map = new Map(rows.map((r) => [r.hour, r.count]))
+  return Array.from({ length: 24 }, (_, h) => ({ hour: h, count: map.get(h) ?? 0 }))
+}
+
+export async function getGlobalMonthly(pool: pg.Pool): Promise<MonthBucket[]> {
+  const { rows } = await pool.query<{ month: string; count: number }>(
+    `SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') AS month,
+            COUNT(*)::int AS count
+     FROM beer_logs
+     GROUP BY 1 ORDER BY 1 ASC`,
+  )
+  return rows
 }
 
 // ─── User Stats ────────────────────────────────────────────────────────────────

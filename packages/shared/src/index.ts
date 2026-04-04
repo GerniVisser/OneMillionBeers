@@ -14,9 +14,11 @@ export {
   GroupSchema,
   GroupSummarySchema,
   GroupProfileResponseSchema,
+  GroupListItemSchema,
   type Group,
   type GroupSummary,
   type GroupProfileResponse,
+  type GroupListItem,
 } from './group.js'
 
 export {
@@ -38,14 +40,44 @@ export {
 } from './beer.js'
 
 export {
+  GroupStatsResponseSchema,
+  GroupActivityResponseSchema,
+  GroupHourlyResponseSchema,
+  GroupMonthlyResponseSchema,
+  ActivityDaySchema,
+  HourBucketSchema,
+  MonthBucketSchema,
+  type GroupStatsResponse,
+  type ActivityDay,
+  type GroupActivityResponse,
+  type HourBucket,
+  type GroupHourlyResponse,
+  type MonthBucket,
+  type GroupMonthlyResponse,
+} from './group-stats.js'
+
+export {
+  GlobalStatsResponseSchema,
+  GlobalActivityResponseSchema,
+  GlobalHourlyResponseSchema,
+  GlobalMonthlyResponseSchema,
+  type GlobalStatsResponse,
+  type GlobalActivityResponse,
+  type GlobalHourlyResponse,
+  type GlobalMonthlyResponse,
+} from './global-stats.js'
+
+export {
   PaginationQuerySchema,
   PaginatedResponseSchema,
+  GroupSearchQuerySchema,
   LeaderboardEntrySchema,
   LeaderboardResponseSchema,
   GlobalCountResponseSchema,
   UserStatsResponseSchema,
   SseEventSchema,
   type PaginationQuery,
+  type GroupSearchQuery,
   type LeaderboardEntry,
   type LeaderboardResponse,
   type GlobalCountResponse,

@@ -1,10 +1,19 @@
 import type {
   GlobalCountResponse,
+  GlobalStatsResponse,
+  GlobalActivityResponse,
+  GlobalHourlyResponse,
+  GlobalMonthlyResponse,
   FeedItem,
   LeaderboardResponse,
   GroupProfileResponse,
+  GroupListItem,
   UserProfileResponse,
   UserStatsResponse,
+  GroupStatsResponse,
+  GroupActivityResponse,
+  GroupHourlyResponse,
+  GroupMonthlyResponse,
 } from '@omb/shared'
 
 const API_BASE = '/api/v1'
@@ -69,6 +78,34 @@ export function getGlobalLeaderboard(fetch: typeof globalThis.fetch): Promise<Le
   return get<LeaderboardResponse>(fetch, '/global/leaderboard')
 }
 
+export function getGlobalStats(fetch: typeof globalThis.fetch): Promise<GlobalStatsResponse> {
+  return get<GlobalStatsResponse>(fetch, '/global/stats')
+}
+
+export function getGlobalActivity(fetch: typeof globalThis.fetch): Promise<GlobalActivityResponse> {
+  return get<GlobalActivityResponse>(fetch, '/global/activity')
+}
+
+export function getGlobalHourly(fetch: typeof globalThis.fetch): Promise<GlobalHourlyResponse> {
+  return get<GlobalHourlyResponse>(fetch, '/global/hourly')
+}
+
+export function getGlobalMonthly(fetch: typeof globalThis.fetch): Promise<GlobalMonthlyResponse> {
+  return get<GlobalMonthlyResponse>(fetch, '/global/monthly')
+}
+
+export function getGroups(
+  fetch: typeof globalThis.fetch,
+  params?: { search?: string; limit?: number; offset?: number },
+): Promise<PaginatedResponse<GroupListItem>> {
+  const p: Record<string, string | number> = {
+    limit: params?.limit ?? 20,
+    offset: params?.offset ?? 0,
+  }
+  if (params?.search) p.search = params.search
+  return get<PaginatedResponse<GroupListItem>>(fetch, '/groups', p)
+}
+
 export function getGroupProfile(
   fetch: typeof globalThis.fetch,
   slug: string,
@@ -92,6 +129,34 @@ export function getGroupLeaderboard(
   slug: string,
 ): Promise<LeaderboardResponse> {
   return get<LeaderboardResponse>(fetch, `/groups/${slug}/leaderboard`)
+}
+
+export function getGroupStats(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupStatsResponse> {
+  return get<GroupStatsResponse>(fetch, `/groups/${slug}/stats`)
+}
+
+export function getGroupActivity(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupActivityResponse> {
+  return get<GroupActivityResponse>(fetch, `/groups/${slug}/activity`)
+}
+
+export function getGroupHourly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupHourlyResponse> {
+  return get<GroupHourlyResponse>(fetch, `/groups/${slug}/hourly`)
+}
+
+export function getGroupMonthly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupMonthlyResponse> {
+  return get<GroupMonthlyResponse>(fetch, `/groups/${slug}/monthly`)
 }
 
 export function getUserProfile(

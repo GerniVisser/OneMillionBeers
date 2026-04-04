@@ -41,3 +41,7 @@ Only register the Chart.js components actually used (tree-shaking).
 ## Types
 
 Import schemas and inferred types from `@omb/shared` via the workspace protocol. If a type is needed and the schema does not yet exist in `@omb/shared`, define it locally in `src/lib/` as a temporary bridge — but the schema must be added to `@omb/shared` before the route is considered done.
+
+## Design
+
+An mobile-first approach will be followed with regards to design. Smooth navigation and controls on mobile devises specifically mobile phones are the main focus of this site. Intuitive user experience should be the core design philosophy. The user should never be confused about that to do next or what they are looking at. The style should be fun, and cartoonish while still keeping close to the social media theme with social engagement and statistics being the main focus point.
