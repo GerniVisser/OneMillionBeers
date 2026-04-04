@@ -11,6 +11,7 @@
   import BeerToast from '$lib/components/BeerToast.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
+  import GroupSearch from '$lib/components/GroupSearch.svelte'
   import type { Toast } from '$lib/components/BeerToast.svelte'
 
   let { data }: { data: PageData } = $props()
@@ -248,6 +249,9 @@
   </div>
 
   <StatsStrip count={liveCount} {sessionCount} leaderboard={data.leaderboard.entries} {sseRate} />
+
+  <!-- Groups search -->
+  <GroupSearch />
 
   <!-- Feed + Leaderboard grid -->
   <div class="content-grid">

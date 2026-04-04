@@ -3,17 +3,28 @@
 
   let { days }: { days: ActivityDay[] } = $props()
 
-  // Build a lookup: date string → count
   const countByDate = $derived(new Map(days.map((d) => [d.date, d.count])))
   const maxCount = $derived(days.length > 0 ? Math.max(...days.map((d) => d.count)) : 1)
 
-  // Generate the last ~6 months as a grid anchored so the last column ends today
+  const CELL = 13 // px per cell including gap
+  const LABEL_OFFSET = 28 // px reserved for day-of-week labels on left
+  const MAX_WEEKS = 104 // ~24 months
+  const MIN_WEEKS = 4
+
+  let containerWidth = $state(0)
+
+  // How many weeks fit in the available space
+  const numWeeks = $derived.by(() => {
+    const available = containerWidth - LABEL_OFFSET
+    if (available <= 0) return MAX_WEEKS
+    return Math.max(MIN_WEEKS, Math.min(MAX_WEEKS, Math.floor(available / CELL)))
+  })
+
   const cells = $derived.by(() => {
     const today = new Date()
-    // Start from the most recent Sunday on or before (today - 89 days)
+    // Go back numWeeks * 7 days, then rewind to the previous Sunday
     const start = new Date(today)
-    start.setDate(start.getDate() - 181)
-    // Rewind to previous Sunday
+    start.setDate(start.getDate() - numWeeks * 7)
     start.setDate(start.getDate() - start.getDay())
 
     const result: Array<{ date: string; count: number; week: number; dow: number }> = []
@@ -29,40 +40,37 @@
     return result
   })
 
-  const totalWeeks = $derived(cells.length > 0 ? cells[cells.length - 1].week + 1 : 53)
+  const totalWeeks = $derived(cells.length > 0 ? cells[cells.length - 1].week + 1 : numWeeks)
 
-  // Month label positions: find the first cell of each month, record its week
   const monthLabels = $derived.by(() => {
     const seen = new Set<string>()
     const labels: Array<{ label: string; week: number }> = []
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
     for (const cell of cells) {
       const monthKey = cell.date.slice(0, 7)
       if (!seen.has(monthKey)) {
         seen.add(monthKey)
-        const [, m] = cell.date.split('-')
-        const monthNames = [
-          'Jan',
-          'Feb',
-          'Mar',
-          'Apr',
-          'May',
-          'Jun',
-          'Jul',
-          'Aug',
-          'Sep',
-          'Oct',
-          'Nov',
-          'Dec',
-        ]
-        labels.push({ label: monthNames[parseInt(m, 10) - 1], week: cell.week })
+        const m = parseInt(cell.date.slice(5, 7), 10) - 1
+        labels.push({ label: monthNames[m], week: cell.week })
       }
     }
     return labels
   })
 
-  const CELL = 13 // px per cell including gap
   const DOW_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
-  const LABEL_OFFSET = 28 // px for day-of-week labels on left
 
   function cellColor(count: number): string {
     if (count === 0) return 'var(--color-bg-surface)'
@@ -88,59 +96,61 @@
   }
 
   const svgWidth = $derived(LABEL_OFFSET + totalWeeks * CELL)
-  const svgHeight = 7 * CELL + 20 // 7 rows + month label row at top
+  const svgHeight = 7 * CELL + 20
 </script>
 
-<div class="heatmap-wrap">
-  <svg
-    width={svgWidth}
-    height={svgHeight}
-    role="img"
-    aria-label="Beer activity over the past 6 months"
-    style="display:block; overflow: visible;"
-  >
-    <!-- Month labels -->
-    {#each monthLabels as { label, week }}
-      <text
-        x={LABEL_OFFSET + week * CELL + 1}
-        y={10}
-        font-size="9"
-        fill="var(--color-text-muted)"
-        font-family="var(--font-body)">{label}</text
-      >
-    {/each}
-
-    <!-- Day-of-week labels -->
-    {#each DOW_LABELS as dow, i}
-      {#if dow}
+<div class="heatmap-wrap" bind:clientWidth={containerWidth}>
+  {#if containerWidth > 0}
+    <svg
+      width={svgWidth}
+      height={svgHeight}
+      role="img"
+      aria-label="Beer activity heatmap"
+      style="display:block; overflow: visible;"
+    >
+      <!-- Month labels -->
+      {#each monthLabels as { label, week }}
         <text
-          x={LABEL_OFFSET - 4}
-          y={20 + i * CELL + CELL * 0.75}
+          x={LABEL_OFFSET + week * CELL + 1}
+          y={10}
           font-size="9"
           fill="var(--color-text-muted)"
-          font-family="var(--font-body)"
-          text-anchor="end">{dow}</text
+          font-family="var(--font-body)">{label}</text
         >
-      {/if}
-    {/each}
+      {/each}
 
-    <!-- Cells -->
-    {#each cells as cell}
-      <rect
-        x={LABEL_OFFSET + cell.week * CELL}
-        y={20 + cell.dow * CELL}
-        width={CELL - 2}
-        height={CELL - 2}
-        rx="2"
-        fill={cellColor(cell.count)}
-        role="img"
-        aria-label="{cell.date}: {cell.count} beer{cell.count === 1 ? '' : 's'}"
-        style="cursor: pointer;"
-        onmouseenter={(e) => showTooltip(cell, e)}
-        onmouseleave={hideTooltip}
-      />
-    {/each}
-  </svg>
+      <!-- Day-of-week labels -->
+      {#each DOW_LABELS as dow, i}
+        {#if dow}
+          <text
+            x={LABEL_OFFSET - 4}
+            y={20 + i * CELL + CELL * 0.75}
+            font-size="9"
+            fill="var(--color-text-muted)"
+            font-family="var(--font-body)"
+            text-anchor="end">{dow}</text
+          >
+        {/if}
+      {/each}
+
+      <!-- Cells -->
+      {#each cells as cell}
+        <rect
+          x={LABEL_OFFSET + cell.week * CELL}
+          y={20 + cell.dow * CELL}
+          width={CELL - 2}
+          height={CELL - 2}
+          rx="2"
+          fill={cellColor(cell.count)}
+          role="img"
+          aria-label="{cell.date}: {cell.count} beer{cell.count === 1 ? '' : 's'}"
+          style="cursor: pointer;"
+          onmouseenter={(e) => showTooltip(cell, e)}
+          onmouseleave={hideTooltip}
+        />
+      {/each}
+    </svg>
+  {/if}
 
   {#if tooltip}
     <div class="heatmap-tooltip" style="left:{tooltip.x + 12}px; top:{tooltip.y - 36}px;">
@@ -151,7 +161,7 @@
 
 <style>
   .heatmap-wrap {
-    overflow-x: auto;
+    width: 100%;
     position: relative;
     padding-bottom: 4px;
   }

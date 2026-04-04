@@ -12,6 +12,7 @@
   import ActivityBarChart from '$lib/components/ActivityBarChart.svelte'
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
+  import GroupSearch from '$lib/components/GroupSearch.svelte'
 
   let { data }: { data: PageData } = $props()
 
@@ -71,6 +72,7 @@
   )
 
   let activeTab = $state<'feed' | 'stats' | 'leaderboard'>('feed')
+  let searchOpen = $state(false)
 
   function formatDate(dateStr: string) {
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
@@ -105,8 +107,73 @@
   }}
 />
 
+<!-- ── Search overlay ─────────────────────────────────────────────────── -->
+{#if searchOpen}
+  <div class="search-overlay" role="dialog" aria-label="Search groups">
+    <GroupSearch autofocus />
+    <button class="search-close-btn" aria-label="Close search" onclick={() => (searchOpen = false)}>
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+{/if}
+
 <!-- ── Hero ──────────────────────────────────────────────────────────── -->
 <section class="hero">
+  <!-- Hero controls: back (top-left) + search (top-right) -->
+  <div class="hero-controls">
+    <a
+      href="/"
+      class="hero-btn"
+      aria-label="Go back"
+      onclick={(e) => {
+        e.preventDefault()
+        history.back()
+      }}
+    >
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M15 18l-6-6 6-6" />
+      </svg>
+    </a>
+    <button class="hero-btn" aria-label="Search groups" onclick={() => (searchOpen = true)}>
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="M15.5 15.5L20 20" />
+      </svg>
+    </button>
+  </div>
+
   <!-- Atmospheric glow behind avatar -->
   <div class="hero-glow" aria-hidden="true"></div>
 
@@ -353,6 +420,88 @@
 </div>
 
 <style>
+  /* ── Search overlay ─────────────────────────────── */
+  .search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: rgba(24, 17, 10, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--color-border);
+    animation: slide-down 180ms ease both;
+  }
+
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .search-close-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--color-cream-faint);
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 120ms ease;
+  }
+
+  .search-close-btn:hover {
+    color: var(--color-beer-amber);
+  }
+
+  /* ── Hero controls ───────────────────────────────── */
+  .hero-controls {
+    position: absolute;
+    top: 0.875rem;
+    left: 1rem;
+    right: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+  }
+
+  .hero-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.35);
+    border: none;
+    color: var(--color-cream-faint);
+    cursor: pointer;
+    text-decoration: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+
+  .hero-btn:hover {
+    background: rgba(189, 109, 9, 0.3);
+    color: var(--color-beer-amber);
+  }
+
   /* ── Hero ───────────────────────────────────────── */
   .hero {
     position: relative;

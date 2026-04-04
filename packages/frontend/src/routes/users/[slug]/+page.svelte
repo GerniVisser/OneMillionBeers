@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageData } from './$types'
   import StatCard from '$lib/components/StatCard.svelte'
+  import GroupSearch from '$lib/components/GroupSearch.svelte'
 
   let { data }: { data: PageData } = $props()
 
@@ -36,6 +37,37 @@
     content="{displayName} has logged {data.stats.totalBeers} beers on OneMillionBeers."
   />
 </svelte:head>
+
+<!-- Page header -->
+<header class="page-header">
+  <a
+    href="/"
+    class="page-header-btn back-btn"
+    aria-label="Go back"
+    onclick={(e) => {
+      e.preventDefault()
+      history.back()
+    }}
+  >
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+    Back
+  </a>
+  <div class="header-search">
+    <GroupSearch />
+  </div>
+</header>
 
 <!-- Profile header -->
 <section
@@ -110,6 +142,48 @@
 </section>
 
 <style>
+  .page-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.25rem;
+    background-color: rgba(24, 17, 10, 0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--color-border);
+    min-height: 3.25rem;
+  }
+
+  .page-header-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--color-cream-faint);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 120ms ease;
+  }
+
+  .page-header-btn:hover {
+    color: var(--color-beer-amber);
+  }
+
+  .back-btn {
+    flex-shrink: 0;
+  }
+
+  .header-search {
+    flex: 1;
+    max-width: 320px;
+  }
+
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
