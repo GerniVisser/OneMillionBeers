@@ -66,13 +66,24 @@ export async function getGroupPictureUrl(groupId: string): Promise<string | null
 
 export async function listAllGroups(): Promise<Array<{ id: string; subject: string }>> {
   try {
-    const res = await fetch(`${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups?limit=100`, {
+    const res = await fetch(`${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups`, {
       headers: wahaHeaders(),
       signal: AbortSignal.timeout(15_000),
     })
     if (!res.ok) return []
-    const data = (await res.json()) as Array<{ id: string; subject?: string }>
-    return data.map((g) => ({ id: g.id, subject: g.subject ?? g.id }))
+    const data = await res.json()
+    // WAHA NOWEB returns an object map { "groupId@g.us": { id, subject, ... } }
+    // WAHA Plus may return an array — handle both
+    if (Array.isArray(data)) {
+      return (data as Array<{ id: string; subject?: string }>).map((g) => ({
+        id: g.id,
+        subject: g.subject ?? g.id,
+      }))
+    }
+    return Object.values(data as Record<string, { id: string; subject?: string }>).map((g) => ({
+      id: g.id,
+      subject: g.subject ?? g.id,
+    }))
   } catch {
     return []
   }

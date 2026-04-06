@@ -23,17 +23,41 @@ export async function upsertGroup(
   avatarUrl?: string | null,
 ): Promise<Group> {
   const slug = toSlug(name)
-  const { rows } = await pool.query<Group>(
-    `INSERT INTO groups (source_group_id, name, slug, avatar_url)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (source_group_id) DO UPDATE SET
-       name = EXCLUDED.name,
-       avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
-     RETURNING id, source_group_id AS "sourceGroupId", name, slug,
-               avatar_url AS "avatarUrl", created_at AS "createdAt"`,
-    [sourceGroupId, name, slug, avatarUrl ?? null],
-  )
-  return rows[0]
+  try {
+    const { rows } = await pool.query<Group>(
+      `INSERT INTO groups (source_group_id, name, slug, avatar_url)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (source_group_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
+       RETURNING id, source_group_id AS "sourceGroupId", name, slug,
+                 avatar_url AS "avatarUrl", created_at AS "createdAt"`,
+      [sourceGroupId, name, slug, avatarUrl ?? null],
+    )
+    return rows[0]
+  } catch (err: unknown) {
+    // Two different groups can share the same name → slug uniqueness conflict on INSERT.
+    // Retry with a suffix derived from the sourceGroupId to guarantee uniqueness.
+    if ((err as { code?: string }).code === '23505') {
+      const suffix = sourceGroupId
+        .replace(/[^a-z0-9]/gi, '')
+        .slice(-6)
+        .toLowerCase()
+      const uniqueSlug = (slug + '-' + suffix).slice(0, 128)
+      const { rows } = await pool.query<Group>(
+        `INSERT INTO groups (source_group_id, name, slug, avatar_url)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (source_group_id) DO UPDATE SET
+           name = EXCLUDED.name,
+           avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
+         RETURNING id, source_group_id AS "sourceGroupId", name, slug,
+                   avatar_url AS "avatarUrl", created_at AS "createdAt"`,
+        [sourceGroupId, name, uniqueSlug, avatarUrl ?? null],
+      )
+      return rows[0]
+    }
+    throw err
+  }
 }
 
 export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | null> {

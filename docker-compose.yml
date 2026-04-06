@@ -77,7 +77,7 @@ services:
       WHATSAPP_START_SESSION: default
       WHATSAPP_DOWNLOAD_MEDIA: 'true'
       WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
-      WAHA_WEBHOOK_EVENTS: message,session.status
+      WAHA_WEBHOOK_EVENTS: message,session.status,group.v2.join,group.v2.update
     logging:
       driver: awslogs
       options:
