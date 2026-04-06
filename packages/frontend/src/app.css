@@ -35,17 +35,14 @@
     font-family: var(--font-body);
   }
 
-  ::-webkit-scrollbar {
-    width: 8px;
+  /* Hide scrollbar — all browsers */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE / Edge legacy */
   }
 
-  ::-webkit-scrollbar-track {
-    background: var(--color-bg-surface);
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 4px;
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
   }
 
   ::-webkit-scrollbar-thumb:hover {

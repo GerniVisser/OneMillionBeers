@@ -2,6 +2,7 @@ import { type Logger } from 'pino'
 import { uploadPhoto, forwardBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
 import { getGroupName } from './waha-client.js'
+import { syncGroup } from './group-sync.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -22,6 +23,16 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
 
   if (event === 'message' || event === 'message.any') {
     await handleMessage(body as Record<string, unknown>, logger)
+    return
+  }
+
+  if (event === 'group.v2.join') {
+    await handleGroupJoin(body as Record<string, unknown>, logger)
+    return
+  }
+
+  if (event === 'group.v2.update') {
+    await handleGroupUpdate(body as Record<string, unknown>, logger)
     return
   }
 
@@ -111,5 +122,33 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
   } catch (err) {
     logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
+  }
+}
+
+async function handleGroupJoin(body: Record<string, unknown>, logger: Logger): Promise<void> {
+  try {
+    const payload = body.payload as Record<string, unknown> | undefined
+    const group = payload?.group as Record<string, unknown> | undefined
+    const rawGroupId = group?.id as string | undefined
+    if (!rawGroupId?.endsWith('@g.us')) return
+    const subject = (group?.subject as string | undefined) ?? rawGroupId
+    logger.info({ rawGroupId }, 'Group join — syncing metadata')
+    await syncGroup(rawGroupId, subject, logger)
+  } catch (err) {
+    logger.error({ err }, 'Unhandled error in handleGroupJoin')
+  }
+}
+
+async function handleGroupUpdate(body: Record<string, unknown>, logger: Logger): Promise<void> {
+  try {
+    const payload = body.payload as Record<string, unknown> | undefined
+    const group = payload?.group as Record<string, unknown> | undefined
+    const rawGroupId = group?.id as string | undefined
+    if (!rawGroupId?.endsWith('@g.us')) return
+    const subject = (group?.subject as string | undefined) ?? rawGroupId
+    logger.info({ rawGroupId }, 'Group update — syncing metadata')
+    await syncGroup(rawGroupId, subject, logger)
+  } catch (err) {
+    logger.error({ err }, 'Unhandled error in handleGroupUpdate')
   }
 }

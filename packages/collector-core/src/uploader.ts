@@ -12,6 +12,25 @@ const client = new S3Client({
   forcePathStyle: true, // required for MinIO and most S3-compatible stores
 })
 
+export async function uploadGroupAvatar(sourceGroupId: string, buffer: Buffer): Promise<string> {
+  const safeId = sourceGroupId
+    .replace(/[^a-z0-9]/gi, '-')
+    .replace(/-+/g, '-')
+    .toLowerCase()
+  const key = `group-avatars/${safeId}.jpg`
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.STORAGE_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: 'image/jpeg',
+    }),
+    { abortSignal: AbortSignal.timeout(10_000) },
+  )
+  const publicUrl = config.STORAGE_PUBLIC_URL.replace(/\/$/, '')
+  return `${publicUrl}/${config.STORAGE_BUCKET}/${key}`
+}
+
 export async function uploadPhoto(key: string, buffer: Buffer): Promise<string> {
   await client.send(
     new PutObjectCommand({

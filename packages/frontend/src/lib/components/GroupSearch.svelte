@@ -126,7 +126,13 @@
             aria-selected="false"
             onclick={dismiss}
           >
-            <div class="result-avatar" aria-hidden="true">{getInitials(group.name)}</div>
+            <div class="result-avatar" aria-hidden="true">
+              {#if group.avatarUrl}
+                <img src={group.avatarUrl} alt="" class="result-avatar-img" />
+              {:else}
+                {getInitials(group.name)}
+              {/if}
+            </div>
             <div class="result-text">
               <span class="result-name">{group.name}</span>
               <span class="result-meta">{group.memberCount.toLocaleString()} members</span>
@@ -269,6 +275,13 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .result-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .result-text {
