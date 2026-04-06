@@ -1,8 +1,9 @@
 import { pino } from 'pino'
 import { config } from './config.js'
-import { startSession } from './waha-client.js'
+import { startSession, getSessionStatus } from './waha-client.js'
 import { buildServer } from './server.js'
 import { startPolling } from './session-monitor.js'
+import { syncAllGroups } from './group-sync.js'
 
 async function main(): Promise<void> {
   const logger = pino({ name: 'collector-whatsapp', level: config.LOG_LEVEL })
@@ -16,6 +17,18 @@ async function main(): Promise<void> {
   } catch (err) {
     // Non-fatal — WAHA may already be starting the session via WHATSAPP_START_SESSION env var
     logger.warn({ err }, 'Could not explicitly start WAHA session — continuing anyway')
+  }
+
+  // If WAHA is already WORKING on startup (e.g. collector restarted while WAHA stayed up),
+  // run group sync immediately — the session.status webhook won't fire again in this case.
+  try {
+    const status = await getSessionStatus()
+    if (status === 'WORKING') {
+      logger.info('Session already WORKING on startup — running group sync')
+      syncAllGroups(logger).catch((err) => logger.error({ err }, 'Startup group sync failed'))
+    }
+  } catch (err) {
+    logger.warn({ err }, 'Could not check session status on startup')
   }
 
   const server = buildServer(logger)
