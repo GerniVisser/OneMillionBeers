@@ -43,9 +43,37 @@ export async function getGroupName(groupId: string): Promise<string> {
       { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
     )
     if (!res.ok) return groupId
-    const data = (await res.json()) as { name?: string }
-    return data.name ?? groupId
+    const data = (await res.json()) as { subject?: string }
+    return data.subject ?? groupId
   } catch {
     return groupId
+  }
+}
+
+export async function getGroupPictureUrl(groupId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups/${groupId}/picture`,
+      { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as { url?: string | null }
+    return data.url ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function listAllGroups(): Promise<Array<{ id: string; subject: string }>> {
+  try {
+    const res = await fetch(`${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups?limit=100`, {
+      headers: wahaHeaders(),
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!res.ok) return []
+    const data = (await res.json()) as Array<{ id: string; subject?: string }>
+    return data.map((g) => ({ id: g.id, subject: g.subject ?? g.id }))
+  } catch {
+    return []
   }
 }

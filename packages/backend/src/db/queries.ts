@@ -20,21 +20,26 @@ export async function upsertGroup(
   pool: pg.Pool,
   sourceGroupId: string,
   name: string,
+  avatarUrl?: string | null,
 ): Promise<Group> {
   const slug = toSlug(name)
   const { rows } = await pool.query<Group>(
-    `INSERT INTO groups (source_group_id, name, slug)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (source_group_id) DO UPDATE SET name = EXCLUDED.name
-     RETURNING id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"`,
-    [sourceGroupId, name, slug],
+    `INSERT INTO groups (source_group_id, name, slug, avatar_url)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (source_group_id) DO UPDATE SET
+       name = EXCLUDED.name,
+       avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
+     RETURNING id, source_group_id AS "sourceGroupId", name, slug,
+               avatar_url AS "avatarUrl", created_at AS "createdAt"`,
+    [sourceGroupId, name, slug, avatarUrl ?? null],
   )
   return rows[0]
 }
 
 export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | null> {
   const { rows } = await pool.query<Group>(
-    `SELECT id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"
+    `SELECT id, source_group_id AS "sourceGroupId", name, slug,
+            avatar_url AS "avatarUrl", created_at AS "createdAt"
      FROM groups WHERE id = $1`,
     [id],
   )
@@ -43,7 +48,8 @@ export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | 
 
 export async function findGroupBySlug(pool: pg.Pool, slug: string): Promise<Group | null> {
   const { rows } = await pool.query<Group>(
-    `SELECT id, source_group_id AS "sourceGroupId", name, slug, created_at AS "createdAt"
+    `SELECT id, source_group_id AS "sourceGroupId", name, slug,
+            avatar_url AS "avatarUrl", created_at AS "createdAt"
      FROM groups WHERE slug = $1`,
     [slug],
   )
@@ -78,11 +84,12 @@ export async function listGroups(
        g.id,
        g.name,
        g.slug,
+       g.avatar_url AS "avatarUrl",
        COUNT(DISTINCT bl.user_id)::int AS "memberCount"
      FROM groups g
      LEFT JOIN beer_logs bl ON bl.group_id = g.id
      WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')
-     GROUP BY g.id
+     GROUP BY g.id, g.avatar_url
      ORDER BY g.name ASC
      LIMIT $2 OFFSET $3`,
     [filter, limit, offset],

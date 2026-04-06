@@ -6,6 +6,7 @@ export const GroupSchema = z.object({
   sourceGroupId: z.string().min(1),
   name: z.string().min(1).max(512),
   slug: SlugSchema,
+  avatarUrl: z.string().url().nullable().optional(),
   createdAt: IsoDatetimeSchema,
 })
 export type Group = z.infer<typeof GroupSchema>
@@ -15,6 +16,7 @@ export const GroupSummarySchema = z.object({
   id: UuidSchema,
   name: z.string(),
   slug: SlugSchema,
+  avatarUrl: z.string().url().nullable().optional(),
 })
 export type GroupSummary = z.infer<typeof GroupSummarySchema>
 
@@ -29,6 +31,14 @@ export const GroupListItemSchema = z.object({
   id: UuidSchema,
   name: z.string(),
   slug: SlugSchema,
+  avatarUrl: z.string().url().nullable().optional(),
   memberCount: z.number().int().nonnegative(),
 })
 export type GroupListItem = z.infer<typeof GroupListItemSchema>
+
+// PUT /v1/internal/groups/:sourceGroupId — collector group metadata sync
+export const GroupSyncRequestSchema = z.object({
+  name: z.string().min(1).max(512),
+  avatarUrl: z.string().url().nullable(),
+})
+export type GroupSyncRequest = z.infer<typeof GroupSyncRequestSchema>

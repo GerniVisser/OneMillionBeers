@@ -1,10 +1,9 @@
 <script lang="ts">
   import { browser } from '$app/environment'
-  import { untrack } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import type { PageData } from './$types'
   import type { FeedItem } from '@omb/shared'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
-  import LoadMoreButton from '$lib/components/LoadMoreButton.svelte'
   import LeaderboardTable from '$lib/components/LeaderboardTable.svelte'
   import ProgressBar from '$lib/components/ProgressBar.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
@@ -24,8 +23,21 @@
   let feedTotal = $state(untrack(() => data.feed.total))
   let loadingMore = $state(false)
   let lightboxItem = $state<FeedItem | null>(null)
+  let sentinel = $state<HTMLElement | undefined>(undefined)
 
   const hasMore = $derived(feedOffset < feedTotal)
+
+  $effect(() => {
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore()
+      },
+      { rootMargin: '300px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  })
 
   async function loadMore() {
     if (loadingMore || !hasMore) return
@@ -149,7 +161,15 @@
       <div class="hero-avatar-wrap">
         <div class="avatar-ring">
           <div class="avatar-inner">
-            <span class="avatar-initials">{initials}</span>
+            {#if data.profile.avatarUrl}
+              <img
+                src={data.profile.avatarUrl}
+                alt="{data.profile.name} profile picture"
+                class="avatar-img"
+              />
+            {:else}
+              <span class="avatar-initials">{initials}</span>
+            {/if}
           </div>
         </div>
       </div>
@@ -292,7 +312,12 @@
             lightboxItem = item
           }}
         />
-        <LoadMoreButton {hasMore} onloadmore={loadMore} />
+        {#if hasMore}
+          <div bind:this={sentinel} class="scroll-sentinel" aria-hidden="true"></div>
+        {/if}
+        {#if loadingMore}
+          <p class="loading-msg">Loading…</p>
+        {/if}
       </div>
     </div>
 
@@ -541,6 +566,13 @@
     text-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
   }
 
+  .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
   /* ── Group name + progress ───────────────────────── */
   .hero-text {
     display: flex;
@@ -772,6 +804,17 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 1.25rem 1rem 4rem;
+  }
+
+  .scroll-sentinel {
+    height: 1px;
+  }
+
+  .loading-msg {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    padding: 1.5rem 0;
   }
 
   /* ── Empty / fallback ───────────────────────────── */

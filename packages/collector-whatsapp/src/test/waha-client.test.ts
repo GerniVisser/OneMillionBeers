@@ -75,7 +75,7 @@ describe('waha-client', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ name: 'Beer Crew' }),
+        json: async () => ({ subject: 'Beer Crew' }),
       }),
     )
     const { getGroupName } = await import('../waha-client.js')

@@ -6,6 +6,7 @@ import swaggerUi from '@fastify/swagger-ui'
 import type pg from 'pg'
 import { beerLogRoutes } from './routes/beer-log.js'
 import { groupRoutes } from './routes/groups.js'
+import { groupSyncRoutes } from './routes/group-sync.js'
 import { userRoutes } from './routes/users.js'
 import { globalRoutes } from './routes/global.js'
 
@@ -49,6 +50,7 @@ export async function buildApp(
   app.get('/health', async () => ({ status: 'ok' }))
 
   await app.register(beerLogRoutes, { pool })
+  await app.register(groupSyncRoutes, { pool })
   await app.register(groupRoutes, { pool })
   await app.register(userRoutes, { pool })
   await app.register(globalRoutes, { pool })
