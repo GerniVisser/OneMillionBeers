@@ -112,10 +112,11 @@
     align-items: flex-end;
     justify-content: space-around;
     padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
-    background-color: rgba(24, 17, 10, 0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background-color: rgba(18, 12, 5, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
   }
 
   .nav-item {
@@ -162,11 +163,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #18110a;
+    color: #ffffff;
     margin-top: -1.25rem;
     box-shadow:
-      0 0 0 3px rgba(24, 17, 10, 0.96),
-      0 4px 20px rgba(212, 136, 58, 0.45);
+      0 0 0 3px rgba(255, 255, 255, 0.96),
+      0 4px 20px rgba(245, 158, 11, 0.4);
     transition:
       background 150ms ease,
       box-shadow 150ms ease,
@@ -174,10 +175,10 @@
   }
 
   .capture-btn:hover {
-    background: var(--color-accent-glow);
+    background: var(--color-beer-dark);
     box-shadow:
-      0 0 0 3px rgba(24, 17, 10, 0.96),
-      0 4px 28px rgba(240, 168, 48, 0.6);
+      0 0 0 3px rgba(255, 255, 255, 0.96),
+      0 4px 28px rgba(245, 158, 11, 0.5);
     transform: scale(1.06);
   }
 

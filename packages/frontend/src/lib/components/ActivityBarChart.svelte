@@ -40,8 +40,8 @@
     const ctx = canvas.getContext('2d')!
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 200)
-    gradient.addColorStop(0, 'rgba(240, 168, 48, 0.9)')
-    gradient.addColorStop(1, 'rgba(138, 94, 34, 0.4)')
+    gradient.addColorStop(0, 'rgba(245, 158, 11, 0.85)')
+    gradient.addColorStop(1, 'rgba(253, 230, 138, 0.5)')
 
     chart = new Chart(ctx, {
       type: 'bar',
@@ -51,7 +51,7 @@
           {
             data: counts,
             backgroundColor: gradient,
-            borderColor: 'rgba(189, 109, 9, 0.8)',
+            borderColor: 'rgba(217, 119, 6, 0.6)',
             borderWidth: 1,
             borderRadius: 3,
           },

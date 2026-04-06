@@ -1,22 +1,22 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Backgrounds */
-  --color-bg-deep: #18110a;
-  --color-bg-card: #241808;
-  --color-bg-surface: #301f0a;
-  --color-border: #4a3418;
-  --color-border-muted: #2e1e0a;
+  /* Backgrounds — dark pub atmosphere */
+  --color-bg-deep: #0d0a06;
+  --color-bg-card: #1a1209;
+  --color-bg-surface: #231810;
+  --color-border: #3d2a14;
+  --color-border-muted: #2a1e0e;
 
-  /* Beer palette */
-  --color-beer-amber: #bd6d09;
-  --color-beer-dark: #8a5e22;
-  --color-beer-foam: #f5ead8;
-  --color-beer-head: #fdf4e4;
-  --color-accent-glow: #f0a830;
-  --color-text-muted: #a08860;
-  --color-cream-faint: #6a5640;
-  --color-positive: #4eb86a;
+  /* Amber palette */
+  --color-beer-amber: #f59e0b;
+  --color-beer-dark: #d97706;
+  --color-beer-foam: #fef3c7;
+  --color-beer-head: #fbbf24;
+  --color-accent-glow: #fcd34d;
+  --color-text-muted: #a8906c;
+  --color-cream-faint: #6b5233;
+  --color-positive: #34d399;
 
   /* Rank colours */
   --color-rank-gold: #ffd700;
@@ -24,8 +24,8 @@
   --color-rank-bronze: #cd7f32;
 
   /* Fonts */
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
 }
 
 @layer base {
@@ -40,20 +40,20 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-bg-card);
+    background: var(--color-bg-surface);
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--color-bg-surface);
+    background: var(--color-border);
     border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-beer-dark);
+    background: var(--color-cream-faint);
   }
 
   a {
-    color: var(--color-beer-amber);
+    color: var(--color-beer-dark);
     text-decoration: none;
   }
 
@@ -65,14 +65,14 @@
 @layer utilities {
   .glow-amber {
     text-shadow:
-      0 0 10px var(--color-accent-glow),
-      0 0 30px var(--color-beer-amber);
+      0 0 20px rgba(245, 158, 11, 0.5),
+      0 2px 8px rgba(217, 119, 6, 0.35);
   }
 
   .glow-box-amber {
     box-shadow:
-      0 0 10px var(--color-accent-glow),
-      0 0 30px rgba(200, 132, 42, 0.3);
+      0 0 0 3px rgba(245, 158, 11, 0.3),
+      0 4px 32px rgba(245, 158, 11, 0.25);
   }
 
   .card {
@@ -88,7 +88,8 @@
   .card-hover:hover {
     box-shadow:
       0 0 0 1px var(--color-beer-dark),
-      0 4px 24px rgba(200, 132, 42, 0.12);
+      0 4px 32px rgba(245, 158, 11, 0.2),
+      0 0 0 4px rgba(245, 158, 11, 0.05);
   }
 
   /* Small-caps section label */
@@ -106,7 +107,7 @@
 @keyframes float-up {
   0% {
     transform: translateY(0) scale(1);
-    opacity: 0.6;
+    opacity: 0.4;
   }
   100% {
     transform: translateY(-100vh) scale(0.5);

@@ -107,7 +107,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1.25rem;
-    background-color: rgba(24, 17, 10, 0.92);
+    background-color: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);
@@ -142,7 +142,8 @@
   }
 
   .profile-hero {
-    background: linear-gradient(180deg, #2d1200 0%, var(--color-bg-deep) 100%);
+    background: linear-gradient(180deg, #fef3c7 0%, #fafaf9 100%);
+    border-bottom: 1px solid #fde68a;
     padding: 3rem 1rem 2rem;
   }
 
@@ -157,9 +158,10 @@
     height: 5rem;
     border-radius: 50%;
     background-color: var(--color-beer-amber);
-    color: var(--color-bg-deep);
+    color: #ffffff;
     font-family: var(--font-display);
     font-size: 2rem;
+    font-weight: 800;
     display: flex;
     align-items: center;
     justify-content: center;

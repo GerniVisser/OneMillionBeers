@@ -73,12 +73,12 @@
   const DOW_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 
   function cellColor(count: number): string {
-    if (count === 0) return 'var(--color-bg-surface)'
+    if (count === 0) return '#2a1e0e'
     const intensity = Math.min(count / maxCount, 1)
-    if (intensity < 0.25) return '#5a3a08'
-    if (intensity < 0.5) return '#8a5e18'
-    if (intensity < 0.75) return '#bd6d09'
-    return '#f0a830'
+    if (intensity < 0.25) return '#5c3d1a'
+    if (intensity < 0.5) return '#d97706'
+    if (intensity < 0.75) return '#f59e0b'
+    return '#fbbf24'
   }
 
   let tooltip = $state<{ text: string; x: number; y: number } | null>(null)
