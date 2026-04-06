@@ -112,7 +112,7 @@ jobs:
                 "docker compose --env-file .env --env-file .env.sha pull backend collector-telegram collector-whatsapp frontend nginx",
                 "docker pull ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }}",
                 "FLYWAY_IMAGE=ghcr.io/${{ env.REPO_LC }}/omb-flyway:${{ env.GIT_SHA }} ./prod-db-migrate.sh",
-                "docker compose --env-file .env --env-file .env.sha up -d --no-deps backend collector-telegram collector-whatsapp waha frontend nginx"
+                "docker compose --env-file .env --env-file .env.sha up -d --no-deps backend collector-telegram collector-whatsapp frontend nginx"
               ]
             }
           wait-until-command-executed: true
