@@ -47,8 +47,32 @@
 
   // Tab state
   let activeTab = $state<'feed' | 'stats'>('feed')
+  let searchOpen = $state(false)
 
   const hasMore = $derived(feedOffset < feedTotal)
+
+  // Stat cards for the infinite carousel
+  type StatItem = { value: string; label: string; sub?: string; dim?: boolean }
+  const statItems = $derived(
+    (() => {
+      const items: StatItem[] = [
+        { value: data.stats.totalBeers.toLocaleString(), label: 'Total Beers' },
+        { value: data.stats.activeMemberCount.toLocaleString(), label: 'Members' },
+        { value: data.stats.activeGroupCount.toLocaleString(), label: 'Groups' },
+        { value: String(data.stats.avgPerDay), label: 'Avg / Day' },
+      ]
+      if (data.stats.peakDay) {
+        items.push({
+          value: data.stats.peakDay.count.toLocaleString(),
+          label: 'Record Day',
+          sub: formatDate(data.stats.peakDay.date),
+        })
+      } else {
+        items.push({ value: String(data.stats.daysActive), label: 'Days Active', dim: true })
+      }
+      return items
+    })(),
+  )
 
   // Derived stats from activity data — no extra endpoint needed
   const weekdayData = $derived(getWeekdayBreakdown(data.activity.days))
@@ -197,6 +221,27 @@
   }}
 />
 
+{#if searchOpen}
+  <div class="search-overlay" role="dialog" aria-label="Search groups">
+    <GroupSearch autofocus />
+    <button class="search-close-btn" aria-label="Close search" onclick={() => (searchOpen = false)}>
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+{/if}
+
 <!-- Floating pill: notifies user of new beers arriving while they browse (feed tab only) -->
 {#if pendingItems.length > 0 && activeTab === 'feed'}
   <button class="new-beers-pill" onclick={flushPending}>
@@ -208,11 +253,13 @@
 <div class="page">
   <!-- Hero section — full progress card at top of page -->
   <div class="hero-wrap">
-    <HeroCard count={liveCount} {sessionCount} {flashCount} />
+    <HeroCard
+      count={liveCount}
+      {sessionCount}
+      {flashCount}
+      onsearchclick={() => (searchOpen = true)}
+    />
   </div>
-
-  <!-- Groups search -->
-  <GroupSearch />
 
   <!-- Tab bar -->
   <div class="tab-bar" role="tablist" aria-label="Home page sections">
@@ -302,36 +349,17 @@
     {:else}
       <div class="tab-panel" id="panel-stats" role="tabpanel">
         <div class="panel-content">
-          <!-- Summary stat cards -->
-          <div class="summary-cards">
-            <div class="stat-card">
-              <span class="stat-value">{data.stats.totalBeers.toLocaleString()}</span>
-              <span class="stat-label">Total Beers</span>
+          <!-- Summary stat cards — infinite scrolling carousel -->
+          <div class="stats-carousel">
+            <div class="stats-track">
+              {#each [...statItems, ...statItems] as item, i (i)}
+                <div class="stat-card" aria-hidden={i >= statItems.length ? true : undefined}>
+                  <span class="stat-value" class:stat-value--dim={item.dim}>{item.value}</span>
+                  <span class="stat-label">{item.label}</span>
+                  {#if item.sub}<span class="stat-sub">{item.sub}</span>{/if}
+                </div>
+              {/each}
             </div>
-            <div class="stat-card">
-              <span class="stat-value">{data.stats.activeMemberCount.toLocaleString()}</span>
-              <span class="stat-label">Members</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value">{data.stats.activeGroupCount.toLocaleString()}</span>
-              <span class="stat-label">Groups</span>
-            </div>
-            <div class="stat-card">
-              <span class="stat-value">{data.stats.avgPerDay}</span>
-              <span class="stat-label">Avg / Day</span>
-            </div>
-            {#if data.stats.peakDay}
-              <div class="stat-card">
-                <span class="stat-value">{data.stats.peakDay.count.toLocaleString()}</span>
-                <span class="stat-label">Record Day</span>
-                <span class="stat-sub">{formatDate(data.stats.peakDay.date)}</span>
-              </div>
-            {:else}
-              <div class="stat-card">
-                <span class="stat-value stat-value--dim">{data.stats.daysActive}</span>
-                <span class="stat-label">Days Active</span>
-              </div>
-            {/if}
           </div>
 
           <!-- Contribution heatmap — 1 year -->
@@ -341,7 +369,7 @@
               <ContributionGraph days={data.activity.days} />
               <div class="heatmap-legend">
                 <span class="legend-label">Less</span>
-                {#each ['#f5f5f4', '#fef3c7', '#fcd34d', '#f59e0b', '#d97706'] as c}
+                {#each ['#2a1e0e', '#5c3d1a', '#d97706', '#f59e0b', '#fbbf24'] as c}
                   <span class="legend-swatch" style="background:{c};"></span>
                 {/each}
                 <span class="legend-label">More</span>
@@ -404,6 +432,52 @@
 </div>
 
 <style>
+  /* ── Search overlay ─────────────────────────────── */
+  .search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: rgba(18, 12, 5, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--color-border);
+    animation: slide-down 180ms ease both;
+  }
+
+  @keyframes slide-down {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .search-close-btn {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--color-cream-faint);
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: color 120ms ease;
+  }
+
+  .search-close-btn:hover {
+    color: var(--color-beer-amber);
+  }
+
   .page {
     max-width: 1200px;
     margin: 0 auto;
@@ -424,9 +498,11 @@
     z-index: 50;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    background: var(--color-bg-card);
+    background: rgba(18, 12, 5, 0.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
     /* Extend to full viewport width */
     margin-left: -1rem;
     margin-right: -1rem;
@@ -523,40 +599,71 @@
     gap: 1.25rem;
   }
 
-  /* ── Summary cards ──────────────────────────────── */
-  .summary-cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
+  /* ── Stats carousel ─────────────────────────────── */
+  .stats-carousel {
+    overflow: hidden;
+    width: 100%;
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
   }
 
-  @media (min-width: 640px) {
-    .summary-cards {
-      grid-template-columns: repeat(3, 1fr);
+  .stats-track {
+    display: flex;
+    gap: 0.5rem;
+    width: max-content;
+    animation: scroll-carousel 16s linear infinite;
+  }
+
+  .stats-track:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes scroll-carousel {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
     }
   }
 
-  @media (min-width: 900px) {
-    .summary-cards {
-      grid-template-columns: repeat(5, 1fr);
+  @media (prefers-reduced-motion: reduce) {
+    .stats-track {
+      animation: none;
     }
   }
 
   .stat-card {
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    padding: 1rem 0.75rem;
+    flex-shrink: 0;
+    width: 96px;
+    background: linear-gradient(160deg, #201508 0%, #150e05 100%);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    border-radius: 0.875rem;
+    padding: 0.65rem 0.5rem 0.6rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.15rem;
     text-align: center;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(245, 158, 11, 0.07);
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease;
+  }
+
+  .stat-card:hover {
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.4),
+      0 0 18px rgba(245, 158, 11, 0.14),
+      inset 0 1px 0 rgba(245, 158, 11, 0.1);
   }
 
   .stat-value {
     font-family: var(--font-display);
-    font-size: clamp(1.2rem, 3vw, 1.6rem);
+    font-size: 1.05rem;
     font-weight: 700;
     color: var(--color-beer-amber);
     line-height: 1;
@@ -567,17 +674,17 @@
   }
 
   .stat-label {
-    font-size: 0.52rem;
+    font-size: 0.48rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
     color: var(--color-text-muted);
   }
 
   .stat-sub {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     color: var(--color-text-muted);
-    margin-top: 0.1rem;
+    margin-top: 0.05rem;
   }
 
   /* ── Shared chart card ──────────────────────────── */
@@ -586,6 +693,7 @@
     border: 1px solid var(--color-border);
     border-radius: 0.75rem;
     padding: 1.1rem 1rem 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   }
 
   .chart-title {

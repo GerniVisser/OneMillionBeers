@@ -78,17 +78,10 @@
     width: 100%;
   }
 
-  /* Sizer and items: 2 columns on mobile, 3 on tablet+ */
+  /* Sizer and items: 3 columns always */
   .masonry-sizer,
   :global(.masonry-item) {
-    width: calc(50% - 5px);
-  }
-
-  @media (min-width: 480px) {
-    .masonry-sizer,
-    :global(.masonry-item) {
-      width: calc(33.333% - 7px);
-    }
+    width: calc(33.333% - 7px);
   }
 
   .skeleton {

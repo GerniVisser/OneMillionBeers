@@ -1,21 +1,21 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Backgrounds — warm off-white light surfaces */
-  --color-bg-deep: #fafaf9;
-  --color-bg-card: #ffffff;
-  --color-bg-surface: #f5f5f4;
-  --color-border: #e7e5e4;
-  --color-border-muted: #f5f5f4;
+  /* Backgrounds — dark pub atmosphere */
+  --color-bg-deep: #0d0a06;
+  --color-bg-card: #1a1209;
+  --color-bg-surface: #231810;
+  --color-border: #3d2a14;
+  --color-border-muted: #2a1e0e;
 
   /* Amber palette */
   --color-beer-amber: #f59e0b;
   --color-beer-dark: #d97706;
-  --color-beer-foam: #1c1917;
-  --color-beer-head: #92400e;
-  --color-accent-glow: #fbbf24;
-  --color-text-muted: #78716c;
-  --color-cream-faint: #a8a29e;
+  --color-beer-foam: #fef3c7;
+  --color-beer-head: #fbbf24;
+  --color-accent-glow: #fcd34d;
+  --color-text-muted: #a8906c;
+  --color-cream-faint: #6b5233;
   --color-positive: #34d399;
 
   /* Rank colours */
@@ -64,13 +64,15 @@
 
 @layer utilities {
   .glow-amber {
-    text-shadow: 0 1px 4px rgba(217, 119, 6, 0.18);
+    text-shadow:
+      0 0 20px rgba(245, 158, 11, 0.5),
+      0 2px 8px rgba(217, 119, 6, 0.35);
   }
 
   .glow-box-amber {
     box-shadow:
-      0 0 0 3px rgba(245, 158, 11, 0.25),
-      0 4px 20px rgba(245, 158, 11, 0.15);
+      0 0 0 3px rgba(245, 158, 11, 0.3),
+      0 4px 32px rgba(245, 158, 11, 0.25);
   }
 
   .card {
@@ -86,7 +88,8 @@
   .card-hover:hover {
     box-shadow:
       0 0 0 1px var(--color-beer-dark),
-      0 4px 24px rgba(245, 158, 11, 0.12);
+      0 4px 32px rgba(245, 158, 11, 0.2),
+      0 0 0 4px rgba(245, 158, 11, 0.05);
   }
 
   /* Small-caps section label */

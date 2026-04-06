@@ -307,7 +307,7 @@
             <ContributionGraph days={data.activity.days} />
             <div class="heatmap-legend">
               <span class="legend-label">Less</span>
-              {#each ['#f5f5f4', '#fef3c7', '#fcd34d', '#f59e0b', '#d97706'] as c}
+              {#each ['#2a1e0e', '#5c3d1a', '#d97706', '#f59e0b', '#fbbf24'] as c}
                 <span class="legend-swatch" style="background:{c};"></span>
               {/each}
               <span class="legend-label">More</span>
@@ -382,7 +382,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    background-color: rgba(255, 255, 255, 0.97);
+    background-color: rgba(18, 12, 5, 0.97);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-border);
@@ -436,8 +436,8 @@
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.7);
-    border: none;
+    background: rgba(30, 20, 8, 0.8);
+    border: 1px solid rgba(245, 158, 11, 0.2);
     color: var(--color-text-muted);
     cursor: pointer;
     text-decoration: none;
@@ -457,21 +457,22 @@
   .hero {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(165deg, #fef3c7 0%, #fffbeb 55%, #fafaf9 100%);
-    border-bottom: 1px solid #fde68a;
+    background: linear-gradient(165deg, #0d0803 0%, #1e1005 45%, #2d1a08 80%, #3d2510 100%);
+    border-bottom: 1px solid #5c3d1a;
     padding: 2.5rem 1.25rem 0;
+    box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
   }
 
-  /* Soft radial bloom centred above the avatar */
+  /* Radial amber bloom behind the avatar */
   .hero-glow {
     position: absolute;
     top: -80px;
     left: 50%;
     transform: translateX(-50%);
-    width: 340px;
-    height: 340px;
+    width: 420px;
+    height: 420px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 68%);
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 65%);
     pointer-events: none;
   }
 
@@ -524,7 +525,7 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle at 40% 35%, #fef9c3, #fde68a);
+    background: radial-gradient(circle at 40% 35%, #2d1a08, #1a0f05);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -534,9 +535,10 @@
     font-family: var(--font-display);
     font-size: 2rem;
     font-weight: 800;
-    color: #92400e;
+    color: var(--color-beer-head);
     letter-spacing: 0.04em;
     line-height: 1;
+    text-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
   }
 
   /* ── Group name + progress ───────────────────────── */
@@ -578,12 +580,12 @@
     align-items: stretch;
     width: 100%;
     max-width: 540px;
-    background: rgba(255, 255, 255, 0.65);
+    background: rgba(26, 18, 9, 0.75);
     border: 1px solid var(--color-border);
     border-bottom: none; /* merges flush into the tab bar below */
     border-radius: 0.85rem 0.85rem 0 0;
     padding: 1rem 0.5rem;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px);
   }
 
   .hstat {
@@ -633,9 +635,11 @@
     z-index: 50;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    background: var(--color-bg-card);
+    background: rgba(18, 12, 5, 0.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   }
 
   .tab-btn {
@@ -711,6 +715,7 @@
     border: 1px solid var(--color-border);
     border-radius: 0.75rem;
     padding: 1.1rem 1rem 1rem;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
   }
 
   .chart-title {

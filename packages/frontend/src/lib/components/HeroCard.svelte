@@ -5,10 +5,12 @@
     count = 0,
     sessionCount = 0,
     flashCount = 0,
+    onsearchclick,
   }: {
     count: number
     sessionCount?: number
     flashCount?: number
+    onsearchclick?: () => void
   } = $props()
 
   const TARGET = 1_000_000
@@ -65,6 +67,28 @@
 </script>
 
 <div class="hero-card">
+  <!-- Search button -->
+  {#if onsearchclick}
+    <div class="hero-controls">
+      <button class="hero-btn" aria-label="Search groups" onclick={onsearchclick}>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="M15.5 15.5L20 20" />
+        </svg>
+      </button>
+    </div>
+  {/if}
+
   <!-- Foam bubbles background -->
   <div aria-hidden="true" class="bubbles-wrap">
     {#each bubbles as b (b.id)}
@@ -127,11 +151,45 @@
   .hero-card {
     position: relative;
     overflow: hidden;
-    padding: 3rem 1rem 2.5rem;
+    padding: 1.5rem 1rem 1.25rem;
     text-align: center;
-    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
+    background: linear-gradient(135deg, #0d0803 0%, #1e1005 40%, #2d1a08 75%, #3d2510 100%);
     border-radius: 1rem;
-    border: 1px solid #fde68a;
+    border: 1px solid #5c3d1a;
+    box-shadow:
+      0 0 0 1px rgba(245, 158, 11, 0.08),
+      0 8px 48px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(245, 158, 11, 0.12);
+  }
+
+  .hero-controls {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 10;
+  }
+
+  .hero-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: rgba(30, 20, 8, 0.8);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition:
+      background 150ms ease,
+      color 150ms ease;
+  }
+
+  .hero-btn:hover {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-beer-amber);
   }
 
   .bubbles-wrap {
@@ -163,15 +221,15 @@
   }
 
   .badge-wrap {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
   }
 
   .live-badge {
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    background-color: var(--color-bg-surface);
-    border: 1px solid var(--color-beer-dark);
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.4);
     border-radius: 9999px;
     padding: 0.25rem 0.75rem;
     font-size: 0.75rem;
@@ -179,6 +237,7 @@
     letter-spacing: 0.1em;
     color: var(--color-beer-amber);
     text-transform: uppercase;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
   }
 
   .live-dot {
@@ -191,15 +250,15 @@
 
   .hero-title {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 6vw, 3rem);
+    font-size: clamp(1.25rem, 4vw, 1.75rem);
     color: var(--color-beer-head);
     letter-spacing: 0.05em;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .counter-wrap {
     text-align: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .digits {
@@ -209,17 +268,20 @@
 
   .digit {
     font-family: var(--font-display);
-    font-size: clamp(3rem, 10vw, 6rem);
+    font-size: clamp(2rem, 7vw, 3.5rem);
     line-height: 1;
     color: var(--color-beer-amber);
     display: inline-block;
+    text-shadow:
+      0 0 20px rgba(245, 158, 11, 0.6),
+      0 0 40px rgba(245, 158, 11, 0.3);
   }
 
   .counter-label {
     font-family: var(--font-body);
     color: var(--color-text-muted);
-    font-size: 1rem;
-    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
     letter-spacing: 0.05em;
   }
 
@@ -230,7 +292,7 @@
   .progress-track {
     background-color: var(--color-bg-surface);
     border-radius: 9999px;
-    height: 12px;
+    height: 8px;
     overflow: hidden;
   }
 
@@ -249,8 +311,8 @@
   .progress-labels {
     display: flex;
     justify-content: space-between;
-    margin-top: 0.375rem;
-    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted);
   }
 
@@ -264,12 +326,14 @@
     font-family: var(--font-display);
     font-size: clamp(1.5rem, 5vw, 2.5rem);
     font-weight: 800;
-    color: var(--color-beer-dark);
-    text-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
-    background: rgba(255, 251, 235, 0.93);
+    color: var(--color-beer-head);
+    text-shadow:
+      0 0 30px rgba(245, 158, 11, 0.8),
+      0 2px 8px rgba(245, 158, 11, 0.4);
+    background: rgba(13, 8, 3, 0.92);
     border-radius: inherit;
     animation: count-glow 5s ease-out forwards;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
   }
 
   @keyframes count-glow {

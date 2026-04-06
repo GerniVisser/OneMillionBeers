@@ -112,10 +112,11 @@
     align-items: flex-end;
     justify-content: space-around;
     padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom));
-    background-color: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background-color: rgba(18, 12, 5, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--color-border);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
   }
 
   .nav-item {

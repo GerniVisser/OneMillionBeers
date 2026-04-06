@@ -1,12 +1,12 @@
 /** Shared Chart.js theme constants — applied across all chart components */
 
 export const chartTooltip = {
-  backgroundColor: '#ffffff',
-  borderColor: '#e7e5e4',
+  backgroundColor: '#1a1209',
+  borderColor: '#3d2a14',
   borderWidth: 1,
-  titleColor: '#1c1917',
-  bodyColor: '#78716c',
+  titleColor: '#fef3c7',
+  bodyColor: '#a8906c',
 } as const
 
-export const chartScaleColor = '#a8a29e'
-export const chartGridColor = 'rgba(231, 229, 228, 0.6)'
+export const chartScaleColor = '#a8906c'
+export const chartGridColor = 'rgba(61, 42, 20, 0.7)'
