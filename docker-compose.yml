@@ -67,7 +67,7 @@ services:
         tag: collector-telegram/{{.ID}}
 
   waha:
-    image: devlikeapro/waha
+    image: devlikeapro/waha:2026.3.4
     expose:
       - '3000'
     restart: unless-stopped
