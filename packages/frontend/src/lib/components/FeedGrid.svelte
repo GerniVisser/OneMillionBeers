@@ -82,6 +82,7 @@
   .masonry-sizer,
   :global(.masonry-item) {
     width: calc(33.333% - 7px);
+    margin-bottom: 10px;
   }
 
   .skeleton {
