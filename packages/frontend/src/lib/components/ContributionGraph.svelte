@@ -75,10 +75,10 @@
   function cellColor(count: number): string {
     if (count === 0) return 'var(--color-bg-surface)'
     const intensity = Math.min(count / maxCount, 1)
-    if (intensity < 0.25) return '#5a3a08'
-    if (intensity < 0.5) return '#8a5e18'
-    if (intensity < 0.75) return '#bd6d09'
-    return '#f0a830'
+    if (intensity < 0.25) return '#fef3c7'
+    if (intensity < 0.5) return '#fcd34d'
+    if (intensity < 0.75) return '#f59e0b'
+    return '#d97706'
   }
 
   let tooltip = $state<{ text: string; x: number; y: number } | null>(null)

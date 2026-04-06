@@ -307,7 +307,7 @@
             <ContributionGraph days={data.activity.days} />
             <div class="heatmap-legend">
               <span class="legend-label">Less</span>
-              {#each ['#2e1e0a', '#5a3a08', '#8a5e18', '#bd6d09', '#f0a830'] as c}
+              {#each ['#f5f5f4', '#fef3c7', '#fcd34d', '#f59e0b', '#d97706'] as c}
                 <span class="legend-swatch" style="background:{c};"></span>
               {/each}
               <span class="legend-label">More</span>
@@ -382,7 +382,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    background-color: rgba(24, 17, 10, 0.97);
+    background-color: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--color-border);
@@ -436,9 +436,9 @@
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(255, 255, 255, 0.7);
     border: none;
-    color: var(--color-cream-faint);
+    color: var(--color-text-muted);
     cursor: pointer;
     text-decoration: none;
     backdrop-filter: blur(8px);
@@ -449,15 +449,16 @@
   }
 
   .hero-btn:hover {
-    background: rgba(189, 109, 9, 0.3);
-    color: var(--color-beer-amber);
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--color-beer-dark);
   }
 
   /* ── Hero ───────────────────────────────────────── */
   .hero {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(165deg, #2e1100 0%, #1c0b00 55%, var(--color-bg-deep) 100%);
+    background: linear-gradient(165deg, #fef3c7 0%, #fffbeb 55%, #fafaf9 100%);
+    border-bottom: 1px solid #fde68a;
     padding: 2.5rem 1.25rem 0;
   }
 
@@ -470,7 +471,7 @@
     width: 340px;
     height: 340px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(189, 109, 9, 0.22) 0%, transparent 68%);
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 68%);
     pointer-events: none;
   }
 
@@ -523,7 +524,7 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle at 40% 35%, #3a1800, #1e0c00);
+    background: radial-gradient(circle at 40% 35%, #fef9c3, #fde68a);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -532,12 +533,10 @@
   .avatar-initials {
     font-family: var(--font-display);
     font-size: 2rem;
-    font-weight: 700;
-    color: var(--color-beer-amber);
+    font-weight: 800;
+    color: #92400e;
     letter-spacing: 0.04em;
     line-height: 1;
-    /* subtle inner glow on the letters */
-    text-shadow: 0 0 12px rgba(240, 168, 48, 0.5);
   }
 
   /* ── Group name + progress ───────────────────────── */
@@ -579,7 +578,7 @@
     align-items: stretch;
     width: 100%;
     max-width: 540px;
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(255, 255, 255, 0.65);
     border: 1px solid var(--color-border);
     border-bottom: none; /* merges flush into the tab bar below */
     border-radius: 0.85rem 0.85rem 0 0;
@@ -662,8 +661,8 @@
   }
 
   .tab-btn:hover {
-    color: var(--color-beer-foam);
-    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-beer-dark);
+    background: rgba(245, 158, 11, 0.04);
   }
 
   .tab-btn--active {

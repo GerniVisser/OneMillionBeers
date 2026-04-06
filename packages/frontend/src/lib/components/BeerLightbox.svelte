@@ -87,7 +87,7 @@
   }
 
   .lightbox::backdrop {
-    background: rgba(18, 8, 2, 0.92);
+    background: rgba(28, 25, 23, 0.88);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -177,9 +177,9 @@
     width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    background: rgba(18, 8, 2, 0.7);
-    border: 1px solid var(--color-border);
-    color: var(--color-beer-foam);
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
     font-size: 0.875rem;
     cursor: pointer;
     display: flex;
@@ -190,7 +190,7 @@
   }
 
   .lightbox-close:hover {
-    background: rgba(212, 136, 58, 0.2);
+    background: rgba(245, 158, 11, 0.3);
     border-color: var(--color-beer-amber);
   }
 </style>

@@ -39,8 +39,8 @@
       [
         { color: 'var(--color-beer-amber)' },
         {
-          color: 'var(--color-accent-glow)',
-          textShadow: '0 0 24px var(--color-accent-glow), 0 0 48px rgba(240,168,48,0.35)',
+          color: 'var(--color-beer-dark)',
+          textShadow: '0 2px 12px rgba(245, 158, 11, 0.5)',
         },
         { color: 'var(--color-beer-amber)' },
       ],
@@ -129,9 +129,9 @@
     overflow: hidden;
     padding: 3rem 1rem 2.5rem;
     text-align: center;
-    background: linear-gradient(180deg, #2d1200 0%, var(--color-bg-deep) 100%);
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%);
     border-radius: 1rem;
-    border: 1px solid var(--color-bg-surface);
+    border: 1px solid #fde68a;
   }
 
   .bubbles-wrap {
@@ -264,9 +264,9 @@
     font-family: var(--font-display);
     font-size: clamp(1.5rem, 5vw, 2.5rem);
     font-weight: 800;
-    color: var(--color-accent-glow);
-    text-shadow: 0 0 32px var(--color-accent-glow);
-    background: rgba(18, 8, 2, 0.75);
+    color: var(--color-beer-dark);
+    text-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+    background: rgba(255, 251, 235, 0.93);
     border-radius: inherit;
     animation: count-glow 5s ease-out forwards;
     backdrop-filter: blur(2px);

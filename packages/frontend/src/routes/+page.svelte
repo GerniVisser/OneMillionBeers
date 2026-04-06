@@ -341,7 +341,7 @@
               <ContributionGraph days={data.activity.days} />
               <div class="heatmap-legend">
                 <span class="legend-label">Less</span>
-                {#each ['#2e1e0a', '#5a3a08', '#8a5e18', '#bd6d09', '#f0a830'] as c}
+                {#each ['#f5f5f4', '#fef3c7', '#fcd34d', '#f59e0b', '#d97706'] as c}
                   <span class="legend-swatch" style="background:{c};"></span>
                 {/each}
                 <span class="legend-label">More</span>
@@ -455,8 +455,8 @@
   }
 
   .tab-btn:hover {
-    color: var(--color-beer-foam);
-    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-beer-dark);
+    background: rgba(245, 158, 11, 0.04);
   }
 
   .tab-btn--active {
@@ -652,9 +652,9 @@
     left: 50%;
     transform: translateX(-50%) translateY(0);
     z-index: 39;
-    background: var(--color-beer-dark);
-    border: 1px solid var(--color-beer-amber);
-    color: var(--color-beer-head);
+    background: var(--color-beer-amber);
+    border: 1px solid var(--color-beer-dark);
+    color: #ffffff;
     font-family: var(--font-body);
     font-size: 0.8rem;
     font-weight: 600;
@@ -667,8 +667,7 @@
   }
 
   .new-beers-pill:hover {
-    background: var(--color-beer-amber);
-    color: var(--color-bg-deep);
+    background: var(--color-beer-dark);
   }
 
   @keyframes pill-drop {
