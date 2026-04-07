@@ -6,26 +6,26 @@
     item,
     isNew = false,
     onlongpress,
-    onimageload,
   }: {
     item: FeedItem
     isNew?: boolean
     onlongpress?: (item: FeedItem) => void
-    onimageload?: () => void
   } = $props()
 
   const displayName = $derived(item.user.displayName ?? 'Anonymous')
   const ago = $derived(timeAgo(item.loggedAt))
 
-  // Long-press state
-  let pressTimer: ReturnType<typeof setTimeout> | null = null
-  let isPressed = $state(false)
-  let startX = 0
-  let startY = 0
+  let imageLoaded = $state(false)
   let animating = $state(false)
   $effect(() => {
     if (isNew) animating = true
   })
+
+  // Long-press
+  let pressTimer: ReturnType<typeof setTimeout> | null = null
+  let isPressed = $state(false)
+  let startX = 0
+  let startY = 0
 
   function handlePointerDown(e: PointerEvent) {
     if (e.button !== 0 && e.pointerType === 'mouse') return
@@ -53,35 +53,42 @@
     }
     isPressed = false
   }
-
-  function handleAnimationEnd() {
-    animating = false
-  }
 </script>
 
 <div
-  class="beer-card card-hover"
-  class:beer-card-new={animating}
-  class:is-pressed={isPressed}
+  class="card"
+  class:card-new={animating}
+  class:card-pressed={isPressed}
   onpointerdown={handlePointerDown}
   onpointermove={handlePointerMove}
   onpointerup={cancelPress}
   onpointercancel={cancelPress}
   onpointerleave={cancelPress}
-  onanimationend={handleAnimationEnd}
+  onanimationend={() => (animating = false)}
   role="button"
   tabindex="0"
   aria-label="Beer photo by {displayName} — long press to enlarge"
 >
+  <!--
+    photo-wrap always has aspect-ratio: 3/4 — a fixed height that Masonry can
+    measure before any image loads. The image is absolutely inset within it.
+    This is the key that makes the masonry grid stable.
+  -->
   <div class="photo-wrap">
+    <!-- Skeleton shown until image is ready -->
+    <div class="skeleton" class:skeleton-hidden={imageLoaded} aria-hidden="true"></div>
+
     <img
       src={item.photoUrl}
       alt="Beer logged by {displayName}"
       loading="lazy"
       class="photo"
-      onload={onimageload}
+      class:photo-loaded={imageLoaded}
+      onload={() => (imageLoaded = true)}
     />
-    <div class="overlay"></div>
+
+    <div class="overlay" aria-hidden="true"></div>
+
     <div class="meta">
       <div class="meta-left">
         <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
@@ -93,10 +100,10 @@
 </div>
 
 <style>
-  .beer-card {
+  .card {
     border-radius: 0.75rem;
     overflow: hidden;
-    background-color: var(--color-bg-card);
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     cursor: pointer;
     user-select: none;
@@ -105,29 +112,64 @@
       box-shadow 150ms ease;
   }
 
-  .beer-card.is-pressed {
+  .card-pressed {
     transform: scale(0.97);
     box-shadow:
       0 0 0 2px var(--color-beer-amber),
       0 0 12px rgba(212, 136, 58, 0.4);
   }
 
+  /* Fixed 3:4 portrait ratio — deterministic height for Masonry */
   .photo-wrap {
     position: relative;
+    aspect-ratio: 3 / 4;
     overflow: hidden;
     touch-action: manipulation;
   }
 
+  /* Pulsing placeholder, sits below image in stacking order */
+  .skeleton {
+    position: absolute;
+    inset: 0;
+    background: var(--color-bg-surface);
+    animation: pulse 1.6s ease-in-out infinite;
+    transition: opacity 200ms ease;
+  }
+
+  .skeleton-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  /* Image fills the fixed-ratio box; starts invisible, fades in on load */
   .photo {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    display: block;
-    transition: transform 300ms ease;
+    opacity: 0;
+    transition:
+      opacity 350ms ease,
+      transform 300ms ease;
   }
 
-  .beer-card:hover .photo {
-    transform: scale(1.03);
+  .photo-loaded {
+    opacity: 1;
+  }
+
+  .card:hover .photo-loaded {
+    transform: scale(1.04);
   }
 
   .overlay {

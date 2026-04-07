@@ -17,10 +17,20 @@
 
   let { data }: { data: PageData } = $props()
 
-  // untrack: intentional one-time capture of SSR data; state is then managed independently (load-more)
+  // Initialised from SSR data; $effect below resets when the slug changes (search navigation)
   let feedItems = $state<FeedItem[]>(untrack(() => data.feed.items))
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
+
+  $effect(() => {
+    // Track the slug so this runs on group-to-group navigation
+    const _ = data.profile.slug
+    untrack(() => {
+      feedItems = data.feed.items
+      feedOffset = data.feed.items.length
+      feedTotal = data.feed.total
+    })
+  })
   let loadingMore = $state(false)
   let lightboxItem = $state<FeedItem | null>(null)
   let sentinel = $state<HTMLElement | undefined>(undefined)
