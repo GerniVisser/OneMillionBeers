@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import { browser } from '$app/environment'
   import type { FeedItem } from '@omb/shared'
   import BeerCard from './BeerCard.svelte'
@@ -19,86 +19,97 @@
   let gridEl = $state<HTMLElement | undefined>()
   let masonry: import('masonry-layout') | undefined
 
-  async function initMasonry() {
-    if (!browser || !gridEl) return
-    const Masonry = (await import('masonry-layout')).default
-    masonry = new Masonry(gridEl, {
-      itemSelector: '.masonry-item',
-      columnWidth: '.masonry-sizer',
-      percentPosition: true,
-      gutter: 10,
-      transitionDuration: '0.2s',
-    })
-  }
-
-  async function relayout() {
-    await tick()
-    masonry?.reloadItems?.()
-    masonry?.layout?.()
-  }
-
   onMount(() => {
-    initMasonry()
-    return () => {
-      masonry?.destroy?.()
-    }
+    if (!browser) return
+
+    // Tick ensures Svelte has committed the current items to the DOM.
+    // Because BeerCard uses a fixed aspect-ratio, every item already has a
+    // real, measurable height — Masonry can position the grid correctly on
+    // the very first call without waiting for any images to load.
+    tick().then(async () => {
+      if (!gridEl) return
+      const Masonry = (await import('masonry-layout')).default
+      masonry = new Masonry(gridEl, {
+        itemSelector: '.item',
+        columnWidth: '.sizer',
+        percentPosition: true,
+        gutter: 10,
+        transitionDuration: '0.15s',
+      })
+    })
+
+    return () => masonry?.destroy?.()
   })
 
-  // Re-layout whenever items change (new cards added / images load)
+  // Re-layout whenever the items array changes (load-more appends or
+  // navigation replaces the list). With fixed-ratio cards all items have
+  // stable heights so a single reloadItems + layout is sufficient —
+  // no per-image relayout is needed.
   $effect(() => {
-    void items
-    relayout()
+    void items // reactive dependency
+    untrack(async () => {
+      if (!masonry) return
+      await tick() // wait for Svelte to add/remove DOM nodes
+      masonry.reloadItems?.()
+      masonry.layout?.()
+    })
   })
 </script>
 
 {#if loading}
-  <div class="feed-grid">
-    {#each { length: 8 } as _}
-      <div class="masonry-item skeleton"></div>
+  <!-- Skeleton grid uses plain CSS grid — no Masonry needed since all
+       cards are the same fixed ratio. -->
+  <div class="skeleton-grid" aria-busy="true" aria-label="Loading feed">
+    {#each { length: 9 } as _, i}
+      <div class="skeleton-card" style="animation-delay: {(i % 3) * 120}ms"></div>
     {/each}
   </div>
 {:else if items.length === 0}
   <p class="empty">No beers logged yet. Be the first!</p>
 {:else}
-  <div class="feed-grid" bind:this={gridEl}>
-    <!-- Sizer element controls column width for Masonry -->
-    <div class="masonry-sizer"></div>
+  <div class="grid" bind:this={gridEl}>
+    <!-- Zero-width sizer element tells Masonry the column width -->
+    <div class="sizer" aria-hidden="true"></div>
     {#each items as item (item.id)}
-      <div class="masonry-item">
-        <BeerCard {item} isNew={item.id === newestId} {onlongpress} onimageload={relayout} />
+      <div class="item">
+        <BeerCard {item} isNew={item.id === newestId} {onlongpress} />
       </div>
     {/each}
   </div>
 {/if}
 
 <style>
-  .feed-grid {
-    /* Masonry uses absolute positioning; position:relative anchors children */
+  /* ── Masonry grid ───────────────────────────────────────────────────── */
+
+  .grid {
+    /* Masonry absolutely positions children; this anchors them */
     position: relative;
     width: 100%;
   }
 
-  /* Sizer and items: 3 columns always */
-  .masonry-sizer,
-  :global(.masonry-item) {
+  /* Column width: 3 columns with 10px gutters on each side */
+  .sizer,
+  :global(.item) {
     width: calc(33.333% - 7px);
     margin-bottom: 10px;
   }
 
-  .skeleton {
-    aspect-ratio: 4 / 5;
-    border-radius: 0.75rem;
-    background-color: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    animation: pulse 2s ease-in-out infinite;
-    /* Give skeletons varying heights for a natural pre-load feel */
+  /* ── Skeleton loading state ─────────────────────────────────────────── */
+
+  /* Use CSS grid for skeletons — same 3-column layout without Masonry */
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
   }
 
-  .skeleton:nth-child(3n) {
+  .skeleton-card {
+    /* Match BeerCard's fixed aspect-ratio so the skeleton has the same size */
     aspect-ratio: 3 / 4;
-  }
-  .skeleton:nth-child(3n + 1) {
-    aspect-ratio: 1 / 1;
+    border-radius: 0.75rem;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    animation: pulse 1.6s ease-in-out infinite;
   }
 
   @keyframes pulse {
@@ -107,9 +118,11 @@
       opacity: 1;
     }
     50% {
-      opacity: 0.4;
+      opacity: 0.35;
     }
   }
+
+  /* ── Empty state ────────────────────────────────────────────────────── */
 
   .empty {
     text-align: center;

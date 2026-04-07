@@ -171,7 +171,7 @@
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: 9999px;
-    color: var(--color-beer-head);
+    color: var(--color-text-muted);
     font-size: 0.95rem;
     padding: 0.65rem 2.5rem 0.65rem 2.5rem;
     outline: none;
