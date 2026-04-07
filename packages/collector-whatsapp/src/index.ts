@@ -1,6 +1,6 @@
 import { pino } from 'pino'
 import { config } from './config.js'
-import { startSession, getSessionStatus } from './waha-client.js'
+import { startSession, getSessionStatus, ensureWebhookConfigured } from './waha-client.js'
 import { buildServer } from './server.js'
 import { startPolling } from './session-monitor.js'
 import { syncAllGroups } from './group-sync.js'
@@ -10,30 +10,48 @@ async function main(): Promise<void> {
 
   logger.info('Starting WhatsApp collector')
 
-  // Ensure WAHA session is started (idempotent)
+  // Start the webhook server before touching WAHA, so any session.status events
+  // triggered by the config update below land on a live listener.
+  const server = buildServer(logger)
+  await server.listen({ port: config.COLLECTOR_PORT, host: '0.0.0.0' })
+  logger.info({ port: config.COLLECTOR_PORT }, 'Webhook server listening')
+
+  // Ensure WAHA session is started (idempotent). Includes webhook config in the
+  // start body — required since WAHA 2026.x no longer reads WAHA_WEBHOOK_URL env var.
   try {
     await startSession()
     logger.info('WAHA session started')
   } catch (err) {
-    // Non-fatal — WAHA may already be starting the session via WHATSAPP_START_SESSION env var
+    // Non-fatal — WAHA may already be running the session via WHATSAPP_START_SESSION env var
     logger.warn({ err }, 'Could not explicitly start WAHA session — continuing anyway')
   }
 
-  // If WAHA is already WORKING on startup (e.g. collector restarted while WAHA stayed up),
-  // run group sync immediately — the session.status webhook won't fire again in this case.
+  // If session was already running (startSession returned 422), it may have no webhook
+  // config (WAHA 2026.x broke env-var-based webhook config). Configure it now via PUT,
+  // which restarts the session briefly. The server is already up so the WORKING event lands.
+  let webhookConfigured = false
   try {
-    const status = await getSessionStatus()
-    if (status === 'WORKING') {
-      logger.info('Session already WORKING on startup — running group sync')
-      syncAllGroups(logger).catch((err) => logger.error({ err }, 'Startup group sync failed'))
+    webhookConfigured = await ensureWebhookConfigured()
+    if (webhookConfigured) {
+      logger.info('Applied WAHA webhook config — session restarting')
     }
   } catch (err) {
-    logger.warn({ err }, 'Could not check session status on startup')
+    logger.warn({ err }, 'Could not configure WAHA webhook')
   }
 
-  const server = buildServer(logger)
-  await server.listen({ port: config.COLLECTOR_PORT, host: '0.0.0.0' })
-  logger.info({ port: config.COLLECTOR_PORT }, 'Webhook server listening')
+  // If WAHA is already WORKING and we didn't just restart it, run group sync immediately —
+  // the session.status webhook won't fire again in this case.
+  if (!webhookConfigured) {
+    try {
+      const status = await getSessionStatus()
+      if (status === 'WORKING') {
+        logger.info('Session already WORKING on startup — running group sync')
+        syncAllGroups(logger).catch((err) => logger.error({ err }, 'Startup group sync failed'))
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Could not check session status on startup')
+    }
+  }
 
   const stopPolling = startPolling(logger)
 

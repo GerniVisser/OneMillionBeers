@@ -8,6 +8,7 @@ const REQUIRED_ENV = {
   STORAGE_REGION: 'auto',
   WAHA_BASE_URL: 'http://waha:3000',
   WAHA_API_KEY: 'test-api-key',
+  WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
   PUBLIC_BASE_URL: 'http://localhost:8080',
   STATUS_TOKEN: 'test-token',
 }

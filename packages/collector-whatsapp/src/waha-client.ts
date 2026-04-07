@@ -2,8 +2,21 @@ import { config } from './config.js'
 
 export type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED'
 
+// Events the collector handles — kept in sync with webhook.ts handler
+const WEBHOOK_EVENTS = [
+  'message',
+  'message.any',
+  'session.status',
+  'group.v2.join',
+  'group.v2.update',
+]
+
 function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }
+}
+
+function webhookConfig() {
+  return { webhooks: [{ url: config.WAHA_WEBHOOK_URL, events: WEBHOOK_EVENTS }] }
 }
 
 export async function getSessionStatus(): Promise<SessionStatus> {
@@ -20,10 +33,34 @@ export async function startSession(): Promise<void> {
   const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/start`, {
     method: 'POST',
     headers: wahaHeaders(),
-    body: JSON.stringify({ name: config.WAHA_SESSION }),
+    body: JSON.stringify({ name: config.WAHA_SESSION, config: webhookConfig() }),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`WAHA startSession returned ${res.status}`)
+}
+
+/**
+ * Ensures the WAHA session has webhook config set.
+ * Needed when the session was already running (e.g. collector restarted while WAHA stayed up)
+ * and WAHA did not apply the webhook config from environment variables (changed in 2026.x).
+ * Returns true if a config update was applied (session will restart briefly).
+ */
+export async function ensureWebhookConfigured(): Promise<boolean> {
+  const sessionRes = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
+    headers: wahaHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!sessionRes.ok) return false
+  const session = (await sessionRes.json()) as { config: unknown }
+  if (session.config !== null) return false
+
+  await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
+    method: 'PUT',
+    headers: wahaHeaders(),
+    body: JSON.stringify({ config: webhookConfig() }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  return true
 }
 
 export async function getQrCodePng(): Promise<Buffer> {

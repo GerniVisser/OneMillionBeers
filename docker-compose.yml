@@ -67,7 +67,7 @@ services:
         tag: collector-telegram/{{.ID}}
 
   waha:
-    image: devlikeapro/waha
+    image: devlikeapro/waha:2026.3.4
     expose:
       - '3000'
     restart: unless-stopped
@@ -76,8 +76,6 @@ services:
       WAHA_API_KEY: ${WAHA_API_KEY}
       WHATSAPP_START_SESSION: default
       WHATSAPP_DOWNLOAD_MEDIA: 'true'
-      WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
-      WAHA_WEBHOOK_EVENTS: message,session.status,group.v2.join,group.v2.update
     logging:
       driver: awslogs
       options:
@@ -102,6 +100,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
       COLLECTOR_PORT: '8080'
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       STATUS_TOKEN: ${STATUS_TOKEN}

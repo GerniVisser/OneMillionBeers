@@ -5,6 +5,7 @@ vi.mock('../config.js', () => ({
     WAHA_BASE_URL: 'http://waha:3000',
     WAHA_API_KEY: 'test-api-key',
     WAHA_SESSION: 'default',
+    WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
   },
 }))
 
@@ -46,7 +47,10 @@ describe('waha-client', () => {
     expect(url).toBe('http://waha:3000/api/sessions/start')
     expect(init.method).toBe('POST')
     expect((init.headers as Record<string, string>)['x-api-key']).toBe('test-api-key')
-    expect(JSON.parse(init.body as string)).toEqual({ name: 'default' })
+    const body = JSON.parse(init.body as string)
+    expect(body.name).toBe('default')
+    expect(body.config.webhooks[0].url).toBe('http://collector:8080/webhook')
+    expect(body.config.webhooks[0].events).toContain('message')
   })
 
   it('getQrCodePng returns a Buffer from the response', async () => {
