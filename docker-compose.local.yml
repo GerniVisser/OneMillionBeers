@@ -34,7 +34,7 @@ services:
       "
 
   waha:
-    image: devlikeapro/waha
+    image: devlikeapro/waha:2026.3.4
     network_mode: host
     environment:
       PORT: '3100'
