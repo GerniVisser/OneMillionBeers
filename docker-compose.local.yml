@@ -42,8 +42,6 @@ services:
       WAHA_API_KEY: local-api-key
       WHATSAPP_START_SESSION: default
       WHATSAPP_DOWNLOAD_MEDIA: 'true'
-      WAHA_WEBHOOK_URL: http://localhost:8080/webhook
-      WAHA_WEBHOOK_EVENTS: message,message.any,session.status,group.v2.join,group.v2.update
       WAHA_PRINT_QR: 'true'
 
 volumes:
