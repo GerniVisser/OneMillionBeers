@@ -212,4 +212,32 @@ describe('webhook', () => {
     await handleWebhookEvent(makeImagePayload(), logger)
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
+
+  it('discards a duplicate webhook delivery for the same message ID fired concurrently', async () => {
+    // Simulates WAHA retrying the webhook before the collector has responded.
+    // Both calls start before either resolves; the second should be dropped.
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+
+    await Promise.all([
+      handleWebhookEvent(makeImagePayload(), logger),
+      handleWebhookEvent(makeImagePayload(), logger), // same msgId — duplicate
+    ])
+
+    expect(mockUploadPhoto).toHaveBeenCalledOnce()
+    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+  })
+
+  it('processes the same message ID again after the first delivery completes', async () => {
+    // Verifies the processingMsgIds Set is cleaned up via finally, so a genuine
+    // re-delivery after a crash is not permanently blocked.
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+
+    await handleWebhookEvent(makeImagePayload(), logger)
+    await handleWebhookEvent(makeImagePayload(), logger) // sequential, not concurrent
+
+    expect(mockUploadPhoto).toHaveBeenCalledTimes(2)
+    expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
+  })
 })

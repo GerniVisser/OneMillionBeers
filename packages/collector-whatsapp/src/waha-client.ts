@@ -3,13 +3,7 @@ import { config } from './config.js'
 export type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED'
 
 // Events the collector handles — kept in sync with webhook.ts handler
-const WEBHOOK_EVENTS = [
-  'message',
-  'message.any',
-  'session.status',
-  'group.v2.join',
-  'group.v2.update',
-]
+const WEBHOOK_EVENTS = ['message', 'session.status', 'group.v2.join', 'group.v2.update']
 
 function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }
@@ -40,10 +34,10 @@ export async function startSession(): Promise<void> {
 }
 
 /**
- * Ensures the WAHA session has webhook config set.
- * Needed when the session was already running (e.g. collector restarted while WAHA stayed up)
- * and WAHA did not apply the webhook config from environment variables (changed in 2026.x).
- * Returns true if a config update was applied (session will restart briefly).
+ * Ensures the WAHA session has the correct webhook config.
+ * Always applies the canonical config — this overwrites any stale registrations
+ * (e.g. a previous deploy that registered extra events like message.any).
+ * Returns true if the config was applied (session will restart briefly).
  */
 export async function ensureWebhookConfigured(): Promise<boolean> {
   const sessionRes = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
@@ -51,8 +45,6 @@ export async function ensureWebhookConfigured(): Promise<boolean> {
     signal: AbortSignal.timeout(10_000),
   })
   if (!sessionRes.ok) return false
-  const session = (await sessionRes.json()) as { config: unknown }
-  if (session.config !== null) return false
 
   await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
     method: 'PUT',

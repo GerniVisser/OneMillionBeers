@@ -93,4 +93,49 @@ describe('waha-client', () => {
     const name = await getGroupName('120363@g.us')
     expect(name).toBe('120363@g.us')
   })
+
+  it('ensureWebhookConfigured always PUTs the canonical config and returns true', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ config: { webhooks: [] } }) }) // GET session
+      .mockResolvedValueOnce({ ok: true }) // PUT config
+    vi.stubGlobal('fetch', mockFetch)
+    const { ensureWebhookConfigured } = await import('../waha-client.js')
+    const result = await ensureWebhookConfigured()
+    expect(result).toBe(true)
+    const [putUrl, putInit] = mockFetch.mock.calls[1] as [string, RequestInit]
+    expect(putUrl).toBe('http://waha:3000/api/sessions/default')
+    expect(putInit.method).toBe('PUT')
+    const body = JSON.parse(putInit.body as string)
+    expect(body.config.webhooks[0].events).toContain('message')
+    expect(body.config.webhooks[0].events).not.toContain('message.any')
+  })
+
+  it('ensureWebhookConfigured overwrites stale config that includes message.any', async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          config: {
+            webhooks: [
+              { url: 'http://collector:8080/webhook', events: ['message', 'message.any'] },
+            ],
+          },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true })
+    vi.stubGlobal('fetch', mockFetch)
+    const { ensureWebhookConfigured } = await import('../waha-client.js')
+    const result = await ensureWebhookConfigured()
+    expect(result).toBe(true)
+    expect(mockFetch).toHaveBeenCalledTimes(2) // GET + PUT — did not skip
+  })
+
+  it('ensureWebhookConfigured returns false when session fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
+    const { ensureWebhookConfigured } = await import('../waha-client.js')
+    const result = await ensureWebhookConfigured()
+    expect(result).toBe(false)
+  })
 })

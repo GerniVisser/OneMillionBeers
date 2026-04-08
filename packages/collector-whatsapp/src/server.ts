@@ -8,8 +8,12 @@ export function buildServer(logger: Logger) {
   const server = Fastify({ logger: false })
 
   server.post('/webhook', async (req, reply) => {
-    await handleWebhookEvent(req.body, logger)
-    return reply.send({ ok: true })
+    // Respond immediately — WAHA retries on timeout, which causes duplicate processing.
+    // handleWebhookEvent never throws (errors are caught and logged internally).
+    reply.send({ ok: true })
+    handleWebhookEvent(req.body, logger).catch((err) => {
+      logger.error({ err }, 'Unhandled error in webhook handler')
+    })
   })
 
   server.get('/status', async (req, reply) => {
