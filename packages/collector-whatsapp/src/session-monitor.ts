@@ -2,7 +2,6 @@ import { type Logger } from 'pino'
 import { config } from './config.js'
 import { sendReauthAlert } from './mailer.js'
 import { getSessionStatus } from './waha-client.js'
-import { syncAllGroups } from './group-sync.js'
 
 // Module-level — tracks last status we sent an alert for, to avoid duplicate emails
 let lastAlertedStatus: string | null = null
@@ -11,7 +10,6 @@ export async function handleSessionStatusChange(status: string, logger: Logger):
   if (status === 'WORKING') {
     lastAlertedStatus = null
     logger.info({ status }, 'WhatsApp session is working')
-    syncAllGroups(logger).catch((err) => logger.error({ err }, 'Startup group sync failed'))
     return
   }
 

@@ -6,6 +6,7 @@ export const UserSchema = z.object({
   identityHash: Sha256HexSchema,
   displayName: z.string().min(1).max(256).nullable(),
   slug: SlugSchema,
+  countryCode: z.string().length(2).nullable(),
   createdAt: IsoDatetimeSchema,
 })
 export type User = z.infer<typeof UserSchema>
@@ -15,6 +16,7 @@ export const UserSummarySchema = z.object({
   id: UuidSchema,
   displayName: z.string().nullable(),
   slug: SlugSchema,
+  countryCode: z.string().length(2).nullable(),
 })
 export type UserSummary = z.infer<typeof UserSummarySchema>
 

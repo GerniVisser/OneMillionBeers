@@ -9,6 +9,7 @@ import {
   getGlobalActivity,
   getGlobalHourly,
   getGlobalMonthly,
+  getGlobalCountries,
   getLatestBeer,
 } from '../db/queries.js'
 import { subscribe } from '../lib/sse.js'
@@ -51,6 +52,11 @@ export const globalRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, {
   app.get('/v1/global/monthly', async (_request, reply) => {
     const months = await getGlobalMonthly(pool)
     return reply.send({ months })
+  })
+
+  app.get('/v1/global/countries', async (_request, reply) => {
+    const countries = await getGlobalCountries(pool)
+    return reply.send(countries)
   })
 
   app.get(

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { FeedItem } from '@omb/shared'
   import { timeAgo } from '$lib/utils'
+  import CountryFlag from './CountryFlag.svelte'
 
   let {
     item,
@@ -70,12 +71,10 @@
   aria-label="Beer photo by {displayName} — long press to enlarge"
 >
   <!--
-    photo-wrap always has aspect-ratio: 3/4 — a fixed height that Masonry can
-    measure before any image loads. The image is absolutely inset within it.
-    This is the key that makes the masonry grid stable.
+    photo-wrap is the container query root. Its fixed 3:4 aspect-ratio gives
+    Masonry a stable, measurable height before any image loads.
   -->
   <div class="photo-wrap">
-    <!-- Skeleton shown until image is ready -->
     <div class="skeleton" class:skeleton-hidden={imageLoaded} aria-hidden="true"></div>
 
     <img
@@ -87,8 +86,17 @@
       onload={() => (imageLoaded = true)}
     />
 
+    <!-- Gradient only needed when text is present; hidden via container query at tiny sizes -->
     <div class="overlay" aria-hidden="true"></div>
 
+    <!-- Flag: top-left, scales with card via cqi -->
+    {#if item.user.countryCode}
+      <div class="flag-badge">
+        <CountryFlag countryCode={item.user.countryCode} />
+      </div>
+    {/if}
+
+    <!-- Progressive meta: what's shown depends on card width via @container -->
     <div class="meta">
       <div class="meta-left">
         <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
@@ -119,15 +127,17 @@
       0 0 12px rgba(212, 136, 58, 0.4);
   }
 
-  /* Fixed 3:4 portrait ratio — deterministic height for Masonry */
+  /* Container query root — also the fixed-ratio anchor for Masonry */
   .photo-wrap {
+    container-type: inline-size;
+    container-name: card;
     position: relative;
     aspect-ratio: 3 / 4;
     overflow: hidden;
     touch-action: manipulation;
   }
 
-  /* Pulsing placeholder, sits below image in stacking order */
+  /* ── Skeleton ───────────────────────────────────────────────────────── */
   .skeleton {
     position: absolute;
     inset: 0;
@@ -151,7 +161,7 @@
     }
   }
 
-  /* Image fills the fixed-ratio box; starts invisible, fades in on load */
+  /* ── Photo ──────────────────────────────────────────────────────────── */
   .photo {
     position: absolute;
     inset: 0;
@@ -172,23 +182,41 @@
     transform: scale(1.04);
   }
 
+  /* ── Gradient overlay ───────────────────────────────────────────────── */
   .overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(to top, rgba(26, 18, 8, 0.88) 0%, transparent 55%);
     pointer-events: none;
+    transition: opacity 150ms ease;
   }
 
+  /* ── Flag badge — scales with card width via cqi ────────────────────── */
+  .flag-badge {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    z-index: 2;
+    width: clamp(14px, 10cqi, 22px);
+    aspect-ratio: 4 / 3;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+    display: flex;
+    line-height: 0;
+  }
+
+  /* ── Meta overlay ───────────────────────────────────────────────────── */
   .meta {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 0.75rem;
+    padding: 0.6rem 0.55rem;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    gap: 0.5rem;
+    gap: 0.4rem;
   }
 
   .meta-left {
@@ -200,7 +228,7 @@
     display: block;
     font-family: var(--font-body);
     font-weight: 500;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--color-beer-foam);
     white-space: nowrap;
     overflow: hidden;
@@ -214,7 +242,7 @@
   .meta-group {
     display: inline-block;
     margin-top: 0.2rem;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     font-weight: 500;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -222,7 +250,7 @@
     background: rgba(200, 132, 42, 0.15);
     border: 1px solid rgba(200, 132, 42, 0.3);
     border-radius: 3px;
-    padding: 1px 5px;
+    padding: 1px 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -235,9 +263,64 @@
 
   .meta-time {
     font-family: var(--font-body);
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--color-cream-faint);
     white-space: nowrap;
     flex-shrink: 0;
   }
+
+  /* ── Progressive disclosure via container queries ───────────────────── */
+
+  /*
+   * < 120px  — pure photo, nothing overlaid
+   * 120–154px — flag only
+   * 155–219px — flag + username
+   * 220–279px — flag + username + time
+   * 280px+    — flag + username + time + group label
+   */
+
+  /* Tiny: strip everything */
+  @container card (max-width: 119px) {
+    .flag-badge {
+      display: none;
+    }
+    .overlay {
+      display: none;
+    }
+    .meta {
+      display: none;
+    }
+  }
+
+  /* Small: flag visible, no text */
+  @container card (min-width: 120px) and (max-width: 154px) {
+    .overlay {
+      display: none;
+    }
+    .meta {
+      display: none;
+    }
+  }
+
+  /* Medium-small: flag + username only */
+  @container card (min-width: 155px) and (max-width: 219px) {
+    .meta-group {
+      display: none;
+    }
+    .meta-time {
+      display: none;
+    }
+    .meta {
+      padding: 0.5rem 0.45rem;
+    }
+  }
+
+  /* Medium: flag + username + time, no group */
+  @container card (min-width: 220px) and (max-width: 279px) {
+    .meta-group {
+      display: none;
+    }
+  }
+
+  /* Large (280px+): everything shown — default styles apply */
 </style>

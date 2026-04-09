@@ -30,6 +30,12 @@ const validPayload = {
   photoUrl: 'https://example.com/beer.jpg',
 }
 
+// South African number: +27 country code → "ZA"
+const zaPayload = {
+  ...validPayload,
+  senderId: 'wa:27831234567',
+}
+
 describe('POST /v1/internal/beer-log', () => {
   it('returns 201 on valid request', async () => {
     const res = await app.inject({
@@ -59,6 +65,27 @@ describe('POST /v1/internal/beer-log', () => {
     const { rows } = await pool.query('SELECT identity_hash FROM users')
     expect(rows[0].identity_hash).not.toBe(validPayload.senderId)
     expect(rows[0].identity_hash).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('stores country code from phone number prefix', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    const { rows } = await pool.query('SELECT country_code FROM users')
+    expect(rows[0].country_code).toBe('ZA')
+  })
+
+  it('sets country code once and does not overwrite it', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    // Second log with same sender — country_code must remain 'ZA'
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    const { rows } = await pool.query('SELECT country_code FROM users')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].country_code).toBe('ZA')
+  })
+
+  it('stores null country code for unparseable senderId', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    const { rows } = await pool.query('SELECT country_code FROM users')
+    expect(rows[0].country_code).toBeNull()
   })
 
   it('returns 400 on invalid body', async () => {

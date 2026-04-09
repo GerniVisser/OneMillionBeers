@@ -6,7 +6,6 @@ const mockGetSessionStatus = vi.fn()
 
 vi.mock('../mailer.js', () => ({ sendReauthAlert: mockSendReauthAlert }))
 vi.mock('../waha-client.js', () => ({ getSessionStatus: mockGetSessionStatus }))
-vi.mock('../group-sync.js', () => ({ syncAllGroups: async () => {} }))
 
 // Mutable config — mutate per test
 const testConfig = {

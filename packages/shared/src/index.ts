@@ -63,10 +63,14 @@ export {
   GlobalActivityResponseSchema,
   GlobalHourlyResponseSchema,
   GlobalMonthlyResponseSchema,
+  CountryStatSchema,
+  GlobalCountriesResponseSchema,
   type GlobalStatsResponse,
   type GlobalActivityResponse,
   type GlobalHourlyResponse,
   type GlobalMonthlyResponse,
+  type CountryStat,
+  type GlobalCountriesResponse,
 } from './global-stats.js'
 
 export {
