@@ -120,15 +120,7 @@
 <section class="hero">
   <!-- Hero controls: back (top-left) + search (top-right) -->
   <div class="hero-controls">
-    <a
-      href="/"
-      class="hero-btn"
-      aria-label="Go back"
-      onclick={(e) => {
-        e.preventDefault()
-        history.back()
-      }}
-    >
+    <a href="/" class="hero-btn" aria-label="Go to home">
       <svg
         width="22"
         height="22"
@@ -140,7 +132,8 @@
         stroke-linejoin="round"
         aria-hidden="true"
       >
-        <path d="M15 18l-6-6 6-6" />
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H5a1 1 0 01-1-1V9.5z" />
+        <path d="M9 21V12h6v9" />
       </svg>
     </a>
     <button class="hero-btn" aria-label="Search groups" onclick={() => (searchOpen = true)}>

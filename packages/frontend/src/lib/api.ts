@@ -4,6 +4,7 @@ import type {
   GlobalActivityResponse,
   GlobalHourlyResponse,
   GlobalMonthlyResponse,
+  GlobalCountriesResponse,
   FeedItem,
   LeaderboardResponse,
   GroupProfileResponse,
@@ -92,6 +93,12 @@ export function getGlobalHourly(fetch: typeof globalThis.fetch): Promise<GlobalH
 
 export function getGlobalMonthly(fetch: typeof globalThis.fetch): Promise<GlobalMonthlyResponse> {
   return get<GlobalMonthlyResponse>(fetch, '/global/monthly')
+}
+
+export function getGlobalCountries(
+  fetch: typeof globalThis.fetch,
+): Promise<GlobalCountriesResponse> {
+  return get<GlobalCountriesResponse>(fetch, '/global/countries')
 }
 
 export function getGroups(

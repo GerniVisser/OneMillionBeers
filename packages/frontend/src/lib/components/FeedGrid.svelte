@@ -87,20 +87,45 @@
     width: 100%;
   }
 
-  /* Column width: 3 columns with 10px gutters on each side */
+  /* 2 columns on mobile, 3 on tablet, 4 on large screens */
   .sizer,
   :global(.item) {
-    width: calc(33.333% - 7px);
+    width: calc(50% - 5px);
     margin-bottom: 10px;
+  }
+
+  @media (min-width: 600px) {
+    .sizer,
+    :global(.item) {
+      width: calc(33.333% - 7px);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .sizer,
+    :global(.item) {
+      width: calc(25% - 7.5px);
+    }
   }
 
   /* ── Skeleton loading state ─────────────────────────────────────────── */
 
-  /* Use CSS grid for skeletons — same 3-column layout without Masonry */
   .skeleton-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+  }
+
+  @media (min-width: 600px) {
+    .skeleton-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .skeleton-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
   }
 
   .skeleton-card {

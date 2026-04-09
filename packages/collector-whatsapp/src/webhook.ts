@@ -2,7 +2,6 @@ import { type Logger } from 'pino'
 import { uploadPhoto, forwardBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
 import { getGroupName } from './waha-client.js'
-import { syncGroup } from './group-sync.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -28,16 +27,6 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
 
   if (event === 'message') {
     await handleMessage(body as Record<string, unknown>, logger)
-    return
-  }
-
-  if (event === 'group.v2.join') {
-    await handleGroupJoin(body as Record<string, unknown>, logger)
-    return
-  }
-
-  if (event === 'group.v2.update') {
-    await handleGroupUpdate(body as Record<string, unknown>, logger)
     return
   }
 
@@ -76,8 +65,19 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   try {
     logger.warn({ chatId }, 'Processing photo from WhatsApp group')
 
-    const senderJid = (payload.participant ?? payload.from) as string
-    const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '')
+    // WhatsApp's newer LID protocol uses a device-linked identifier (ends in @lid)
+    // as the primary participant field instead of a phone number. Fall back to
+    // _data.key.participantAlt which always carries the real phone JID.
+    const participantRaw = payload.participant as string | undefined
+    const isLid = participantRaw?.endsWith('@lid')
+    const dataKey = (payload._data as Record<string, unknown> | undefined)?.key as
+      | Record<string, unknown>
+      | undefined
+    const participantAlt = dataKey?.participantAlt as string | undefined
+    const senderJid = (
+      isLid && participantAlt ? participantAlt : (participantRaw ?? payload.from)
+    ) as string
+    const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
     const sourceGroupId = 'wa:' + chatId
     const groupName = await getGroupName(chatId)
     const timestamp = new Date((payload.timestamp as number) * 1000).toISOString()
@@ -143,33 +143,5 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     }
   } finally {
     processingMsgIds.delete(msgId)
-  }
-}
-
-async function handleGroupJoin(body: Record<string, unknown>, logger: Logger): Promise<void> {
-  try {
-    const payload = body.payload as Record<string, unknown> | undefined
-    const group = payload?.group as Record<string, unknown> | undefined
-    const rawGroupId = group?.id as string | undefined
-    if (!rawGroupId?.endsWith('@g.us')) return
-    const subject = (group?.subject as string | undefined) ?? rawGroupId
-    logger.info({ rawGroupId }, 'Group join — syncing metadata')
-    await syncGroup(rawGroupId, subject, logger)
-  } catch (err) {
-    logger.error({ err }, 'Unhandled error in handleGroupJoin')
-  }
-}
-
-async function handleGroupUpdate(body: Record<string, unknown>, logger: Logger): Promise<void> {
-  try {
-    const payload = body.payload as Record<string, unknown> | undefined
-    const group = payload?.group as Record<string, unknown> | undefined
-    const rawGroupId = group?.id as string | undefined
-    if (!rawGroupId?.endsWith('@g.us')) return
-    const subject = (group?.subject as string | undefined) ?? rawGroupId
-    logger.info({ rawGroupId }, 'Group update — syncing metadata')
-    await syncGroup(rawGroupId, subject, logger)
-  } catch (err) {
-    logger.error({ err }, 'Unhandled error in handleGroupUpdate')
   }
 }

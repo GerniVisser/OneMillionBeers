@@ -12,6 +12,7 @@ export const userRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { p
       id: user.id,
       displayName: user.displayName,
       slug: user.slug,
+      countryCode: user.countryCode,
       createdAt: user.createdAt,
     })
   })

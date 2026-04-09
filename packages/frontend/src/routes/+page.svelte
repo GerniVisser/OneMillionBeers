@@ -7,7 +7,6 @@
   import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
-  import BeerToast from '$lib/components/BeerToast.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
   import GroupSearch from '$lib/components/GroupSearch.svelte'
@@ -16,7 +15,8 @@
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
-  import type { Toast } from '$lib/components/BeerToast.svelte'
+  import WorldMap from '$lib/components/WorldMap.svelte'
+  import CountryFlag from '$lib/components/CountryFlag.svelte'
   import { formatDate, getWeekdayBreakdown, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
@@ -34,7 +34,6 @@
   let flashCount = $state(0)
   let lightboxItem = $state<FeedItem | null>(null)
   let newestId = $state('')
-  let toasts = $state<Toast[]>([])
 
   // Scroll state — drives pending-item buffering
   let isNearTop = $state(true)
@@ -46,7 +45,7 @@
   let pendingItems = $state<FeedItem[]>([])
 
   // Tab state
-  let activeTab = $state<'feed' | 'stats'>('feed')
+  let activeTab = $state<'feed' | 'stats' | 'map'>('feed')
   let searchOpen = $state(false)
 
   const hasMore = $derived(feedOffset < feedTotal)
@@ -81,6 +80,8 @@
   )
   const peakHour = $derived(getPeakHour(data.hourly.hours))
 
+  const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
+
   function transformSseToFeedItem(latestBeer: NonNullable<SseEvent['latestBeer']>): FeedItem {
     return {
       id: latestBeer.id,
@@ -90,6 +91,7 @@
         id: latestBeer.id,
         displayName: latestBeer.userName,
         slug: latestBeer.userName?.toLowerCase().replace(/\s+/g, '-') ?? 'anonymous',
+        countryCode: null,
       },
       group: {
         id: latestBeer.id,
@@ -160,18 +162,6 @@
             pendingItems = [item, ...pendingItems]
           }
         }
-
-        const toast: Toast = {
-          id: event.latestBeer.id,
-          photoUrl: event.latestBeer.photoUrl,
-          userName: event.latestBeer.userName,
-          groupName: event.latestBeer.groupName,
-          ts: Date.now(),
-        }
-        toasts = [...toasts.slice(-2), toast]
-        setTimeout(() => {
-          toasts = toasts.filter((t) => t.id !== toast.id)
-        }, 4500)
       }
     })
 
@@ -208,12 +198,6 @@
 </svelte:head>
 
 <BeerFlash trigger={flashCount} />
-<BeerToast
-  {toasts}
-  ondismiss={(id) => {
-    toasts = toasts.filter((t) => t.id !== id)
-  }}
-/>
 <BeerLightbox
   item={lightboxItem}
   onclose={() => {
@@ -314,6 +298,31 @@
       </svg>
       Stats
     </button>
+    <button
+      class="tab-btn"
+      class:tab-btn--active={activeTab === 'map'}
+      role="tab"
+      aria-selected={activeTab === 'map'}
+      aria-controls="panel-map"
+      onclick={() => (activeTab = 'map')}
+    >
+      <!-- Globe icon -->
+      <svg
+        class="tab-icon"
+        viewBox="0 0 17 17"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="8.5" cy="8.5" r="6.5" />
+        <ellipse cx="8.5" cy="8.5" rx="2.5" ry="6.5" />
+        <line x1="2" y1="8.5" x2="15" y2="8.5" />
+      </svg>
+      Map
+    </button>
   </div>
 
   <!-- Tab panels -->
@@ -346,7 +355,7 @@
       </div>
 
       <!-- STATS TAB -->
-    {:else}
+    {:else if activeTab === 'stats'}
       <div class="tab-panel" id="panel-stats" role="tabpanel">
         <div class="panel-content">
           <!-- Summary stat cards — infinite scrolling carousel -->
@@ -427,6 +436,33 @@
           </div>
         </div>
       </div>
+
+      <!-- MAP TAB -->
+    {:else if activeTab === 'map'}
+      <div class="tab-panel" id="panel-map" role="tabpanel">
+        <div class="map-layout">
+          <div class="map-card">
+            <WorldMap countries={data.countries} />
+          </div>
+
+          {#if data.countries.length > 0}
+            <div class="country-leaderboard">
+              <h3 class="country-lb-title">Countries</h3>
+              <ol class="country-lb-list">
+                {#each data.countries as country, i}
+                  {@const name = regionNames.of(country.countryCode) ?? country.countryCode}
+                  <li class="country-lb-row">
+                    <span class="country-lb-rank">{i + 1}</span>
+                    <CountryFlag countryCode={country.countryCode} size={16} />
+                    <span class="country-lb-name">{name}</span>
+                    <span class="country-lb-count">{country.beerCount.toLocaleString()}</span>
+                  </li>
+                {/each}
+              </ol>
+            </div>
+          {/if}
+        </div>
+      </div>
     {/if}
   </div>
 </div>
@@ -497,7 +533,7 @@
     top: 0;
     z-index: 50;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     background: rgba(18, 12, 5, 0.97);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
@@ -597,6 +633,113 @@
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+  }
+
+  /* ── Map panel ──────────────────────────────────── */
+  .map-layout {
+    padding: 1.25rem 0 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .map-card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+  }
+
+  /* Country leaderboard */
+  .country-leaderboard {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .country-lb-title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 0.6rem;
+    flex-shrink: 0;
+  }
+
+  .country-lb-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    /* On mobile let the list grow naturally */
+    padding-bottom: 0.5rem;
+  }
+
+  .country-lb-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .country-lb-row:last-child {
+    border-bottom: none;
+  }
+
+  .country-lb-rank {
+    width: 1.4rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .country-lb-name {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--color-beer-foam);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .country-lb-count {
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-beer-amber);
+    flex-shrink: 0;
+  }
+
+  /* Landscape: map left, leaderboard right — both same height */
+  @media (min-width: 768px) {
+    .map-layout {
+      flex-direction: row;
+      align-items: stretch;
+    }
+
+    .map-card {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .country-leaderboard {
+      width: 220px;
+      flex-shrink: 0;
+    }
+
+    .country-lb-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 0.5rem;
+    }
   }
 
   /* ── Stats carousel ─────────────────────────────── */

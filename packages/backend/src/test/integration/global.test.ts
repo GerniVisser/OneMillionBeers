@@ -9,6 +9,7 @@ import {
   GlobalActivityResponseSchema,
   GlobalHourlyResponseSchema,
   GlobalMonthlyResponseSchema,
+  GlobalCountriesResponseSchema,
   PaginatedResponseSchema,
   FeedItemSchema,
   LeaderboardResponseSchema,
@@ -31,6 +32,20 @@ afterAll(async () => {
 beforeEach(async () => {
   await clearTables(pool)
 })
+
+async function seedBeerLogWithCountry(senderId: string, ts = '2024-06-01T12:00:00.000Z') {
+  return app.inject({
+    method: 'POST',
+    url: '/v1/internal/beer-log',
+    payload: {
+      sourceGroupId: 'group-tg-1',
+      groupName: 'Test Group',
+      senderId,
+      timestamp: ts,
+      photoUrl: 'https://example.com/beer.jpg',
+    },
+  })
+}
 
 async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000Z') {
   return app.inject({
@@ -260,5 +275,36 @@ describe('GET /v1/global/monthly', () => {
     const juneBucket = body.months.find((m: { month: string }) => m.month === '2024-06')
     expect(mayBucket?.count).toBe(2)
     expect(juneBucket?.count).toBe(1)
+  })
+})
+
+describe('GET /v1/global/countries', () => {
+  it('returns empty array when no beers', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/countries' })
+    expect(res.statusCode).toBe(200)
+    const parsed = GlobalCountriesResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).toHaveLength(0)
+  })
+
+  it('aggregates beer and user counts by country', async () => {
+    await seedBeerLogWithCountry('wa:27831234567') // ZA
+    await seedBeerLogWithCountry('wa:27831234567') // ZA — same user, second log
+    await seedBeerLogWithCountry('wa:4915123456789') // DE
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/countries' })
+    const body = res.json()
+    const za = body.find((c: { countryCode: string }) => c.countryCode === 'ZA')
+    const de = body.find((c: { countryCode: string }) => c.countryCode === 'DE')
+    expect(za?.beerCount).toBe(2)
+    expect(za?.userCount).toBe(1) // one user logged twice
+    expect(de?.beerCount).toBe(1)
+    expect(de?.userCount).toBe(1)
+  })
+
+  it('excludes users with null country_code', async () => {
+    await seedBeerLog() // plain senderId — extractCountryCode returns null
+    const res = await app.inject({ method: 'GET', url: '/v1/global/countries' })
+    expect(res.json()).toHaveLength(0)
   })
 })

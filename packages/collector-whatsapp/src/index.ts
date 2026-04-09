@@ -1,9 +1,9 @@
 import { pino } from 'pino'
 import { config } from './config.js'
-import { startSession, getSessionStatus, ensureWebhookConfigured } from './waha-client.js'
+import { startSession, ensureWebhookConfigured } from './waha-client.js'
 import { buildServer } from './server.js'
 import { startPolling } from './session-monitor.js'
-import { syncAllGroups } from './group-sync.js'
+import { startGroupPolling } from './group-sync.js'
 
 async function main(): Promise<void> {
   const logger = pino({ name: 'collector-whatsapp', level: config.LOG_LEVEL })
@@ -39,25 +39,13 @@ async function main(): Promise<void> {
     logger.warn({ err }, 'Could not configure WAHA webhook')
   }
 
-  // If WAHA is already WORKING and we didn't just restart it, run group sync immediately —
-  // the session.status webhook won't fire again in this case.
-  if (!webhookConfigured) {
-    try {
-      const status = await getSessionStatus()
-      if (status === 'WORKING') {
-        logger.info('Session already WORKING on startup — running group sync')
-        syncAllGroups(logger).catch((err) => logger.error({ err }, 'Startup group sync failed'))
-      }
-    } catch (err) {
-      logger.warn({ err }, 'Could not check session status on startup')
-    }
-  }
-
   const stopPolling = startPolling(logger)
+  const stopGroupPolling = startGroupPolling(logger)
 
   const shutdown = async () => {
     logger.info('Shutting down')
     stopPolling()
+    stopGroupPolling()
     await server.close()
   }
 

@@ -9,6 +9,7 @@ import {
   getLatestBeer,
 } from '../db/queries.js'
 import { hashIdentity } from '../lib/hash.js'
+import { extractCountryCode } from '../lib/phone.js'
 import { broadcast } from '../lib/sse.js'
 
 export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
@@ -21,9 +22,10 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
     const { sourceGroupId, groupName, senderId, timestamp, photoUrl } = parse.data
 
     const identityHash = hashIdentity(senderId)
+    const countryCode = extractCountryCode(senderId)
     const [group, user] = await Promise.all([
       upsertGroup(pool, sourceGroupId, groupName),
-      upsertUser(pool, identityHash),
+      upsertUser(pool, identityHash, countryCode),
     ])
 
     await insertBeerLog(pool, user.id, group.id, photoUrl, timestamp)

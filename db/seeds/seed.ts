@@ -34,6 +34,30 @@ const NUM_USERS = 20
 const NUM_BEER_LOGS = 200
 const NUM_PHOTOS = 20 // pool downloaded once and re-used across logs
 
+// Weighted country pool — more users from some countries to show colour variation on the map
+const COUNTRY_POOL = [
+  'ZA',
+  'ZA',
+  'ZA',
+  'ZA',
+  'ZA', // South Africa
+  'NL',
+  'NL',
+  'NL', // Netherlands
+  'DE',
+  'DE',
+  'DE', // Germany
+  'GB',
+  'GB', // United Kingdom
+  'US',
+  'US', // United States
+  'AU', // Australia
+  'BE', // Belgium
+  'IE', // Ireland
+  'NO', // Norway
+  'BR', // Brazil
+]
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function toSlug(text: string): string {
@@ -137,14 +161,15 @@ async function seedUsers(client: pg.PoolClient) {
     const hash = identityHash(telegramId)
     const displayName = Math.random() > 0.15 ? faker.person.firstName() : null
     const slug = `user-${id.slice(0, 8)}`
+    const countryCode = COUNTRY_POOL[Math.floor(Math.random() * COUNTRY_POOL.length)]
 
     await client.query(
-      `INSERT INTO users (id, identity_hash, display_name, slug, created_at)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, hash, displayName, slug, randomPastDate(365)],
+      `INSERT INTO users (id, identity_hash, display_name, slug, country_code, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, hash, displayName, slug, countryCode, randomPastDate(365)],
     )
     users.push({ id, slug })
-    console.log(`  user: ${displayName ?? '(anonymous)'} (${slug})`)
+    console.log(`  user: ${displayName ?? '(anonymous)'} (${slug}) [${countryCode}]`)
   }
 
   return users

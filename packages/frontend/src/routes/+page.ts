@@ -6,16 +6,18 @@ import {
   getGlobalActivity,
   getGlobalHourly,
   getGlobalMonthly,
+  getGlobalCountries,
 } from '$lib/api'
 
 export const load: PageLoad = async ({ fetch }) => {
-  const [countData, feedData, stats, activity, hourly, monthly] = await Promise.all([
+  const [countData, feedData, stats, activity, hourly, monthly, countries] = await Promise.all([
     getGlobalCount(fetch),
     getGlobalFeed(fetch, { limit: 20, offset: 0 }),
     getGlobalStats(fetch),
     getGlobalActivity(fetch),
     getGlobalHourly(fetch),
     getGlobalMonthly(fetch),
+    getGlobalCountries(fetch),
   ])
   return {
     count: countData.count,
@@ -24,5 +26,6 @@ export const load: PageLoad = async ({ fetch }) => {
     activity,
     hourly,
     monthly,
+    countries,
   }
 }

@@ -1,6 +1,7 @@
 import { type Logger } from 'pino'
 import { uploadGroupAvatar, coreConfig } from '@omb/collector-core'
 import { getGroupPictureUrl, listAllGroups } from './waha-client.js'
+import { config } from './config.js'
 
 async function downloadBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -64,11 +65,21 @@ export async function syncGroup(
 }
 
 export async function syncAllGroups(logger: Logger): Promise<void> {
-  logger.info('Starting startup group sync')
+  logger.info('Starting group sync')
   const groups = await listAllGroups()
   logger.info({ count: groups.length }, 'Groups to sync')
   for (const { id, subject } of groups) {
     await syncGroup(id, subject, logger)
   }
-  logger.info('Startup group sync complete')
+  logger.info('Group sync complete')
+}
+
+export function startGroupPolling(logger: Logger): () => void {
+  syncAllGroups(logger).catch((err) => logger.error({ err }, 'Initial group sync failed'))
+
+  const timer = setInterval(() => {
+    syncAllGroups(logger).catch((err) => logger.error({ err }, 'Periodic group sync failed'))
+  }, config.WAHA_POLL_INTERVAL_MS)
+
+  return () => clearInterval(timer)
 }

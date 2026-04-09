@@ -12,6 +12,7 @@ import type {
   ActivityDay,
   HourBucket,
   MonthBucket,
+  CountryStat,
 } from '@omb/shared'
 
 // ─── Groups ─────────────────────────────────────────────────────────────────
@@ -195,28 +196,28 @@ export async function getGroupMonthly(pool: pg.Pool, groupId: string): Promise<M
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-export async function upsertUser(pool: pg.Pool, identityHash: string): Promise<User> {
+export async function upsertUser(
+  pool: pg.Pool,
+  identityHash: string,
+  countryCode: string | null = null,
+): Promise<User> {
   const slug = `user-${identityHash.slice(0, 12)}`
   const { rows } = await pool.query<User>(
-    `INSERT INTO users (identity_hash, slug)
-     VALUES ($1, $2)
-     ON CONFLICT (identity_hash) DO NOTHING
-     RETURNING id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"`,
-    [identityHash, slug],
+    `INSERT INTO users (identity_hash, slug, country_code)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (identity_hash) DO UPDATE SET
+       country_code = COALESCE(users.country_code, EXCLUDED.country_code)
+     RETURNING id, identity_hash AS "identityHash", display_name AS "displayName",
+               slug, country_code AS "countryCode", created_at AS "createdAt"`,
+    [identityHash, slug, countryCode],
   )
-  if (rows[0]) return rows[0]
-  // Already existed — fetch it
-  const { rows: existing } = await pool.query<User>(
-    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
-     FROM users WHERE identity_hash = $1`,
-    [identityHash],
-  )
-  return existing[0]
+  return rows[0]
 }
 
 export async function findUserById(pool: pg.Pool, id: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
-    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
+    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
+            slug, country_code AS "countryCode", created_at AS "createdAt"
      FROM users WHERE id = $1`,
     [id],
   )
@@ -225,7 +226,8 @@ export async function findUserById(pool: pg.Pool, id: string): Promise<User | nu
 
 export async function findUserBySlug(pool: pg.Pool, slug: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
-    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName", slug, created_at AS "createdAt"
+    `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
+            slug, country_code AS "countryCode", created_at AS "createdAt"
      FROM users WHERE slug = $1`,
     [slug],
   )
@@ -268,7 +270,7 @@ export async function getGlobalFeed(
        bl.id,
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
-       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug) AS user,
+       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
        json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
@@ -297,7 +299,7 @@ export async function getGroupFeed(
        bl.id,
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
-       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug) AS user,
+       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
        json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
@@ -319,16 +321,18 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
     id: string
     displayName: string | null
     slug: string
+    countryCode: string | null
   }>(
     `SELECT
        RANK() OVER (ORDER BY COUNT(*) DESC)::text AS rank,
        COUNT(*)::text AS "beerCount",
        u.id,
        u.display_name AS "displayName",
-       u.slug
+       u.slug,
+       u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
-     GROUP BY u.id, u.display_name, u.slug
+     GROUP BY u.id, u.display_name, u.slug, u.country_code
      ORDER BY COUNT(*) DESC
      LIMIT $1`,
     [limit],
@@ -336,7 +340,7 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
   return rows.map((r) => ({
     rank: parseInt(r.rank, 10),
     beerCount: parseInt(r.beerCount, 10),
-    user: { id: r.id, displayName: r.displayName, slug: r.slug },
+    user: { id: r.id, displayName: r.displayName, slug: r.slug, countryCode: r.countryCode },
   }))
 }
 
@@ -351,17 +355,19 @@ export async function getGroupLeaderboard(
     id: string
     displayName: string | null
     slug: string
+    countryCode: string | null
   }>(
     `SELECT
        RANK() OVER (ORDER BY COUNT(*) DESC)::text AS rank,
        COUNT(*)::text AS "beerCount",
        u.id,
        u.display_name AS "displayName",
-       u.slug
+       u.slug,
+       u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      WHERE bl.group_id = $1
-     GROUP BY u.id, u.display_name, u.slug
+     GROUP BY u.id, u.display_name, u.slug, u.country_code
      ORDER BY COUNT(*) DESC
      LIMIT $2`,
     [groupId, limit],
@@ -369,7 +375,7 @@ export async function getGroupLeaderboard(
   return rows.map((r) => ({
     rank: parseInt(r.rank, 10),
     beerCount: parseInt(r.beerCount, 10),
-    user: { id: r.id, displayName: r.displayName, slug: r.slug },
+    user: { id: r.id, displayName: r.displayName, slug: r.slug, countryCode: r.countryCode },
   }))
 }
 
@@ -449,6 +455,22 @@ export async function getGlobalMonthly(pool: pg.Pool): Promise<MonthBucket[]> {
             COUNT(*)::int AS count
      FROM beer_logs
      GROUP BY 1 ORDER BY 1 ASC`,
+  )
+  return rows
+}
+
+// ─── Countries ───────────────────────────────────────────────────────────────
+
+export async function getGlobalCountries(pool: pg.Pool): Promise<CountryStat[]> {
+  const { rows } = await pool.query<{ countryCode: string; beerCount: number; userCount: number }>(
+    `SELECT u.country_code AS "countryCode",
+            COUNT(*)::int AS "beerCount",
+            COUNT(DISTINCT bl.user_id)::int AS "userCount"
+     FROM beer_logs bl
+     JOIN users u ON bl.user_id = u.id
+     WHERE u.country_code IS NOT NULL
+     GROUP BY u.country_code
+     ORDER BY COUNT(*) DESC`,
   )
   return rows
 }
