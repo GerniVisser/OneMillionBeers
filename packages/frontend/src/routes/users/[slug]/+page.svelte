@@ -10,7 +10,7 @@
 
   const initials = $derived(getInitials(displayName))
 
-  const memberSince = $derived(
+  const contributorSince = $derived(
     new Date(data.profile.createdAt).toLocaleDateString('en-US', {
       month: 'long',
       year: 'numeric',
@@ -75,7 +75,7 @@
     </h1>
 
     <p class="profile-since">
-      Member since {memberSince}
+      Contributors since {contributorSince}
     </p>
   </div>
 </section>
