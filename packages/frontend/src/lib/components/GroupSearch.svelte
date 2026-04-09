@@ -135,7 +135,7 @@
             </div>
             <div class="result-text">
               <span class="result-name">{group.name}</span>
-              <span class="result-meta">{group.memberCount.toLocaleString()} members</span>
+              <span class="result-meta">{group.memberCount.toLocaleString()} contributors</span>
             </div>
           </a>
         {/each}

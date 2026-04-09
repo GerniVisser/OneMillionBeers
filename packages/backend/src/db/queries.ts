@@ -509,10 +509,12 @@ export async function getLatestBeer(pool: pg.Pool): Promise<{
   loggedAt: string
   userName: string | null
   groupName: string
+  countryCode: string | null
 } | null> {
   const { rows } = await pool.query(
     `SELECT bl.id, bl.photo_url AS "photoUrl", bl.logged_at AS "loggedAt",
-            u.display_name AS "userName", g.name AS "groupName"
+            u.display_name AS "userName", g.name AS "groupName",
+            u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
