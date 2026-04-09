@@ -196,7 +196,7 @@
       <div class="hstat-sep" aria-hidden="true"></div>
       <div class="hstat">
         <span class="hstat-value">{data.stats.activeMemberCount.toLocaleString()}</span>
-        <span class="hstat-label">Members</span>
+        <span class="hstat-label">Contributors</span>
       </div>
       <div class="hstat-sep" aria-hidden="true"></div>
       <div class="hstat">

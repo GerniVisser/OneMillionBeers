@@ -67,6 +67,7 @@ export const SseEventSchema = z.object({
       loggedAt: IsoDatetimeSchema,
       userName: z.string().nullable(),
       groupName: z.string(),
+      countryCode: z.string().length(2).nullable(),
     })
     .optional(),
 })

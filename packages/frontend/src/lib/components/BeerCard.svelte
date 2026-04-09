@@ -97,11 +97,10 @@
     {/if}
 
     <!-- Progressive meta: what's shown depends on card width via @container -->
+    <!-- Priority order: group → time → name -->
     <div class="meta">
-      <div class="meta-left">
-        <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
-        <a href="/groups/{item.group.slug}" class="meta-group">{item.group.name}</a>
-      </div>
+      <a href="/groups/{item.group.slug}" class="meta-group">{item.group.name}</a>
+      <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
       <span class="meta-time">{ago}</span>
     </div>
   </div>
@@ -207,42 +206,32 @@
   }
 
   /* ── Meta overlay ───────────────────────────────────────────────────── */
+  /*
+   * Default (190px+): CSS grid — group spans full top row, name+time share bottom row.
+   *   [ group  group ]
+   *   [ name   time  ]
+   */
   .meta {
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
     padding: 0.6rem 0.55rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 0.4rem;
-  }
-
-  .meta-left {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .meta-name {
-    display: block;
-    font-family: var(--font-body);
-    font-weight: 500;
-    font-size: 0.8rem;
-    color: var(--color-beer-foam);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .meta-name:hover {
-    color: var(--color-beer-head);
+    display: grid;
+    grid-template-areas:
+      'group group'
+      'name  time';
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    row-gap: 0.15rem;
+    column-gap: 0.4rem;
   }
 
   .meta-group {
+    grid-area: group;
+    justify-self: start;
     display: inline-block;
-    margin-top: 0.2rem;
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 500;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -261,66 +250,83 @@
     color: var(--color-accent-glow);
   }
 
-  .meta-time {
+  .meta-name {
+    grid-area: name;
     font-family: var(--font-body);
-    font-size: 0.65rem;
+    font-weight: 500;
+    font-size: 0.72rem;
+    color: var(--color-beer-foam);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .meta-name:hover {
+    color: var(--color-beer-head);
+  }
+
+  .meta-time {
+    grid-area: time;
+    font-family: var(--font-body);
+    font-size: 0.58rem;
     color: var(--color-cream-faint);
     white-space: nowrap;
-    flex-shrink: 0;
   }
 
   /* ── Progressive disclosure via container queries ───────────────────── */
 
   /*
-   * < 120px  — pure photo, nothing overlaid
-   * 120–154px — flag only
-   * 155–219px — flag + username
-   * 220–279px — flag + username + time
-   * 280px+    — flag + username + time + group label
+   * < 80px   — pure photo, nothing overlaid
+   * 80–109px  — flag only
+   * 110–149px — flag + group (no time, no name)
+   * 150–189px — flag + group + time on one row (no name)
+   *               flex row: [ group ··· time ]
+   * 190px+    — flag + group + time + name
+   *               grid:  [ group  group ]
+   *                      [ name   time  ]
    */
 
   /* Tiny: strip everything */
-  @container card (max-width: 119px) {
-    .flag-badge {
-      display: none;
-    }
-    .overlay {
-      display: none;
-    }
+  @container card (max-width: 79px) {
+    .flag-badge,
+    .overlay,
     .meta {
       display: none;
     }
   }
 
-  /* Small: flag visible, no text */
-  @container card (min-width: 120px) and (max-width: 154px) {
-    .overlay {
-      display: none;
-    }
+  /* Small: flag only */
+  @container card (min-width: 80px) and (max-width: 109px) {
+    .overlay,
     .meta {
       display: none;
     }
   }
 
-  /* Medium-small: flag + username only */
-  @container card (min-width: 155px) and (max-width: 219px) {
-    .meta-group {
-      display: none;
+  /* Medium-small: flag + group only */
+  @container card (min-width: 110px) and (max-width: 149px) {
+    .meta {
+      display: flex;
+      padding: 0.4rem 0.4rem;
     }
+    .meta-name,
     .meta-time {
       display: none;
     }
-    .meta {
-      padding: 0.5rem 0.45rem;
-    }
   }
 
-  /* Medium: flag + username + time, no group */
-  @container card (min-width: 220px) and (max-width: 279px) {
-    .meta-group {
+  /* Medium: flag + group + time on same row, no name */
+  @container card (min-width: 150px) and (max-width: 189px) {
+    .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.45rem;
+    }
+    .meta-name {
       display: none;
     }
   }
 
-  /* Large (280px+): everything shown — default styles apply */
+  /* Large (190px+): grid layout — default styles apply */
 </style>

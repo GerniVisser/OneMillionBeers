@@ -84,7 +84,7 @@
         return logColor(a2 ? (countryMap.get(a2) ?? 0) : 0, maxCount)
       })
       .attr('stroke', '#1a1209')
-      .attr('stroke-width', '0.5')
+      .attr('stroke-width', '0.3')
       .attr('cursor', (d) => {
         const a2 = NUM_TO_A2[String(d.id).padStart(3, '0')]
         return a2 && countryMap.has(a2) ? 'pointer' : 'default'
@@ -124,34 +124,9 @@
       tooltip = null
     })
 
-    // Beer count labels — only for countries with data, hidden until zoomed
-    const labelFeatures = features.filter((d) => {
-      const a2 = NUM_TO_A2[String(d.id).padStart(3, '0')]
-      return a2 && countryMap.has(a2)
-    })
-
-    g.selectAll<SVGTextElement, GeoFeature>('text')
-      .data(labelFeatures)
-      .join('text')
-      .attr('class', 'country-label')
-      .attr('transform', (d) => {
-        const c = path.centroid(d)
-        return isFinite(c[0]) && isFinite(c[1]) ? `translate(${c})` : 'translate(-9999,-9999)'
-      })
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('font-size', '10')
-      .attr('fill', '#f59e0b')
-      .attr('opacity', '0')
-      .attr('pointer-events', 'none')
-      .text((d) => {
-        const a2 = NUM_TO_A2[String(d.id).padStart(3, '0')]
-        return String(countryMap.get(a2 ?? '') ?? '')
-      })
-
     // Zoom + pan
     const zoomBehavior = d3zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 8])
+      .scaleExtent([1, 16])
       .translateExtent([
         [0, 0],
         [W, H],
@@ -159,9 +134,7 @@
       .on('zoom', (event) => {
         const k: number = event.transform.k
         g.attr('transform', event.transform)
-        g.selectAll<SVGTextElement, GeoFeature>('text.country-label')
-          .attr('opacity', k >= 2.5 ? '1' : '0')
-          .attr('font-size', String(10 / k))
+        g.selectAll<SVGPathElement, GeoFeature>('path').attr('stroke-width', String(0.3 / k))
       })
 
     svgSel.call(zoomBehavior)
@@ -233,11 +206,6 @@
     border-radius: 50%;
     background: var(--color-beer-amber);
     animation: pulse-dot 1.2s ease-in-out infinite;
-  }
-
-  :global(.country-label) {
-    user-select: none;
-    font-family: var(--font-body);
   }
 
   /* ── Tooltip ──────────────────────────────────────────────────────────────── */

@@ -17,7 +17,7 @@
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import WorldMap from '$lib/components/WorldMap.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
-  import { formatDate, getWeekdayBreakdown, getPeakHour } from '$lib/utils'
+  import { getWeekdayBreakdown, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -51,12 +51,12 @@
   const hasMore = $derived(feedOffset < feedTotal)
 
   // Stat cards for the infinite carousel
-  type StatItem = { value: string; label: string; sub?: string; dim?: boolean }
+  type StatItem = { value: string; label: string; dim?: boolean }
   const statItems = $derived(
     (() => {
       const items: StatItem[] = [
         { value: data.stats.totalBeers.toLocaleString(), label: 'Total Beers' },
-        { value: data.stats.activeMemberCount.toLocaleString(), label: 'Members' },
+        { value: data.stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
         { value: data.stats.activeGroupCount.toLocaleString(), label: 'Groups' },
         { value: String(data.stats.avgPerDay), label: 'Avg / Day' },
       ]
@@ -64,7 +64,6 @@
         items.push({
           value: data.stats.peakDay.count.toLocaleString(),
           label: 'Record Day',
-          sub: formatDate(data.stats.peakDay.date),
         })
       } else {
         items.push({ value: String(data.stats.daysActive), label: 'Days Active', dim: true })
@@ -91,7 +90,7 @@
         id: latestBeer.id,
         displayName: latestBeer.userName,
         slug: latestBeer.userName?.toLowerCase().replace(/\s+/g, '-') ?? 'anonymous',
-        countryCode: null,
+        countryCode: latestBeer.countryCode,
       },
       group: {
         id: latestBeer.id,
@@ -365,7 +364,6 @@
                 <div class="stat-card" aria-hidden={i >= statItems.length ? true : undefined}>
                   <span class="stat-value" class:stat-value--dim={item.dim}>{item.value}</span>
                   <span class="stat-label">{item.label}</span>
-                  {#if item.sub}<span class="stat-sub">{item.sub}</span>{/if}
                 </div>
               {/each}
             </div>
@@ -637,14 +635,19 @@
 
   /* ── Map panel ──────────────────────────────────── */
   .map-layout {
-    padding: 1.25rem 0 4rem;
+    padding: 0.5rem 0 4rem;
+    /* Pull the map flush with the page edges on mobile */
+    margin-left: -1rem;
+    margin-right: -1rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
 
   .map-card {
-    border-radius: 0.75rem;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
     border: 1px solid var(--color-border);
     overflow: hidden;
   }
@@ -655,6 +658,7 @@
     border: 1px solid var(--color-border);
     border-radius: 0.75rem;
     padding: 0.875rem 1rem 0;
+    margin: 0 1rem;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -722,17 +726,29 @@
   @media (min-width: 768px) {
     .map-layout {
       flex-direction: row;
-      align-items: stretch;
+      align-items: flex-start;
+      padding: 1.25rem 0 4rem;
+      margin-left: 0;
+      margin-right: 0;
     }
 
     .map-card {
       flex: 1;
       min-width: 0;
+      align-self: flex-start;
+      border-radius: 0.75rem;
+      border: 1px solid var(--color-border);
     }
 
     .country-leaderboard {
       width: 220px;
       flex-shrink: 0;
+      margin: 0;
+      /* Match the map's natural height: (available width - leaderboard - gap) × 500/960 */
+      max-height: calc((min(100vw, 1200px) - 2rem - 220px - 1rem) * 500 / 960);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .country-lb-list {
@@ -822,12 +838,6 @@
     letter-spacing: 0.11em;
     text-transform: uppercase;
     color: var(--color-text-muted);
-  }
-
-  .stat-sub {
-    font-size: 0.55rem;
-    color: var(--color-text-muted);
-    margin-top: 0.05rem;
   }
 
   /* ── Shared chart card ──────────────────────────── */
