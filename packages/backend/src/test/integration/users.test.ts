@@ -51,8 +51,8 @@ describe('GET /v1/users/:userId', () => {
     expect(res.statusCode).toBe(404)
   })
 
-  it('returns user profile without identityHash', async () => {
-    await seedBeerLog()
+  it('returns user profile without internal fields', async () => {
+    await seedBeerLog('wa:27831234567')
     const { slug } = await getUserSlugAndId()
 
     const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}` })
@@ -60,6 +60,10 @@ describe('GET /v1/users/:userId', () => {
 
     const body = res.json()
     expect(body.identityHash).toBeUndefined()
+    expect(body.phoneNumber).toBeUndefined()
+    expect(body.pushName).toBeUndefined()
+    expect(body.active).toBeUndefined()
+    expect(body.public).toBeUndefined()
 
     const parsed = UserProfileResponseSchema.safeParse(body)
     expect(parsed.success).toBe(true)

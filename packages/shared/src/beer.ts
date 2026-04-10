@@ -16,12 +16,14 @@ export type BeerLog = z.infer<typeof BeerLogSchema>
 // POST /v1/internal/beer-log (Collector → Backend)
 // groupName included so group name stays current via upsert (no separate sync needed)
 // senderId is an opaque string — the collector hashes whatever identity the platform provides
+// pushName is optional for backward compatibility during rolling deploys
 export const BeerLogRequestSchema = z.object({
   sourceGroupId: z.string().min(1),
   groupName: z.string().min(1).max(512),
   senderId: z.string().min(1),
   timestamp: IsoDatetimeSchema,
   photoUrl: z.string().url(),
+  pushName: z.string().max(512).nullable().optional(),
 })
 export type BeerLogRequest = z.infer<typeof BeerLogRequestSchema>
 

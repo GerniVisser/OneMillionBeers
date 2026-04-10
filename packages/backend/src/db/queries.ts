@@ -198,18 +198,27 @@ export async function getGroupMonthly(pool: pg.Pool, groupId: string): Promise<M
 
 export async function upsertUser(
   pool: pg.Pool,
-  identityHash: string,
-  countryCode: string | null = null,
+  params: {
+    identityHash: string
+    phoneNumber: string | null
+    pushName: string | null
+    countryCode: string | null
+  },
 ): Promise<User> {
+  const { identityHash, phoneNumber, pushName, countryCode } = params
   const slug = `user-${identityHash.slice(0, 12)}`
   const { rows } = await pool.query<User>(
-    `INSERT INTO users (identity_hash, slug, country_code)
-     VALUES ($1, $2, $3)
+    `INSERT INTO users (identity_hash, slug, country_code, phone_number, push_name)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (identity_hash) DO UPDATE SET
-       country_code = COALESCE(users.country_code, EXCLUDED.country_code)
+       country_code = COALESCE(users.country_code, EXCLUDED.country_code),
+       phone_number = COALESCE(users.phone_number, EXCLUDED.phone_number),
+       push_name    = COALESCE(users.push_name,    EXCLUDED.push_name)
      RETURNING id, identity_hash AS "identityHash", display_name AS "displayName",
-               slug, country_code AS "countryCode", created_at AS "createdAt"`,
-    [identityHash, slug, countryCode],
+               slug, country_code AS "countryCode", created_at AS "createdAt",
+               phone_number AS "phoneNumber", push_name AS "pushName",
+               active, public`,
+    [identityHash, slug, countryCode, phoneNumber, pushName],
   )
   return rows[0]
 }
@@ -217,7 +226,9 @@ export async function upsertUser(
 export async function findUserById(pool: pg.Pool, id: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
     `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
-            slug, country_code AS "countryCode", created_at AS "createdAt"
+            slug, country_code AS "countryCode", created_at AS "createdAt",
+            phone_number AS "phoneNumber", push_name AS "pushName",
+            active, public
      FROM users WHERE id = $1`,
     [id],
   )
@@ -227,7 +238,9 @@ export async function findUserById(pool: pg.Pool, id: string): Promise<User | nu
 export async function findUserBySlug(pool: pg.Pool, slug: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
     `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
-            slug, country_code AS "countryCode", created_at AS "createdAt"
+            slug, country_code AS "countryCode", created_at AS "createdAt",
+            phone_number AS "phoneNumber", push_name AS "pushName",
+            active, public
      FROM users WHERE slug = $1`,
     [slug],
   )

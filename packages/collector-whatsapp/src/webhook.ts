@@ -70,15 +70,17 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     // _data.key.participantAlt which always carries the real phone JID.
     const participantRaw = payload.participant as string | undefined
     const isLid = participantRaw?.endsWith('@lid')
-    const dataKey = (payload._data as Record<string, unknown> | undefined)?.key as
-      | Record<string, unknown>
-      | undefined
+    const data = payload._data as Record<string, unknown> | undefined
+
+    const dataKey = data?.key as Record<string, unknown> | undefined
     const participantAlt = dataKey?.participantAlt as string | undefined
+
     const senderJid = (
       isLid && participantAlt ? participantAlt : (participantRaw ?? payload.from)
     ) as string
     const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
     const sourceGroupId = 'wa:' + chatId
+    const pushName = (data?.pushName as string | undefined) ?? null
     const groupName = await getGroupName(chatId)
     const timestamp = new Date((payload.timestamp as number) * 1000).toISOString()
     const mediaUrl = media!.url as string
@@ -136,7 +138,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     }
 
     try {
-      await forwardBeerLog({ sourceGroupId, groupName, senderId, timestamp, photoUrl })
+      await forwardBeerLog({ sourceGroupId, groupName, senderId, timestamp, photoUrl, pushName })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
     } catch (err) {
       logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
