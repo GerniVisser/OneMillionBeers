@@ -1,4 +1,4 @@
-import type { ActivityDay, HourBucket } from '@omb/shared'
+import type { ActivityDay, FeedItem, HourBucket, SseEvent } from '@omb/shared'
 
 export interface WeekdayEntry {
   name: string
@@ -59,4 +59,23 @@ export function formatHour(h: number): string {
   if (h < 12) return `${h}am`
   if (h === 12) return '12pm'
   return `${h - 12}pm`
+}
+
+export function transformSseToFeedItem(latestBeer: NonNullable<SseEvent['latestBeer']>): FeedItem {
+  return {
+    id: latestBeer.id,
+    photoUrl: latestBeer.photoUrl,
+    loggedAt: latestBeer.loggedAt,
+    user: {
+      id: latestBeer.id,
+      displayName: latestBeer.userName,
+      slug: latestBeer.userSlug,
+      countryCode: latestBeer.countryCode,
+    },
+    group: {
+      id: latestBeer.id,
+      name: latestBeer.groupName,
+      slug: latestBeer.groupSlug,
+    },
+  }
 }

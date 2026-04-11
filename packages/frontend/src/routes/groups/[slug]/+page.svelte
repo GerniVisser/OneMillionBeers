@@ -13,7 +13,22 @@
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
   import GroupSearch from '$lib/components/GroupSearch.svelte'
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
-  import { formatDate, getInitials, getWeekdayBreakdown, getPeakHour } from '$lib/utils'
+  import {
+    formatDate,
+    getInitials,
+    getWeekdayBreakdown,
+    getPeakHour,
+    transformSseToFeedItem,
+  } from '$lib/utils'
+  import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
+  import {
+    getGroupFeed,
+    getGroupStats,
+    getGroupLeaderboard,
+    getGroupActivity,
+    getGroupHourly,
+    getGroupMonthly,
+  } from '$lib/api'
 
   let { data }: { data: PageData } = $props()
 
@@ -21,6 +36,11 @@
   let feedItems = $state<FeedItem[]>(untrack(() => data.feed.items))
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
+  let stats = $state(untrack(() => data.stats))
+  let leaderboard = $state(untrack(() => data.leaderboard))
+  let activity = $state(untrack(() => data.activity))
+  let hourly = $state(untrack(() => data.hourly))
+  let monthly = $state(untrack(() => data.monthly))
 
   $effect(() => {
     // Track the slug so this runs on group-to-group navigation
@@ -29,6 +49,11 @@
       feedItems = data.feed.items
       feedOffset = data.feed.items.length
       feedTotal = data.feed.total
+      stats = data.stats
+      leaderboard = data.leaderboard
+      activity = data.activity
+      hourly = data.hourly
+      monthly = data.monthly
     })
   })
   let loadingMore = $state(false)
@@ -67,8 +92,74 @@
     }
   }
 
-  const peakHour = $derived(getPeakHour(data.hourly.hours))
-  const weekdayData = $derived(getWeekdayBreakdown(data.activity.days))
+  let refetchTimer: ReturnType<typeof setTimeout> | null = null
+
+  $effect(() => {
+    const event = getLastSseEvent()
+    if (!event || !event.latestBeer) return
+
+    // untrack: only lastEvent should be a reactive dependency.
+    // Reads of feedItems inside here must not re-trigger this effect.
+    untrack(() => {
+      const isThisGroup = event.latestBeer!.groupSlug === data.profile.slug
+
+      if (isThisGroup) {
+        const item = transformSseToFeedItem(event.latestBeer!)
+        const isDupe = feedItems.some((f) => f.id === item.id)
+        if (!isDupe) {
+          feedItems = [item, ...feedItems]
+          feedOffset += 1
+          feedTotal += 1
+        }
+      }
+
+      if (!isThisGroup) return
+
+      if (refetchTimer) clearTimeout(refetchTimer)
+      refetchTimer = setTimeout(async () => {
+        const slug = data.profile.slug
+        const [newStats, newLeaderboard, newActivity, newHourly, newMonthly] = await Promise.all([
+          getGroupStats(fetch, slug),
+          getGroupLeaderboard(fetch, slug),
+          getGroupActivity(fetch, slug),
+          getGroupHourly(fetch, slug),
+          getGroupMonthly(fetch, slug),
+        ])
+        stats = newStats
+        leaderboard = newLeaderboard
+        activity = newActivity
+        hourly = newHourly
+        monthly = newMonthly
+      }, 1500)
+    })
+  })
+
+  $effect(() => {
+    getResyncCount()
+    untrack(async () => {
+      const slug = data.profile.slug
+      const [feedData, newStats, newLeaderboard, newActivity, newHourly, newMonthly] =
+        await Promise.all([
+          getGroupFeed(fetch, slug, { limit: 20, offset: 0 }),
+          getGroupStats(fetch, slug),
+          getGroupLeaderboard(fetch, slug),
+          getGroupActivity(fetch, slug),
+          getGroupHourly(fetch, slug),
+          getGroupMonthly(fetch, slug),
+        ])
+      feedItems = feedData.items
+      feedOffset = feedData.items.length
+      feedTotal = feedData.total
+      stats = newStats
+      leaderboard = newLeaderboard
+      activity = newActivity
+      hourly = newHourly
+      monthly = newMonthly
+    })
+  })
+
+  const peakHour = $derived(getPeakHour(hourly.hours))
+  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
@@ -195,23 +286,23 @@
       </div>
       <div class="hstat-sep" aria-hidden="true"></div>
       <div class="hstat">
-        <span class="hstat-value">{data.stats.activeMemberCount.toLocaleString()}</span>
+        <span class="hstat-value">{stats.activeMemberCount.toLocaleString()}</span>
         <span class="hstat-label">Contributors</span>
       </div>
       <div class="hstat-sep" aria-hidden="true"></div>
       <div class="hstat">
-        <span class="hstat-value">{data.stats.avgPerDay}</span>
+        <span class="hstat-value">{stats.avgPerDay}</span>
         <span class="hstat-label">Avg / day</span>
       </div>
       <div class="hstat-sep" aria-hidden="true"></div>
-      {#if data.stats.peakDay}
+      {#if stats.peakDay}
         <div class="hstat">
-          <span class="hstat-value">{data.stats.peakDay.count}</span>
+          <span class="hstat-value">{stats.peakDay.count}</span>
           <span class="hstat-label">Record</span>
         </div>
       {:else}
         <div class="hstat">
-          <span class="hstat-value hstat-value--dim">{data.stats.daysActive}</span>
+          <span class="hstat-value hstat-value--dim">{stats.daysActive}</span>
           <span class="hstat-label">Days active</span>
         </div>
       {/if}
@@ -331,8 +422,8 @@
         <!-- Contribution heatmap -->
         <div class="chart-card">
           <h3 class="chart-title">Activity — Past 6 Months</h3>
-          {#if data.activity.days.length > 0}
-            <ContributionGraph days={data.activity.days} />
+          {#if activity.days.length > 0}
+            <ContributionGraph days={activity.days} />
             <div class="heatmap-legend">
               <span class="legend-label">Less</span>
               {#each ['#2a1e0e', '#5c3d1a', '#d97706', '#f59e0b', '#fbbf24'] as c}
@@ -348,9 +439,9 @@
         <!-- Last 30 days -->
         <div class="chart-card">
           <h3 class="chart-title">Daily Activity — Last 30 Days</h3>
-          {#if browser && data.activity.days.length > 0}
-            <ActivityBarChart days={data.activity.days} />
-          {:else if data.activity.days.length === 0}
+          {#if browser && activity.days.length > 0}
+            <ActivityBarChart days={activity.days} />
+          {:else if activity.days.length === 0}
             <p class="empty-msg">No activity data yet.</p>
           {/if}
         </div>
@@ -359,8 +450,8 @@
         <div class="charts-pair">
           <div class="chart-card">
             <h3 class="chart-title">When Does This Group Drink?</h3>
-            {#if browser && data.hourly.hours.some((h) => h.count > 0)}
-              <HourlyChart hours={data.hourly.hours} />
+            {#if browser && hourly.hours.some((h) => h.count > 0)}
+              <HourlyChart hours={hourly.hours} />
             {:else}
               <p class="empty-msg">No data yet.</p>
             {/if}
@@ -379,9 +470,9 @@
         <!-- Monthly trend -->
         <div class="chart-card">
           <h3 class="chart-title">Monthly Trend</h3>
-          {#if browser && data.monthly.months.length > 0}
-            <MonthlyChart months={data.monthly.months} />
-          {:else if data.monthly.months.length === 0}
+          {#if browser && monthly.months.length > 0}
+            <MonthlyChart months={monthly.months} />
+          {:else if monthly.months.length === 0}
             <p class="empty-msg">Not enough data yet.</p>
           {/if}
         </div>
@@ -392,7 +483,7 @@
   {:else}
     <div class="tab-panel" id="panel-leaderboard" role="tabpanel">
       <div class="panel-content">
-        <LeaderboardTable entries={data.leaderboard.entries} title="Group Leaders" />
+        <LeaderboardTable entries={leaderboard.entries} title="Group Leaders" />
       </div>
     </div>
   {/if}

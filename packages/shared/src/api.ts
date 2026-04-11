@@ -66,7 +66,9 @@ export const SseEventSchema = z.object({
       photoUrl: z.string().url(),
       loggedAt: IsoDatetimeSchema,
       userName: z.string().nullable(),
+      userSlug: z.string(),
       groupName: z.string(),
+      groupSlug: z.string(),
       countryCode: z.string().length(2).nullable(),
     })
     .optional(),

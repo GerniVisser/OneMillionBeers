@@ -2,8 +2,18 @@
   import { onMount, untrack } from 'svelte'
   import { browser } from '$app/environment'
   import type { PageData } from './$types'
-  import type { FeedItem, SseEvent } from '@omb/shared'
-  import { subscribeToStream } from '$lib/sse'
+  import type { FeedItem } from '@omb/shared'
+  import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
+  import {
+    getGlobalCount,
+    getGlobalFeed,
+    getGlobalStats,
+    getGlobalActivity,
+    getGlobalHourly,
+    getGlobalMonthly,
+    getGlobalCountries,
+  } from '$lib/api'
+  import { transformSseToFeedItem } from '$lib/utils'
   import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
@@ -26,6 +36,11 @@
   let feedItems = $state<FeedItem[]>(untrack(() => data.feed.items))
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
+  let stats = $state(untrack(() => data.stats))
+  let activity = $state(untrack(() => data.activity))
+  let hourly = $state(untrack(() => data.hourly))
+  let monthly = $state(untrack(() => data.monthly))
+  let countries = $state(untrack(() => data.countries))
   let loadingMore = $state(false)
   // Tracks beers logged since page load via SSE (proxy for "today" until API provides it)
   let sessionCount = $state(0)
@@ -55,50 +70,114 @@
   const statItems = $derived(
     (() => {
       const items: StatItem[] = [
-        { value: data.stats.totalBeers.toLocaleString(), label: 'Total Beers' },
-        { value: data.stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
-        { value: data.stats.activeGroupCount.toLocaleString(), label: 'Groups' },
-        { value: String(data.stats.avgPerDay), label: 'Avg / Day' },
+        { value: stats.totalBeers.toLocaleString(), label: 'Total Beers' },
+        { value: stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
+        { value: stats.activeGroupCount.toLocaleString(), label: 'Groups' },
+        { value: String(stats.avgPerDay), label: 'Avg / Day' },
       ]
-      if (data.stats.peakDay) {
+      if (stats.peakDay) {
         items.push({
-          value: data.stats.peakDay.count.toLocaleString(),
+          value: stats.peakDay.count.toLocaleString(),
           label: 'Record Day',
         })
       } else {
-        items.push({ value: String(data.stats.daysActive), label: 'Days Active', dim: true })
+        items.push({ value: String(stats.daysActive), label: 'Days Active', dim: true })
       }
       return items
     })(),
   )
 
   // Derived stats from activity data — no extra endpoint needed
-  const weekdayData = $derived(getWeekdayBreakdown(data.activity.days))
+  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
-  const peakHour = $derived(getPeakHour(data.hourly.hours))
+  const peakHour = $derived(getPeakHour(hourly.hours))
 
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
 
-  function transformSseToFeedItem(latestBeer: NonNullable<SseEvent['latestBeer']>): FeedItem {
-    return {
-      id: latestBeer.id,
-      photoUrl: latestBeer.photoUrl,
-      loggedAt: latestBeer.loggedAt,
-      user: {
-        id: latestBeer.id,
-        displayName: latestBeer.userName,
-        slug: latestBeer.userName?.toLowerCase().replace(/\s+/g, '-') ?? 'anonymous',
-        countryCode: latestBeer.countryCode,
-      },
-      group: {
-        id: latestBeer.id,
-        name: latestBeer.groupName,
-        slug: latestBeer.groupName.toLowerCase().replace(/\s+/g, '-'),
-      },
-    }
-  }
+  let refetchTimer: ReturnType<typeof setTimeout> | null = null
+
+  $effect(() => {
+    const event = getLastSseEvent()
+    if (!event) return
+
+    // untrack: only lastEvent should be a reactive dependency.
+    // Reads of feedItems, pendingItems, isNearTop etc. inside here must not
+    // re-trigger this effect, or every scroll/state change reruns it with the
+    // same event, causing sessionCount/flashCount to increment on every scroll.
+    untrack(() => {
+      liveCount = event.count
+      sessionCount += 1
+      flashCount += 1
+
+      if (event.latestBeer) {
+        const item = transformSseToFeedItem(event.latestBeer)
+        const isDupe =
+          feedItems.some((f) => f.id === item.id) || pendingItems.some((p) => p.id === item.id)
+
+        if (!isDupe) {
+          feedTotal += 1
+
+          if (isNearTop) {
+            feedItems = [item, ...feedItems]
+            feedOffset += 1
+            newestId = item.id
+            setTimeout(() => {
+              if (newestId === item.id) newestId = ''
+            }, 2000)
+          } else {
+            pendingItems = [item, ...pendingItems]
+          }
+        }
+      }
+
+      // Debounced aggregate refetch
+      if (refetchTimer) clearTimeout(refetchTimer)
+      refetchTimer = setTimeout(async () => {
+        const [newStats, newActivity, newHourly, newMonthly, newCountries] = await Promise.all([
+          getGlobalStats(fetch),
+          getGlobalActivity(fetch),
+          getGlobalHourly(fetch),
+          getGlobalMonthly(fetch),
+          getGlobalCountries(fetch),
+        ])
+        stats = newStats
+        activity = newActivity
+        hourly = newHourly
+        monthly = newMonthly
+        countries = newCountries
+      }, 1500)
+    })
+  })
+
+  $effect(() => {
+    // Re-run whenever a stale-background resync is triggered.
+    // Reads getResyncCount() as the sole dependency; everything else is untracked.
+    getResyncCount()
+    untrack(async () => {
+      const [countData, feedData, newStats, newActivity, newHourly, newMonthly, newCountries] =
+        await Promise.all([
+          getGlobalCount(fetch),
+          getGlobalFeed(fetch, { limit: 20, offset: 0 }),
+          getGlobalStats(fetch),
+          getGlobalActivity(fetch),
+          getGlobalHourly(fetch),
+          getGlobalMonthly(fetch),
+          getGlobalCountries(fetch),
+        ])
+      liveCount = countData.count
+      feedItems = feedData.items
+      feedOffset = feedData.items.length
+      feedTotal = feedData.total
+      pendingItems = []
+      stats = newStats
+      activity = newActivity
+      hourly = newHourly
+      monthly = newMonthly
+      countries = newCountries
+    })
+  })
 
   function flushPending() {
     if (pendingItems.length === 0) return
@@ -135,39 +214,9 @@
     )
     if (sentinel) observer.observe(sentinel)
 
-    const unsub = subscribeToStream((event: SseEvent) => {
-      liveCount = event.count
-      sessionCount += 1
-      flashCount += 1
-
-      if (event.latestBeer) {
-        const item = transformSseToFeedItem(event.latestBeer)
-        const isDupe =
-          feedItems.some((f) => f.id === item.id) || pendingItems.some((p) => p.id === item.id)
-
-        if (!isDupe) {
-          feedTotal += 1
-
-          if (isNearTop) {
-            // User is at the top — prepend immediately with animation
-            feedItems = [item, ...feedItems]
-            feedOffset += 1
-            newestId = item.id
-            setTimeout(() => {
-              if (newestId === item.id) newestId = ''
-            }, 2000)
-          } else {
-            // User has scrolled — buffer to avoid disrupting their view
-            pendingItems = [item, ...pendingItems]
-          }
-        }
-      }
-    })
-
     return () => {
       window.removeEventListener('scroll', handleScroll)
       observer.disconnect()
-      unsub()
     }
   })
 
@@ -372,8 +421,8 @@
           <!-- Contribution heatmap — 1 year -->
           <div class="chart-card">
             <h3 class="chart-title">Activity — Past Year</h3>
-            {#if data.activity.days.length > 0}
-              <ContributionGraph days={data.activity.days} />
+            {#if activity.days.length > 0}
+              <ContributionGraph days={activity.days} />
               <div class="heatmap-legend">
                 <span class="legend-label">Less</span>
                 {#each ['#2a1e0e', '#5c3d1a', '#d97706', '#f59e0b', '#fbbf24'] as c}
@@ -389,9 +438,9 @@
           <!-- Last 30 days bar chart -->
           <div class="chart-card">
             <h3 class="chart-title">Daily Activity — Last 30 Days</h3>
-            {#if browser && data.activity.days.length > 0}
-              <ActivityBarChart days={data.activity.days} />
-            {:else if data.activity.days.length === 0}
+            {#if browser && activity.days.length > 0}
+              <ActivityBarChart days={activity.days} />
+            {:else if activity.days.length === 0}
               <p class="empty-msg">No activity data yet.</p>
             {/if}
           </div>
@@ -402,8 +451,8 @@
               <h3 class="chart-title">
                 When Does the World Drink?{peakHour ? ` · Peak: ${peakHour}` : ''}
               </h3>
-              {#if browser && data.hourly.hours.some((h) => h.count > 0)}
-                <HourlyChart hours={data.hourly.hours} />
+              {#if browser && hourly.hours.some((h) => h.count > 0)}
+                <HourlyChart hours={hourly.hours} />
               {:else}
                 <p class="empty-msg">No data yet.</p>
               {/if}
@@ -426,9 +475,9 @@
           <!-- Monthly trend line chart -->
           <div class="chart-card">
             <h3 class="chart-title">Monthly Trend</h3>
-            {#if browser && data.monthly.months.length > 0}
-              <MonthlyChart months={data.monthly.months} />
-            {:else if data.monthly.months.length === 0}
+            {#if browser && monthly.months.length > 0}
+              <MonthlyChart months={monthly.months} />
+            {:else if monthly.months.length === 0}
               <p class="empty-msg">Not enough data yet.</p>
             {/if}
           </div>
@@ -440,14 +489,14 @@
       <div class="tab-panel" id="panel-map" role="tabpanel">
         <div class="map-layout">
           <div class="map-card">
-            <WorldMap countries={data.countries} />
+            <WorldMap {countries} />
           </div>
 
-          {#if data.countries.length > 0}
+          {#if countries.length > 0}
             <div class="country-leaderboard">
               <h3 class="country-lb-title">Countries</h3>
               <ol class="country-lb-list">
-                {#each data.countries as country, i}
+                {#each countries as country, i}
                   {@const name = regionNames.of(country.countryCode) ?? country.countryCode}
                   <li class="country-lb-row">
                     <span class="country-lb-rank">{i + 1}</span>
