@@ -1,7 +1,6 @@
 import { type Logger } from 'pino'
 import { uploadPhoto, forwardBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
-import { getGroupName } from './waha-client.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -81,7 +80,11 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
     const sourceGroupId = 'wa:' + chatId
     const pushName = (data?.pushName as string | undefined) ?? null
-    const groupName = await getGroupName(chatId)
+    // Don't fetch group name per-message — WAHA NOWEB calls groupFetchAllParticipating
+    // under the hood (fetches ALL groups from WhatsApp) which hits rate limits immediately
+    // when messages arrive frequently. Group names are kept current by the periodic group
+    // sync; the backend DB guard prevents this JID fallback from overwriting a real name.
+    const groupName = chatId
     const timestamp = new Date((payload.timestamp as number) * 1000).toISOString()
     const mediaUrl = media!.url as string
 

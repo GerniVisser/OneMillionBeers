@@ -29,7 +29,7 @@ export async function upsertGroup(
       `INSERT INTO groups (source_group_id, name, slug, avatar_url)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (source_group_id) DO UPDATE SET
-         name = EXCLUDED.name,
+         name = CASE WHEN EXCLUDED.name ~ '^\d{10,}' THEN groups.name ELSE EXCLUDED.name END,
          avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
        RETURNING id, source_group_id AS "sourceGroupId", name, slug,
                  avatar_url AS "avatarUrl", created_at AS "createdAt"`,
@@ -521,12 +521,15 @@ export async function getLatestBeer(pool: pg.Pool): Promise<{
   photoUrl: string
   loggedAt: string
   userName: string | null
+  userSlug: string
   groupName: string
+  groupSlug: string
   countryCode: string | null
 } | null> {
   const { rows } = await pool.query(
     `SELECT bl.id, bl.photo_url AS "photoUrl", bl.logged_at AS "loggedAt",
-            u.display_name AS "userName", g.name AS "groupName",
+            u.display_name AS "userName", u.slug AS "userSlug",
+            g.name AS "groupName", g.slug AS "groupSlug",
             u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id

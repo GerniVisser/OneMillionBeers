@@ -65,6 +65,14 @@ export async function getQrCodePng(): Promise<Buffer> {
   return Buffer.from(buf)
 }
 
+/**
+ * Returns true when a string looks like a raw WhatsApp JID (15+ leading digits) or contains
+ * JSON syntax characters, indicating WAHA returned internal data instead of a real group name.
+ */
+function isGarbageSubject(value: string): boolean {
+  return /^\d{10,}/.test(value) || /["{}\[\]]/.test(value)
+}
+
 export async function getGroupName(groupId: string): Promise<string> {
   try {
     const res = await fetch(
@@ -73,7 +81,9 @@ export async function getGroupName(groupId: string): Promise<string> {
     )
     if (!res.ok) return groupId
     const data = (await res.json()) as { subject?: string }
-    return data.subject ?? groupId
+    const subject = data.subject?.trim()
+    if (subject && !isGarbageSubject(subject)) return subject
+    return groupId
   } catch {
     return groupId
   }
@@ -103,16 +113,14 @@ export async function listAllGroups(): Promise<Array<{ id: string; subject: stri
     const data = await res.json()
     // WAHA NOWEB returns an object map { "groupId@g.us": { id, subject, ... } }
     // WAHA Plus may return an array — handle both
-    if (Array.isArray(data)) {
-      return (data as Array<{ id: string; subject?: string }>).map((g) => ({
-        id: g.id,
-        subject: g.subject ?? g.id,
-      }))
+    const toEntry = (g: { id: string; subject?: string }) => {
+      const subject = g.subject?.trim()
+      return { id: g.id, subject: subject && !isGarbageSubject(subject) ? subject : g.id }
     }
-    return Object.values(data as Record<string, { id: string; subject?: string }>).map((g) => ({
-      id: g.id,
-      subject: g.subject ?? g.id,
-    }))
+    if (Array.isArray(data)) {
+      return (data as Array<{ id: string; subject?: string }>).map(toEntry)
+    }
+    return Object.values(data as Record<string, { id: string; subject?: string }>).map(toEntry)
   } catch {
     return []
   }

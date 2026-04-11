@@ -6,7 +6,7 @@ const WhatsAppConfigSchema = CoreConfigSchema.extend({
   WAHA_API_KEY: z.string().min(1),
   WAHA_SESSION: z.string().min(1).default('default'),
   WAHA_WEBHOOK_URL: z.string().url(),
-  WAHA_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
+  WAHA_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
   COLLECTOR_PORT: z.coerce.number().int().positive().default(8080),
   PUBLIC_BASE_URL: z.string().url(),
   STATUS_TOKEN: z.string().min(1),

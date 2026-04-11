@@ -63,9 +63,9 @@ describe('config', () => {
     expect(config.COLLECTOR_PORT).toBe(8080)
   })
 
-  it('defaults WAHA_POLL_INTERVAL_MS to 300000', async () => {
+  it('defaults WAHA_POLL_INTERVAL_MS to 1800000', async () => {
     const { config } = await import('../config.js')
-    expect(config.WAHA_POLL_INTERVAL_MS).toBe(300_000)
+    expect(config.WAHA_POLL_INTERVAL_MS).toBe(1_800_000)
   })
 
   it('defaults ENABLE_ALERTS to false', async () => {

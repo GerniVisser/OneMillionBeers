@@ -94,6 +94,47 @@ describe('waha-client', () => {
     expect(name).toBe('120363@g.us')
   })
 
+  it('getGroupName rejects subject that starts with raw JID digits (WAHA garbage)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          subject: '120363402479181080@g.us","countryCode":"ZA"}}',
+        }),
+      }),
+    )
+    const { getGroupName } = await import('../waha-client.js')
+    const name = await getGroupName('120363402479181080@g.us')
+    expect(name).toBe('120363402479181080@g.us')
+  })
+
+  it('getGroupName rejects subject that contains JSON syntax characters', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ subject: '{"id":"120363402479181080@g.us"}' }),
+      }),
+    )
+    const { getGroupName } = await import('../waha-client.js')
+    const name = await getGroupName('120363402479181080@g.us')
+    expect(name).toBe('120363402479181080@g.us')
+  })
+
+  it('getGroupName falls back to groupId when subject is null', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ subject: null }),
+      }),
+    )
+    const { getGroupName } = await import('../waha-client.js')
+    const name = await getGroupName('120363402479181080@g.us')
+    expect(name).toBe('120363402479181080@g.us')
+  })
+
   it('ensureWebhookConfigured always PUTs the canonical config and returns true', async () => {
     const mockFetch = vi
       .fn()
