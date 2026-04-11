@@ -1,10 +1,36 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { PageData } from './$types'
   import StatCard from '$lib/components/StatCard.svelte'
   import GroupSearch from '$lib/components/GroupSearch.svelte'
   import { getInitials, formatHour } from '$lib/utils'
+  import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
+  import { getUserStats } from '$lib/api'
 
   let { data }: { data: PageData } = $props()
+
+  let stats = $state(untrack(() => data.stats))
+
+  let refetchTimer: ReturnType<typeof setTimeout> | null = null
+
+  $effect(() => {
+    const event = getLastSseEvent()
+    if (!event || !event.latestBeer) return
+
+    if (event.latestBeer.userSlug !== data.profile.slug) return
+
+    if (refetchTimer) clearTimeout(refetchTimer)
+    refetchTimer = setTimeout(async () => {
+      stats = await getUserStats(fetch, data.profile.slug)
+    }, 1500)
+  })
+
+  $effect(() => {
+    getResyncCount()
+    untrack(async () => {
+      stats = await getUserStats(fetch, data.profile.slug)
+    })
+  })
 
   const displayName = $derived(data.profile.displayName ?? data.profile.slug)
 
@@ -27,7 +53,7 @@
   <title>{displayName} — OneMillionBeers</title>
   <meta
     name="description"
-    content="{displayName} has logged {data.stats.totalBeers} beers on OneMillionBeers."
+    content="{displayName} has logged {stats.totalBeers} beers on OneMillionBeers."
   />
 </svelte:head>
 
@@ -85,16 +111,12 @@
   <h2 class="stats-heading">Stats</h2>
 
   <div class="stats-grid">
-    <StatCard label="Total Beers" value={data.stats.totalBeers.toLocaleString()} icon="🍺" />
-    <StatCard label="This Month" value={data.stats.thisMonth.toLocaleString()} icon="📅" />
-    <StatCard label="This Year" value={data.stats.thisYear.toLocaleString()} icon="🗓️" />
-    <StatCard label="Current Streak" value="{data.stats.currentStreak}d" icon="🔥" />
-    <StatCard label="Longest Streak" value="{data.stats.longestStreak}d" icon="🏆" />
-    <StatCard
-      label="Favourite Hour"
-      value={formatFavoriteHour(data.stats.favoriteHour)}
-      icon="⏰"
-    />
+    <StatCard label="Total Beers" value={stats.totalBeers.toLocaleString()} icon="🍺" />
+    <StatCard label="This Month" value={stats.thisMonth.toLocaleString()} icon="📅" />
+    <StatCard label="This Year" value={stats.thisYear.toLocaleString()} icon="🗓️" />
+    <StatCard label="Current Streak" value="{stats.currentStreak}d" icon="🔥" />
+    <StatCard label="Longest Streak" value="{stats.longestStreak}d" icon="🏆" />
+    <StatCard label="Favourite Hour" value={formatFavoriteHour(stats.favoriteHour)} icon="⏰" />
   </div>
 </section>
 
