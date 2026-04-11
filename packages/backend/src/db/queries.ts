@@ -17,6 +17,58 @@ import type {
 
 // ─── Groups ─────────────────────────────────────────────────────────────────
 
+/**
+ * Find an existing group or create a new one with the given fallback name.
+ * Never updates the name of an existing group — that is the group sync's job.
+ * Used by the beer-log path where the name is a raw JID fallback, not a real name.
+ */
+export async function findOrCreateGroup(
+  pool: pg.Pool,
+  sourceGroupId: string,
+  fallbackName: string,
+): Promise<Group> {
+  const existing = await pool.query<Group>(
+    `SELECT id, source_group_id AS "sourceGroupId", name, slug,
+            avatar_url AS "avatarUrl", created_at AS "createdAt"
+     FROM groups WHERE source_group_id = $1`,
+    [sourceGroupId],
+  )
+  if (existing.rows[0]) return existing.rows[0]
+
+  const slug = toSlug(fallbackName)
+  try {
+    const { rows } = await pool.query<Group>(
+      `INSERT INTO groups (source_group_id, name, slug)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (source_group_id) DO UPDATE SET
+         source_group_id = groups.source_group_id
+       RETURNING id, source_group_id AS "sourceGroupId", name, slug,
+                 avatar_url AS "avatarUrl", created_at AS "createdAt"`,
+      [sourceGroupId, fallbackName, slug],
+    )
+    return rows[0]
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === '23505') {
+      const suffix = sourceGroupId
+        .replace(/[^a-z0-9]/gi, '')
+        .slice(-6)
+        .toLowerCase()
+      const uniqueSlug = (slug + '-' + suffix).slice(0, 128)
+      const { rows } = await pool.query<Group>(
+        `INSERT INTO groups (source_group_id, name, slug)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (source_group_id) DO UPDATE SET
+           source_group_id = groups.source_group_id
+         RETURNING id, source_group_id AS "sourceGroupId", name, slug,
+                   avatar_url AS "avatarUrl", created_at AS "createdAt"`,
+        [sourceGroupId, fallbackName, uniqueSlug],
+      )
+      return rows[0]
+    }
+    throw err
+  }
+}
+
 export async function upsertGroup(
   pool: pg.Pool,
   sourceGroupId: string,
@@ -29,7 +81,7 @@ export async function upsertGroup(
       `INSERT INTO groups (source_group_id, name, slug, avatar_url)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (source_group_id) DO UPDATE SET
-         name = CASE WHEN EXCLUDED.name ~ '^\d{10,}' THEN groups.name ELSE EXCLUDED.name END,
+         name = EXCLUDED.name,
          avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
        RETURNING id, source_group_id AS "sourceGroupId", name, slug,
                  avatar_url AS "avatarUrl", created_at AS "createdAt"`,

@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import type pg from 'pg'
 import { BeerLogRequestSchema } from '@omb/shared'
 import {
-  upsertGroup,
+  findOrCreateGroup,
   upsertUser,
   insertBeerLog,
   getGlobalCount,
@@ -25,7 +25,7 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
     const countryCode = extractCountryCode(senderId)
     const phoneNumber = senderId.startsWith('wa:') ? senderId.slice(3) : null
     const [group, user] = await Promise.all([
-      upsertGroup(pool, sourceGroupId, groupName),
+      findOrCreateGroup(pool, sourceGroupId, groupName),
       upsertUser(pool, { identityHash, phoneNumber, pushName: pushName ?? null, countryCode }),
     ])
 
