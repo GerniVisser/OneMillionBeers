@@ -102,6 +102,7 @@ describe('webhook', () => {
     expect(beerLog.senderId).toBe('wa:1234567890')
     expect(beerLog.timestamp).toBe(new Date(1742306400 * 1000).toISOString())
     expect(beerLog.sourceMessageId).toBe('MSGID123')
+    expect(beerLog.photoHash).toMatch(/^[0-9a-f]{64}$/) // SHA-256 hex
   })
 
   it('dispatches session.status event to handleSessionStatusChange', async () => {

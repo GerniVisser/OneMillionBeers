@@ -308,15 +308,17 @@ export async function insertBeerLog(
   photoUrl: string,
   loggedAt: string,
   sourceMessageId?: string,
-): Promise<BeerLog> {
+  photoHash?: string,
+): Promise<BeerLog | null> {
   const { rows } = await pool.query<BeerLog>(
-    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id, photo_hash)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (photo_hash) DO NOTHING
      RETURNING id, user_id AS "userId", group_id AS "groupId", photo_url AS "photoUrl",
                logged_at AS "loggedAt", created_at AS "createdAt"`,
-    [userId, groupId, photoUrl, loggedAt, sourceMessageId ?? null],
+    [userId, groupId, photoUrl, loggedAt, sourceMessageId ?? null, photoHash ?? null],
   )
-  return rows[0]
+  return rows[0] ?? null
 }
 
 export async function deleteBeerLogBySourceMessageId(

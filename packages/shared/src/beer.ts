@@ -25,6 +25,7 @@ export const BeerLogRequestSchema = z.object({
   photoUrl: z.string().url(),
   pushName: z.string().max(512).nullable().optional(),
   sourceMessageId: z.string().min(1).optional(),
+  photoHash: z.string().length(64).optional(), // SHA-256 hex digest
 })
 export type BeerLogRequest = z.infer<typeof BeerLogRequestSchema>
 

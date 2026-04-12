@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
@@ -135,6 +136,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
+    const photoHash = createHash('sha256').update(buffer).digest('hex')
     const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
 
     let photoUrl: string
@@ -154,6 +156,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         photoUrl,
         pushName,
         sourceMessageId: msgId,
+        photoHash,
       })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
     } catch (err) {
