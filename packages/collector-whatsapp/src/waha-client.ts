@@ -3,7 +3,13 @@ import { config } from './config.js'
 export type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED'
 
 // Events the collector handles — kept in sync with webhook.ts handler
-const WEBHOOK_EVENTS = ['message', 'session.status', 'group.v2.join', 'group.v2.update']
+const WEBHOOK_EVENTS = [
+  'message',
+  'message.revoked',
+  'session.status',
+  'group.v2.join',
+  'group.v2.update',
+]
 
 function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }

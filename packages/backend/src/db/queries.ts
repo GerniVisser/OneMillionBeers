@@ -307,15 +307,29 @@ export async function insertBeerLog(
   groupId: string,
   photoUrl: string,
   loggedAt: string,
-): Promise<BeerLog> {
+  sourceMessageId?: string,
+  photoHash?: string,
+): Promise<BeerLog | null> {
   const { rows } = await pool.query<BeerLog>(
-    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id, photo_hash)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (photo_hash) DO NOTHING
      RETURNING id, user_id AS "userId", group_id AS "groupId", photo_url AS "photoUrl",
                logged_at AS "loggedAt", created_at AS "createdAt"`,
-    [userId, groupId, photoUrl, loggedAt],
+    [userId, groupId, photoUrl, loggedAt, sourceMessageId ?? null, photoHash ?? null],
   )
-  return rows[0]
+  return rows[0] ?? null
+}
+
+export async function deleteBeerLogBySourceMessageId(
+  pool: pg.Pool,
+  sourceMessageId: string,
+): Promise<{ id: string; photoUrl: string } | null> {
+  const { rows } = await pool.query<{ id: string; photoUrl: string }>(
+    `DELETE FROM beer_logs WHERE source_message_id = $1 RETURNING id, photo_url AS "photoUrl"`,
+    [sourceMessageId],
+  )
+  return rows[0] ?? null
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────

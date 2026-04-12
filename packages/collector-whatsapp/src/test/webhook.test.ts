@@ -2,13 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { pino } from 'pino'
 
 const mockUploadPhoto = vi.fn()
+const mockDeletePhoto = vi.fn()
 const mockForwardBeerLog = vi.fn()
+const mockForwardDeleteBeerLog = vi.fn()
 const mockHandleSessionStatusChange = vi.fn()
 const mockGetGroupName = vi.fn()
 
 vi.mock('@omb/collector-core', () => ({
   uploadPhoto: mockUploadPhoto,
+  deletePhoto: mockDeletePhoto,
   forwardBeerLog: mockForwardBeerLog,
+  forwardDeleteBeerLog: mockForwardDeleteBeerLog,
   coreConfig: { LOG_LEVEL: 'silent' },
 }))
 vi.mock('../session-monitor.js', () => ({
@@ -19,6 +23,8 @@ vi.mock('../config.js', () => ({
   config: {
     WAHA_BASE_URL: 'http://waha:3000',
     WAHA_API_KEY: 'test-key',
+    STORAGE_PUBLIC_URL: 'https://s3.example.com',
+    STORAGE_BUCKET: 'omb-bucket',
   },
 }))
 
@@ -63,12 +69,18 @@ describe('webhook', () => {
   beforeEach(() => {
     vi.resetModules()
     mockUploadPhoto.mockReset()
+    mockDeletePhoto.mockReset()
     mockForwardBeerLog.mockReset()
+    mockForwardDeleteBeerLog.mockReset()
     mockHandleSessionStatusChange.mockReset()
     mockGetGroupName.mockReset()
     mockGetGroupName.mockResolvedValue('Beer Crew')
-    mockUploadPhoto.mockResolvedValue('https://s3.example.com/photos/120363XXXX/MSGID123.jpg')
+    mockUploadPhoto.mockResolvedValue(
+      'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
+    )
     mockForwardBeerLog.mockResolvedValue(undefined)
+    mockDeletePhoto.mockResolvedValue(undefined)
+    mockForwardDeleteBeerLog.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -89,6 +101,8 @@ describe('webhook', () => {
     expect(beerLog.sourceGroupId).toBe('wa:120363XXXX@g.us')
     expect(beerLog.senderId).toBe('wa:1234567890')
     expect(beerLog.timestamp).toBe(new Date(1742306400 * 1000).toISOString())
+    expect(beerLog.sourceMessageId).toBe('MSGID123')
+    expect(beerLog.photoHash).toMatch(/^[0-9a-f]{64}$/) // SHA-256 hex
   })
 
   it('dispatches session.status event to handleSessionStatusChange', async () => {
@@ -239,5 +253,82 @@ describe('webhook', () => {
 
     expect(mockUploadPhoto).toHaveBeenCalledTimes(2)
     expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
+  })
+
+  describe('message.revoked', () => {
+    // WAHA NOWEB: before is null; revokedMessageId is the bare message hash
+    // (same value as payload.id in the original message event)
+    function makeRevokedPayload(revokedMessageId = 'MSGID123') {
+      return {
+        event: 'message.revoked',
+        session: 'default',
+        payload: {
+          revokedMessageId,
+          before: null,
+          after: { id: `false_120363XXXX@g.us_${revokedMessageId}`, type: 'revoked' },
+        },
+      }
+    }
+
+    it('uses revokedMessageId to look up the beer log (WAHA NOWEB — before is null)', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
+      )
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeRevokedPayload(), logger)
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
+      expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+    })
+
+    it('falls back to before.id when revokedMessageId is absent (WAHA Plus/WEBJS)', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
+      )
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        {
+          event: 'message.revoked',
+          payload: { before: { id: 'MSGID123' }, after: { id: 'MSGID123' } },
+        },
+        logger,
+      )
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
+    })
+
+    it('does not call deletePhoto when forwardDeleteBeerLog returns null (not a beer log)', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(null)
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeRevokedPayload(), logger)
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledOnce()
+      expect(mockDeletePhoto).not.toHaveBeenCalled()
+    })
+
+    it('does not throw when forwardDeleteBeerLog rejects', async () => {
+      mockForwardDeleteBeerLog.mockRejectedValue(new Error('network error'))
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).resolves.toBeUndefined()
+      expect(mockDeletePhoto).not.toHaveBeenCalled()
+    })
+
+    it('does not throw when deletePhoto rejects — DB record already removed', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
+      )
+      mockDeletePhoto.mockRejectedValue(new Error('S3 error'))
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).resolves.toBeUndefined()
+    })
+
+    it('ignores event when neither revokedMessageId nor before.id is present', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        { event: 'message.revoked', payload: { before: null, after: {} } },
+        logger,
+      )
+      expect(mockForwardDeleteBeerLog).not.toHaveBeenCalled()
+    })
   })
 })

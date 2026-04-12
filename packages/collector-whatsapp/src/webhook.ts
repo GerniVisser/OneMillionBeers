@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
-import { uploadPhoto, forwardBeerLog } from '@omb/collector-core'
+import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
 import { config } from './config.js'
 
@@ -26,6 +27,11 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
 
   if (event === 'message') {
     await handleMessage(body as Record<string, unknown>, logger)
+    return
+  }
+
+  if (event === 'message.revoked') {
+    await handleRevokedMessage(body as Record<string, unknown>, logger)
     return
   }
 
@@ -130,6 +136,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
+    // WAHA NOWEB: payload.id is the full composite key
+    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
+    // message hash, which matches revokedMessageId in message.revoked events.
+    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
+    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
+
+    const photoHash = createHash('sha256').update(buffer).digest('hex')
     const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
 
     let photoUrl: string
@@ -141,12 +154,76 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     }
 
     try {
-      await forwardBeerLog({ sourceGroupId, groupName, senderId, timestamp, photoUrl, pushName })
+      await forwardBeerLog({
+        sourceGroupId,
+        groupName,
+        senderId,
+        timestamp,
+        photoUrl,
+        pushName,
+        sourceMessageId,
+        photoHash,
+      })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
     } catch (err) {
       logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
     }
   } finally {
     processingMsgIds.delete(msgId)
+  }
+}
+
+function extractS3Key(photoUrl: string, storagePublicUrl: string, bucket: string): string | null {
+  try {
+    const prefix = `${storagePublicUrl.replace(/\/$/, '')}/${bucket}/`
+    if (!photoUrl.startsWith(prefix)) return null
+    return photoUrl.slice(prefix.length)
+  } catch {
+    return null
+  }
+}
+
+async function handleRevokedMessage(body: Record<string, unknown>, logger: Logger): Promise<void> {
+  const payload = body.payload as Record<string, unknown> | undefined
+  if (!payload) return
+
+  // WAHA NOWEB: before is null; revokedMessageId holds the raw message hash which
+  // matches payload.id from the original message event (NOWEB uses the bare hash,
+  // not a JID-prefixed string). Fall back to before.id for WAHA Plus/WEBJS.
+  const msgId =
+    (payload.revokedMessageId as string | undefined) ??
+    ((payload.before as Record<string, unknown> | undefined)?.id as string | undefined)
+
+  if (!msgId) {
+    logger.warn({ payload }, 'message.revoked event has no message ID — ignoring')
+    return
+  }
+
+  logger.info({ msgId }, 'Message revoked — checking for beer log')
+
+  let photoUrl: string | null
+  try {
+    photoUrl = await forwardDeleteBeerLog(msgId)
+  } catch (err) {
+    logger.error({ err, msgId }, 'Failed to delete beer log for revoked message')
+    return
+  }
+
+  if (!photoUrl) {
+    logger.debug({ msgId }, 'Revoked message was not a beer log — nothing to delete')
+    return
+  }
+
+  const key = extractS3Key(photoUrl, config.STORAGE_PUBLIC_URL, config.STORAGE_BUCKET)
+  if (!key) {
+    logger.warn({ photoUrl }, 'Could not extract S3 key from photo URL — skipping S3 delete')
+    return
+  }
+
+  try {
+    await deletePhoto(key)
+    logger.info({ msgId, key }, 'Beer photo deleted from S3')
+  } catch (err) {
+    logger.error({ err, key }, 'Failed to delete beer photo from S3 — DB record already removed')
   }
 }
