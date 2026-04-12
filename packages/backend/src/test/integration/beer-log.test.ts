@@ -30,6 +30,11 @@ const validPayload = {
   photoUrl: 'https://example.com/beer.jpg',
 }
 
+const payloadWithMessageId = {
+  ...validPayload,
+  sourceMessageId: 'false_120363XXX@g.us_MSGID001',
+}
+
 // South African number: +27 country code → "ZA"
 const zaPayload = {
   ...validPayload,
@@ -142,5 +147,77 @@ describe('POST /v1/internal/beer-log', () => {
       payload: { sourceGroupId: 'x' },
     })
     expect(res.statusCode).toBe(400)
+  })
+
+  it('stores sourceMessageId when provided', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: payloadWithMessageId,
+    })
+    const { rows } = await pool.query('SELECT source_message_id FROM beer_logs')
+    expect(rows[0].source_message_id).toBe(payloadWithMessageId.sourceMessageId)
+  })
+
+  it('stores null source_message_id when not provided', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    const { rows } = await pool.query('SELECT source_message_id FROM beer_logs')
+    expect(rows[0].source_message_id).toBeNull()
+  })
+})
+
+describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
+  it('returns 200 and the photoUrl when the beer log exists', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: payloadWithMessageId,
+    })
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true, photoUrl: payloadWithMessageId.photoUrl })
+  })
+
+  it('removes the beer log row from the database', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: payloadWithMessageId,
+    })
+    await app.inject({
+      method: 'DELETE',
+      url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+    })
+    const { rows } = await pool.query('SELECT * FROM beer_logs')
+    expect(rows).toHaveLength(0)
+  })
+
+  it('returns 404 when no beer log matches the sourceMessageId', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/v1/internal/beer-log/by-message/unknown-message-id',
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json()).toEqual({ ok: false })
+  })
+
+  it('second delete of the same sourceMessageId returns 404', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: payloadWithMessageId,
+    })
+    await app.inject({
+      method: 'DELETE',
+      url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+    })
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+    })
+    expect(res.statusCode).toBe(404)
   })
 })

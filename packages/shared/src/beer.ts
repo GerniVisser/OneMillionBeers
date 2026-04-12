@@ -24,8 +24,16 @@ export const BeerLogRequestSchema = z.object({
   timestamp: IsoDatetimeSchema,
   photoUrl: z.string().url(),
   pushName: z.string().max(512).nullable().optional(),
+  sourceMessageId: z.string().min(1).optional(),
 })
 export type BeerLogRequest = z.infer<typeof BeerLogRequestSchema>
+
+// DELETE /v1/internal/beer-log/by-message/:sourceMessageId (Collector → Backend)
+export const BeerLogDeleteResponseSchema = z.object({
+  ok: z.boolean(),
+  photoUrl: z.string().url().optional(),
+})
+export type BeerLogDeleteResponse = z.infer<typeof BeerLogDeleteResponseSchema>
 
 // Feed item — used for both group feed and global feed
 // createdAt excluded (DB bookkeeping, not displayed)

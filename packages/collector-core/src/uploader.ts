@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { config } from './config.js'
 
 const client = new S3Client({
@@ -45,4 +45,10 @@ export async function uploadPhoto(key: string, buffer: Buffer): Promise<string> 
   // Construct public URL from public URL + bucket + key
   const publicUrl = config.STORAGE_PUBLIC_URL.replace(/\/$/, '')
   return `${publicUrl}/${config.STORAGE_BUCKET}/${key}`
+}
+
+export async function deletePhoto(key: string): Promise<void> {
+  await client.send(new DeleteObjectCommand({ Bucket: config.STORAGE_BUCKET, Key: key }), {
+    abortSignal: AbortSignal.timeout(10_000),
+  })
 }

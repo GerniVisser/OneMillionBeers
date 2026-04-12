@@ -307,15 +307,27 @@ export async function insertBeerLog(
   groupId: string,
   photoUrl: string,
   loggedAt: string,
+  sourceMessageId?: string,
 ): Promise<BeerLog> {
   const { rows } = await pool.query<BeerLog>(
-    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING id, user_id AS "userId", group_id AS "groupId", photo_url AS "photoUrl",
                logged_at AS "loggedAt", created_at AS "createdAt"`,
-    [userId, groupId, photoUrl, loggedAt],
+    [userId, groupId, photoUrl, loggedAt, sourceMessageId ?? null],
   )
   return rows[0]
+}
+
+export async function deleteBeerLogBySourceMessageId(
+  pool: pg.Pool,
+  sourceMessageId: string,
+): Promise<{ photoUrl: string } | null> {
+  const { rows } = await pool.query<{ photoUrl: string }>(
+    `DELETE FROM beer_logs WHERE source_message_id = $1 RETURNING photo_url AS "photoUrl"`,
+    [sourceMessageId],
+  )
+  return rows[0] ?? null
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────
