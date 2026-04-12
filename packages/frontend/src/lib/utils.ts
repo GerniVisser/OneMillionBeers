@@ -61,7 +61,9 @@ export function formatHour(h: number): string {
   return `${h - 12}pm`
 }
 
-export function transformSseToFeedItem(latestBeer: NonNullable<SseEvent['latestBeer']>): FeedItem {
+export function transformSseToFeedItem(
+  latestBeer: NonNullable<Extract<SseEvent, { type: 'count' }>['latestBeer']>,
+): FeedItem {
   return {
     id: latestBeer.id,
     photoUrl: latestBeer.photoUrl,
