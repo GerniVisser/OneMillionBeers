@@ -136,6 +136,12 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
+    // WAHA NOWEB: payload.id is the full composite key
+    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
+    // message hash, which matches revokedMessageId in message.revoked events.
+    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
+    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
+
     const photoHash = createHash('sha256').update(buffer).digest('hex')
     const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
 
@@ -155,7 +161,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         timestamp,
         photoUrl,
         pushName,
-        sourceMessageId: msgId,
+        sourceMessageId,
         photoHash,
       })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
