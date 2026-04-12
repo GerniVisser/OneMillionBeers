@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
@@ -135,6 +136,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
+    // WAHA NOWEB: payload.id is the full composite key
+    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
+    // message hash, which matches revokedMessageId in message.revoked events.
+    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
+    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
+
+    const photoHash = createHash('sha256').update(buffer).digest('hex')
     const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
 
     let photoUrl: string
@@ -153,7 +161,8 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         timestamp,
         photoUrl,
         pushName,
-        sourceMessageId: msgId,
+        sourceMessageId,
+        photoHash,
       })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
     } catch (err) {
@@ -178,11 +187,12 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
   const payload = body.payload as Record<string, unknown> | undefined
   if (!payload) return
 
-  // WAHA payload: { revokedMessageId, before: { id, ... }, after: { id, ... } }
-  // Use before.id — it matches payload.id from the original message event
-  // revokedMessageId is just the message hash, not the full JID-based message ID
-  const before = payload.before as Record<string, unknown> | undefined
-  const msgId = before?.id as string | undefined
+  // WAHA NOWEB: before is null; revokedMessageId holds the raw message hash which
+  // matches payload.id from the original message event (NOWEB uses the bare hash,
+  // not a JID-prefixed string). Fall back to before.id for WAHA Plus/WEBJS.
+  const msgId =
+    (payload.revokedMessageId as string | undefined) ??
+    ((payload.before as Record<string, unknown> | undefined)?.id as string | undefined)
 
   if (!msgId) {
     logger.warn({ payload }, 'message.revoked event has no message ID — ignoring')

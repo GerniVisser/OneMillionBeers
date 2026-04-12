@@ -96,7 +96,7 @@
 
   $effect(() => {
     const event = getLastSseEvent()
-    if (!event || !event.latestBeer) return
+    if (!event || event.type !== 'count' || !event.latestBeer) return
 
     // untrack: only lastEvent should be a reactive dependency.
     // Reads of feedItems inside here must not re-trigger this effect.

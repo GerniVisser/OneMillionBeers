@@ -15,7 +15,7 @@
 
   $effect(() => {
     const event = getLastSseEvent()
-    if (!event || !event.latestBeer) return
+    if (!event || event.type !== 'count' || !event.latestBeer) return
 
     if (event.latestBeer.userSlug !== data.profile.slug) return
 

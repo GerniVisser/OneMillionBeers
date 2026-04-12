@@ -55,22 +55,29 @@ export const UserStatsResponseSchema = z.object({
 })
 export type UserStatsResponse = z.infer<typeof UserStatsResponseSchema>
 
-// GET /v1/global/stream (SSE) — inline shape, NOT FeedItemSchema
-// type discriminant allows future union expansion without breaking subscribers
-export const SseEventSchema = z.object({
-  type: z.literal('count'),
-  count: z.number().int().nonnegative(),
-  latestBeer: z
-    .object({
-      id: UuidSchema,
-      photoUrl: z.string().url(),
-      loggedAt: IsoDatetimeSchema,
-      userName: z.string().nullable(),
-      userSlug: z.string(),
-      groupName: z.string(),
-      groupSlug: z.string(),
-      countryCode: z.string().length(2).nullable(),
-    })
-    .optional(),
-})
+// GET /v1/global/stream (SSE) — discriminated union so subscribers can handle
+// additions and deletions without coupling to a single shape.
+export const SseEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('count'),
+    count: z.number().int().nonnegative(),
+    latestBeer: z
+      .object({
+        id: UuidSchema,
+        photoUrl: z.string().url(),
+        loggedAt: IsoDatetimeSchema,
+        userName: z.string().nullable(),
+        userSlug: z.string(),
+        groupName: z.string(),
+        groupSlug: z.string(),
+        countryCode: z.string().length(2).nullable(),
+      })
+      .optional(),
+  }),
+  z.object({
+    type: z.literal('remove'),
+    id: UuidSchema, // beer_log.id of the deleted row
+    count: z.number().int().nonnegative(),
+  }),
+])
 export type SseEvent = z.infer<typeof SseEventSchema>

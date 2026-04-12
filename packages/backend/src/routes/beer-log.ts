@@ -20,8 +20,16 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
       return reply.status(400).send({ error: 'Invalid request', issues: parse.error.issues })
     }
 
-    const { sourceGroupId, groupName, senderId, timestamp, photoUrl, pushName, sourceMessageId } =
-      parse.data
+    const {
+      sourceGroupId,
+      groupName,
+      senderId,
+      timestamp,
+      photoUrl,
+      pushName,
+      sourceMessageId,
+      photoHash,
+    } = parse.data
 
     const identityHash = hashIdentity(senderId)
     const countryCode = extractCountryCode(senderId)
@@ -31,14 +39,25 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
       upsertUser(pool, { identityHash, phoneNumber, pushName: pushName ?? null, countryCode }),
     ])
 
-    await insertBeerLog(pool, user.id, group.id, photoUrl, timestamp, sourceMessageId)
+    const inserted = await insertBeerLog(
+      pool,
+      user.id,
+      group.id,
+      photoUrl,
+      timestamp,
+      sourceMessageId,
+      photoHash,
+    )
 
-    const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
-    broadcast({
-      type: 'count',
-      count,
-      ...(latest ? { latestBeer: latest } : {}),
-    })
+    // null means the photo_hash already exists — duplicate photo, silently accepted
+    if (inserted) {
+      const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
+      broadcast({
+        type: 'count',
+        count,
+        ...(latest ? { latestBeer: latest } : {}),
+      })
+    }
 
     return reply.status(201).send({ ok: true })
   })
@@ -54,12 +73,8 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
         return reply.status(404).send({ ok: false })
       }
 
-      const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
-      broadcast({
-        type: 'count',
-        count,
-        ...(latest ? { latestBeer: latest } : {}),
-      })
+      const count = await getGlobalCount(pool)
+      broadcast({ type: 'remove', id: deleted.id, count })
 
       return reply.status(200).send({ ok: true, photoUrl: deleted.photoUrl })
     },
