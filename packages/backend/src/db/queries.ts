@@ -324,9 +324,9 @@ export async function insertBeerLog(
 export async function deleteBeerLogBySourceMessageId(
   pool: pg.Pool,
   sourceMessageId: string,
-): Promise<{ photoUrl: string } | null> {
-  const { rows } = await pool.query<{ photoUrl: string }>(
-    `DELETE FROM beer_logs WHERE source_message_id = $1 RETURNING photo_url AS "photoUrl"`,
+): Promise<{ id: string; photoUrl: string } | null> {
+  const { rows } = await pool.query<{ id: string; photoUrl: string }>(
+    `DELETE FROM beer_logs WHERE source_message_id = $1 RETURNING id, photo_url AS "photoUrl"`,
     [sourceMessageId],
   )
   return rows[0] ?? null

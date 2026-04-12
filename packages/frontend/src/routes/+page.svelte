@@ -108,31 +108,40 @@
     // same event, causing sessionCount/flashCount to increment on every scroll.
     untrack(() => {
       liveCount = event.count
-      sessionCount += 1
-      flashCount += 1
 
-      if (event.latestBeer) {
-        const item = transformSseToFeedItem(event.latestBeer)
-        const isDupe =
-          feedItems.some((f) => f.id === item.id) || pendingItems.some((p) => p.id === item.id)
+      if (event.type === 'remove') {
+        const wasInFeed = feedItems.some((f) => f.id === event.id)
+        feedItems = feedItems.filter((f) => f.id !== event.id)
+        pendingItems = pendingItems.filter((p) => p.id !== event.id)
+        feedTotal = Math.max(0, feedTotal - 1)
+        if (wasInFeed) feedOffset = Math.max(0, feedOffset - 1)
+      } else {
+        sessionCount += 1
+        flashCount += 1
 
-        if (!isDupe) {
-          feedTotal += 1
+        if (event.latestBeer) {
+          const item = transformSseToFeedItem(event.latestBeer)
+          const isDupe =
+            feedItems.some((f) => f.id === item.id) || pendingItems.some((p) => p.id === item.id)
 
-          if (isNearTop) {
-            feedItems = [item, ...feedItems]
-            feedOffset += 1
-            newestId = item.id
-            setTimeout(() => {
-              if (newestId === item.id) newestId = ''
-            }, 2000)
-          } else {
-            pendingItems = [item, ...pendingItems]
+          if (!isDupe) {
+            feedTotal += 1
+
+            if (isNearTop) {
+              feedItems = [item, ...feedItems]
+              feedOffset += 1
+              newestId = item.id
+              setTimeout(() => {
+                if (newestId === item.id) newestId = ''
+              }, 2000)
+            } else {
+              pendingItems = [item, ...pendingItems]
+            }
           }
         }
       }
 
-      // Debounced aggregate refetch
+      // Debounced aggregate refetch — runs for both additions and removals
       if (refetchTimer) clearTimeout(refetchTimer)
       refetchTimer = setTimeout(async () => {
         const [newStats, newActivity, newHourly, newMonthly, newCountries] = await Promise.all([

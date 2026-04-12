@@ -73,12 +73,8 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
         return reply.status(404).send({ ok: false })
       }
 
-      const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
-      broadcast({
-        type: 'count',
-        count,
-        ...(latest ? { latestBeer: latest } : {}),
-      })
+      const count = await getGlobalCount(pool)
+      broadcast({ type: 'remove', id: deleted.id, count })
 
       return reply.status(200).send({ ok: true, photoUrl: deleted.photoUrl })
     },
