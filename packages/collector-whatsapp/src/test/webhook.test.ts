@@ -256,29 +256,45 @@ describe('webhook', () => {
   })
 
   describe('message.revoked', () => {
-    function makeRevokedPayload(msgId = 'false_120363XXXX@g.us_MSGID123') {
+    // WAHA NOWEB: before is null; revokedMessageId is the bare message hash
+    // (same value as payload.id in the original message event)
+    function makeRevokedPayload(revokedMessageId = 'MSGID123') {
       return {
         event: 'message.revoked',
         session: 'default',
         payload: {
-          revokedMessageId: 'A06CA7BB5DD8C8F705628CDB7E3A33C9',
-          before: { id: msgId },
-          after: { id: msgId, type: 'revoked' },
+          revokedMessageId,
+          before: null,
+          after: { id: `false_120363XXXX@g.us_${revokedMessageId}`, type: 'revoked' },
         },
       }
     }
 
-    it('calls forwardDeleteBeerLog and deletePhoto when beer log exists', async () => {
+    it('uses revokedMessageId to look up the beer log (WAHA NOWEB — before is null)', async () => {
       mockForwardDeleteBeerLog.mockResolvedValue(
-        'https://s3.example.com/omb-bucket/photos/120363XXXX/false_120363XXXX@g.us_MSGID123.jpg',
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
       )
       const { handleWebhookEvent } = await import('../webhook.js')
       await handleWebhookEvent(makeRevokedPayload(), logger)
 
-      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('false_120363XXXX@g.us_MSGID123')
-      expect(mockDeletePhoto).toHaveBeenCalledWith(
-        'photos/120363XXXX/false_120363XXXX@g.us_MSGID123.jpg',
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
+      expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+    })
+
+    it('falls back to before.id when revokedMessageId is absent (WAHA Plus/WEBJS)', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
       )
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        {
+          event: 'message.revoked',
+          payload: { before: { id: 'MSGID123' }, after: { id: 'MSGID123' } },
+        },
+        logger,
+      )
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
     })
 
     it('does not call deletePhoto when forwardDeleteBeerLog returns null (not a beer log)', async () => {
@@ -299,17 +315,17 @@ describe('webhook', () => {
 
     it('does not throw when deletePhoto rejects — DB record already removed', async () => {
       mockForwardDeleteBeerLog.mockResolvedValue(
-        'https://s3.example.com/omb-bucket/photos/120363XXXX/false_120363XXXX@g.us_MSGID123.jpg',
+        'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
       )
       mockDeletePhoto.mockRejectedValue(new Error('S3 error'))
       const { handleWebhookEvent } = await import('../webhook.js')
       await expect(handleWebhookEvent(makeRevokedPayload(), logger)).resolves.toBeUndefined()
     })
 
-    it('ignores event when before.id is absent', async () => {
+    it('ignores event when neither revokedMessageId nor before.id is present', async () => {
       const { handleWebhookEvent } = await import('../webhook.js')
       await handleWebhookEvent(
-        { event: 'message.revoked', payload: { revokedMessageId: 'HASH', before: {}, after: {} } },
+        { event: 'message.revoked', payload: { before: null, after: {} } },
         logger,
       )
       expect(mockForwardDeleteBeerLog).not.toHaveBeenCalled()

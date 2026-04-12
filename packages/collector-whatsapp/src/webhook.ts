@@ -181,11 +181,12 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
   const payload = body.payload as Record<string, unknown> | undefined
   if (!payload) return
 
-  // WAHA payload: { revokedMessageId, before: { id, ... }, after: { id, ... } }
-  // Use before.id — it matches payload.id from the original message event
-  // revokedMessageId is just the message hash, not the full JID-based message ID
-  const before = payload.before as Record<string, unknown> | undefined
-  const msgId = before?.id as string | undefined
+  // WAHA NOWEB: before is null; revokedMessageId holds the raw message hash which
+  // matches payload.id from the original message event (NOWEB uses the bare hash,
+  // not a JID-prefixed string). Fall back to before.id for WAHA Plus/WEBJS.
+  const msgId =
+    (payload.revokedMessageId as string | undefined) ??
+    ((payload.before as Record<string, unknown> | undefined)?.id as string | undefined)
 
   if (!msgId) {
     logger.warn({ payload }, 'message.revoked event has no message ID — ignoring')
