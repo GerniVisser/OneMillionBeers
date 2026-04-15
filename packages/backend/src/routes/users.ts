@@ -11,6 +11,7 @@ export const userRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { p
     return reply.send({
       id: user.id,
       displayName: user.displayName,
+      pseudoName: user.pseudoName,
       slug: user.slug,
       countryCode: user.countryCode,
       createdAt: user.createdAt,

@@ -34,9 +34,9 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, 
     const identityHash = hashIdentity(senderId)
     const countryCode = extractCountryCode(senderId)
     const phoneNumber = senderId.startsWith('wa:') ? senderId.slice(3) : null
-    const [group, user] = await Promise.all([
-      findOrCreateGroup(pool, sourceGroupId, groupName),
+    const [user, group] = await Promise.all([
       upsertUser(pool, { identityHash, phoneNumber, pushName: pushName ?? null, countryCode }),
+      findOrCreateGroup(pool, sourceGroupId, groupName),
     ])
 
     const inserted = await insertBeerLog(

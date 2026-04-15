@@ -32,7 +32,9 @@
     })
   })
 
-  const displayName = $derived(data.profile.displayName ?? data.profile.slug)
+  const displayName = $derived(
+    data.profile.displayName ?? data.profile.pseudoName ?? data.profile.slug,
+  )
 
   const initials = $derived(getInitials(displayName))
 

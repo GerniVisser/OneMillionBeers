@@ -310,3 +310,55 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
     expect(res.statusCode).toBe(404)
   })
 })
+
+describe('pseudo_name generation', () => {
+  it('sets pseudo_name on new user creation', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    const { rows } = await pool.query<{ pseudo_name: string }>('SELECT pseudo_name FROM users')
+    expect(rows[0].pseudo_name).toBeTruthy()
+    expect(typeof rows[0].pseudo_name).toBe('string')
+  })
+
+  it('pseudo_name is at most 20 characters', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    const { rows } = await pool.query<{ pseudo_name: string }>('SELECT pseudo_name FROM users')
+    expect(rows[0].pseudo_name.length).toBeLessThanOrEqual(20)
+  })
+
+  it('slug is derived from pseudo_name in kebab-case', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    const { rows } = await pool.query<{ pseudo_name: string; slug: string }>(
+      'SELECT pseudo_name, slug FROM users',
+    )
+    const expectedSlug = rows[0].pseudo_name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
+    expect(rows[0].slug).toBe(expectedSlug)
+  })
+
+  it('pseudo_name is not overwritten on subsequent upserts', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    const { rows: first } = await pool.query<{ pseudo_name: string }>(
+      'SELECT pseudo_name FROM users',
+    )
+    const originalName = first[0].pseudo_name
+
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    const { rows: second } = await pool.query<{ pseudo_name: string }>(
+      'SELECT pseudo_name FROM users',
+    )
+    expect(second[0].pseudo_name).toBe(originalName)
+  })
+
+  it('pseudo_name is unique across different users', async () => {
+    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: { ...validPayload, senderId: 'wa:27831234567' },
+    })
+    const { rows } = await pool.query<{ pseudo_name: string }>(
+      'SELECT pseudo_name FROM users ORDER BY created_at',
+    )
+    expect(rows).toHaveLength(2)
+    expect(rows[0].pseudo_name).not.toBe(rows[1].pseudo_name)
+  })
+})

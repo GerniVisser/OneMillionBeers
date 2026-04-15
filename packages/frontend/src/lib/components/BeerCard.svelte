@@ -13,7 +13,7 @@
     onlongpress?: (item: FeedItem) => void
   } = $props()
 
-  const displayName = $derived(item.user.displayName ?? 'Anonymous')
+  const displayName = $derived(item.user.displayName ?? item.user.pseudoName ?? 'Anonymous')
   const ago = $derived(timeAgo(item.loggedAt))
 
   let imageLoaded = $state(false)
