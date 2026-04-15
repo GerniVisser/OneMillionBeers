@@ -71,6 +71,7 @@ export function transformSseToFeedItem(
     user: {
       id: latestBeer.id,
       displayName: latestBeer.userName,
+      pseudoName: null,
       slug: latestBeer.userSlug,
       countryCode: latestBeer.countryCode,
     },

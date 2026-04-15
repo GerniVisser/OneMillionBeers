@@ -7,6 +7,7 @@ export const UserSchema = z.object({
   phoneNumber: z.string().nullable(),
   pushName: z.string().nullable(),
   displayName: z.string().min(1).max(256).nullable(),
+  pseudoName: z.string().min(1).max(20).nullable(),
   slug: SlugSchema,
   countryCode: z.string().length(2).nullable(),
   active: z.boolean(),
@@ -19,6 +20,7 @@ export type User = z.infer<typeof UserSchema>
 export const UserSummarySchema = z.object({
   id: UuidSchema,
   displayName: z.string().nullable(),
+  pseudoName: z.string().nullable(),
   slug: SlugSchema,
   countryCode: z.string().length(2).nullable(),
 })

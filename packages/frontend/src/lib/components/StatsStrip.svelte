@@ -54,7 +54,7 @@
       <div class="pill" role="listitem">
         <span class="pill-label">leader</span>
         <span class="pill-value"
-          >{leader.user.displayName ?? 'Anonymous'} · {leader.beerCount.toLocaleString()}</span
+          >{leader.user.displayName ?? leader.user.pseudoName ?? 'Anonymous'} · {leader.beerCount.toLocaleString()}</span
         >
       </div>
     {/if}

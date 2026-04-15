@@ -258,19 +258,20 @@ export async function upsertUser(
   },
 ): Promise<User> {
   const { identityHash, phoneNumber, pushName, countryCode } = params
-  const slug = `user-${identityHash.slice(0, 12)}`
   const { rows } = await pool.query<User>(
-    `INSERT INTO users (identity_hash, slug, country_code, phone_number, push_name)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users (identity_hash, country_code, phone_number, push_name)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (identity_hash) DO UPDATE SET
        country_code = COALESCE(users.country_code, EXCLUDED.country_code),
        phone_number = COALESCE(users.phone_number, EXCLUDED.phone_number),
-       push_name    = COALESCE(users.push_name,    EXCLUDED.push_name)
+       push_name    = COALESCE(users.push_name,    EXCLUDED.push_name),
+       pseudo_name  = COALESCE(users.pseudo_name,  EXCLUDED.pseudo_name),
+       slug         = COALESCE(users.slug,         EXCLUDED.slug)
      RETURNING id, identity_hash AS "identityHash", display_name AS "displayName",
-               slug, country_code AS "countryCode", created_at AS "createdAt",
-               phone_number AS "phoneNumber", push_name AS "pushName",
-               active, public`,
-    [identityHash, slug, countryCode, phoneNumber, pushName],
+               pseudo_name AS "pseudoName", slug, country_code AS "countryCode",
+               created_at AS "createdAt", phone_number AS "phoneNumber",
+               push_name AS "pushName", active, public`,
+    [identityHash, countryCode, phoneNumber, pushName],
   )
   return rows[0]
 }
@@ -278,9 +279,9 @@ export async function upsertUser(
 export async function findUserById(pool: pg.Pool, id: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
     `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
-            slug, country_code AS "countryCode", created_at AS "createdAt",
-            phone_number AS "phoneNumber", push_name AS "pushName",
-            active, public
+            pseudo_name AS "pseudoName", slug, country_code AS "countryCode",
+            created_at AS "createdAt", phone_number AS "phoneNumber",
+            push_name AS "pushName", active, public
      FROM users WHERE id = $1`,
     [id],
   )
@@ -290,9 +291,9 @@ export async function findUserById(pool: pg.Pool, id: string): Promise<User | nu
 export async function findUserBySlug(pool: pg.Pool, slug: string): Promise<User | null> {
   const { rows } = await pool.query<User>(
     `SELECT id, identity_hash AS "identityHash", display_name AS "displayName",
-            slug, country_code AS "countryCode", created_at AS "createdAt",
-            phone_number AS "phoneNumber", push_name AS "pushName",
-            active, public
+            pseudo_name AS "pseudoName", slug, country_code AS "countryCode",
+            created_at AS "createdAt", phone_number AS "phoneNumber",
+            push_name AS "pushName", active, public
      FROM users WHERE slug = $1`,
     [slug],
   )
@@ -349,7 +350,7 @@ export async function getGlobalFeed(
        bl.id,
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
-       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
+       json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
        json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
@@ -378,7 +379,7 @@ export async function getGroupFeed(
        bl.id,
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
-       json_build_object('id', u.id, 'displayName', u.display_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
+       json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
        json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
@@ -399,6 +400,7 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
     beerCount: string
     id: string
     displayName: string | null
+    pseudoName: string | null
     slug: string
     countryCode: string | null
   }>(
@@ -407,11 +409,12 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
        COUNT(*)::text AS "beerCount",
        u.id,
        u.display_name AS "displayName",
+       u.pseudo_name AS "pseudoName",
        u.slug,
        u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
-     GROUP BY u.id, u.display_name, u.slug, u.country_code
+     GROUP BY u.id, u.display_name, u.pseudo_name, u.slug, u.country_code
      ORDER BY COUNT(*) DESC
      LIMIT $1`,
     [limit],
@@ -419,7 +422,13 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
   return rows.map((r) => ({
     rank: parseInt(r.rank, 10),
     beerCount: parseInt(r.beerCount, 10),
-    user: { id: r.id, displayName: r.displayName, slug: r.slug, countryCode: r.countryCode },
+    user: {
+      id: r.id,
+      displayName: r.displayName,
+      pseudoName: r.pseudoName,
+      slug: r.slug,
+      countryCode: r.countryCode,
+    },
   }))
 }
 
@@ -433,6 +442,7 @@ export async function getGroupLeaderboard(
     beerCount: string
     id: string
     displayName: string | null
+    pseudoName: string | null
     slug: string
     countryCode: string | null
   }>(
@@ -441,12 +451,13 @@ export async function getGroupLeaderboard(
        COUNT(*)::text AS "beerCount",
        u.id,
        u.display_name AS "displayName",
+       u.pseudo_name AS "pseudoName",
        u.slug,
        u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      WHERE bl.group_id = $1
-     GROUP BY u.id, u.display_name, u.slug, u.country_code
+     GROUP BY u.id, u.display_name, u.pseudo_name, u.slug, u.country_code
      ORDER BY COUNT(*) DESC
      LIMIT $2`,
     [groupId, limit],
@@ -454,7 +465,13 @@ export async function getGroupLeaderboard(
   return rows.map((r) => ({
     rank: parseInt(r.rank, 10),
     beerCount: parseInt(r.beerCount, 10),
-    user: { id: r.id, displayName: r.displayName, slug: r.slug, countryCode: r.countryCode },
+    user: {
+      id: r.id,
+      displayName: r.displayName,
+      pseudoName: r.pseudoName,
+      slug: r.slug,
+      countryCode: r.countryCode,
+    },
   }))
 }
 

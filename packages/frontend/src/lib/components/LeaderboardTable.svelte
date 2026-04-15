@@ -75,7 +75,7 @@
               text-overflow: ellipsis;
             "
           >
-            {entry.user.displayName ?? 'Anonymous'}
+            {entry.user.displayName ?? entry.user.pseudoName ?? 'Anonymous'}
           </a>
           <span
             style="

@@ -58,7 +58,7 @@
       {/if}
       <img
         src={item.photoUrl}
-        alt="Beer by {item.user.displayName ?? 'Anonymous'}"
+        alt="Beer by {item.user.displayName ?? item.user.pseudoName ?? 'Anonymous'}"
         class="lightbox-img"
         class:loaded={imgLoaded}
         onload={() => {
@@ -66,7 +66,9 @@
         }}
       />
       <div class="lightbox-meta">
-        <span class="lmeta-name">{item.user.displayName ?? 'Anonymous'}</span>
+        <span class="lmeta-name"
+          >{item.user.displayName ?? item.user.pseudoName ?? 'Anonymous'}</span
+        >
         <span class="lmeta-group">{item.group.name}</span>
         <span class="lmeta-time">{timeAgo(item.loggedAt)}</span>
       </div>

@@ -1,0 +1,16 @@
+Stout
+Lager
+Ale
+Porter
+Ipa
+Weizen
+Pilsner
+Saison
+Bock
+Gose
+Bitter
+Dunkel
+Kolsch
+Wit
+Tripel
+Dubbel
