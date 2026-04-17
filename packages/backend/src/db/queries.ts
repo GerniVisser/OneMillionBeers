@@ -1,4 +1,5 @@
 import type pg from 'pg'
+import { normalisePhoneForSearch } from '../lib/phone.js'
 import type {
   Group,
   GroupListItem,
@@ -298,6 +299,40 @@ export async function findUserBySlug(pool: pg.Pool, slug: string): Promise<User 
     [slug],
   )
   return rows[0] ?? null
+}
+
+export async function searchUsers(
+  pool: pg.Pool,
+  q: string,
+  limit: number,
+): Promise<import('@omb/shared').UserSummary[]> {
+  // Try to parse as a phone number first. If libphonenumber accepts it as a
+  // valid E.164 number, do an exact match against phone_number in the DB.
+  const normalisedPhone = normalisePhoneForSearch(q)
+
+  if (normalisedPhone !== null) {
+    const { rows } = await pool.query<import('@omb/shared').UserSummary>(
+      `SELECT id, display_name AS "displayName", pseudo_name AS "pseudoName",
+              slug, country_code AS "countryCode"
+       FROM users
+       WHERE phone_number = $1
+       LIMIT $2`,
+      [normalisedPhone, limit],
+    )
+    return rows
+  }
+
+  const { rows } = await pool.query<import('@omb/shared').UserSummary>(
+    `SELECT id, display_name AS "displayName", pseudo_name AS "pseudoName",
+            slug, country_code AS "countryCode"
+     FROM users
+     WHERE pseudo_name IS NOT NULL
+       AND word_similarity($1, pseudo_name) > 0.4
+     ORDER BY word_similarity($1, pseudo_name) DESC
+     LIMIT $2`,
+    [q, limit],
+  )
+  return rows
 }
 
 // ─── Beer Logs ────────────────────────────────────────────────────────────────

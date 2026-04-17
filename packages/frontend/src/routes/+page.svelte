@@ -19,7 +19,6 @@
   import BeerFlash from '$lib/components/BeerFlash.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
-  import GroupSearch from '$lib/components/GroupSearch.svelte'
   import ContributionGraph from '$lib/components/ContributionGraph.svelte'
   import ActivityBarChart from '$lib/components/ActivityBarChart.svelte'
   import HourlyChart from '$lib/components/HourlyChart.svelte'
@@ -42,7 +41,6 @@
   let monthly = $state(untrack(() => data.monthly))
   let countries = $state(untrack(() => data.countries))
   let loadingMore = $state(false)
-  // Tracks beers logged since page load via SSE (proxy for "today" until API provides it)
   let sessionCount = $state(0)
 
   // New effect triggers
@@ -61,7 +59,6 @@
 
   // Tab state
   let activeTab = $state<'feed' | 'stats' | 'map'>('feed')
-  let searchOpen = $state(false)
 
   const hasMore = $derived(feedOffset < feedTotal)
 
@@ -262,27 +259,6 @@
   }}
 />
 
-{#if searchOpen}
-  <div class="search-overlay" role="dialog" aria-label="Search groups">
-    <GroupSearch autofocus />
-    <button class="search-close-btn" aria-label="Close search" onclick={() => (searchOpen = false)}>
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M18 6L6 18M6 6l12 12" />
-      </svg>
-    </button>
-  </div>
-{/if}
-
 <!-- Floating pill: notifies user of new beers arriving while they browse (feed tab only) -->
 {#if pendingItems.length > 0 && activeTab === 'feed'}
   <button class="new-beers-pill" onclick={flushPending}>
@@ -294,12 +270,7 @@
 <div class="page">
   <!-- Hero section — full progress card at top of page -->
   <div class="hero-wrap">
-    <HeroCard
-      count={liveCount}
-      {sessionCount}
-      {flashCount}
-      onsearchclick={() => (searchOpen = true)}
-    />
+    <HeroCard count={liveCount} {sessionCount} {flashCount} />
   </div>
 
   <!-- Tab bar -->
@@ -390,9 +361,6 @@
         <div class="content-grid">
           <!-- Feed -->
           <section class="feed-section">
-            <div class="section-header">
-              <h2 class="section-title">Latest Beers</h2>
-            </div>
             <FeedGrid
               items={feedItems}
               loading={loadingMore && feedItems.length === 0}
@@ -524,52 +492,6 @@
 </div>
 
 <style>
-  /* ── Search overlay ─────────────────────────────── */
-  .search-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background-color: rgba(18, 12, 5, 0.97);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--color-border);
-    animation: slide-down 180ms ease both;
-  }
-
-  @keyframes slide-down {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .search-close-btn {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: none;
-    border: none;
-    color: var(--color-cream-faint);
-    cursor: pointer;
-    padding: 0.25rem;
-    transition: color 120ms ease;
-  }
-
-  .search-close-btn:hover {
-    color: var(--color-beer-amber);
-  }
-
   .page {
     max-width: 1200px;
     margin: 0 auto;
@@ -660,32 +582,18 @@
 
   /* ── Feed panel ─────────────────────────────────── */
   .content-grid {
-    padding: 1.25rem 0 4rem;
+    padding: 0rem 0 4rem;
   }
 
   .feed-section {
     width: 100%;
   }
 
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.875rem;
-  }
-
-  .section-title {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-beer-foam);
-  }
-
   /* ── Stats panel ────────────────────────────────── */
   .panel-content {
     max-width: 900px;
     margin: 0 auto;
-    padding: 1.25rem 0 4rem;
+    padding: 0rem 0 4rem;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -693,7 +601,7 @@
 
   /* ── Map panel ──────────────────────────────────── */
   .map-layout {
-    padding: 0.5rem 0 4rem;
+    padding: 0rem 0 4rem;
     /* Pull the map flush with the page edges on mobile */
     margin-left: -1rem;
     margin-right: -1rem;
@@ -785,7 +693,7 @@
     .map-layout {
       flex-direction: row;
       align-items: flex-start;
-      padding: 1.25rem 0 4rem;
+      padding: 0rem 0 4rem;
       margin-left: 0;
       margin-right: 0;
     }
@@ -1015,7 +923,7 @@
   /* ── Desktop ────────────────────────────────────── */
   @media (min-width: 1024px) {
     .panel-content {
-      padding: 1.75rem 0 5rem;
+      padding: 0rem 0 5rem;
       gap: 1.5rem;
     }
   }

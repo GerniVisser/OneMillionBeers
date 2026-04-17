@@ -5,12 +5,10 @@
     count = 0,
     sessionCount = 0,
     flashCount = 0,
-    onsearchclick,
   }: {
     count: number
     sessionCount?: number
     flashCount?: number
-    onsearchclick?: () => void
   } = $props()
 
   const TARGET = 1_000_000
@@ -67,28 +65,6 @@
 </script>
 
 <div class="hero-card">
-  <!-- Search button -->
-  {#if onsearchclick}
-    <div class="hero-controls">
-      <button class="hero-btn" aria-label="Search groups" onclick={onsearchclick}>
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="M15.5 15.5L20 20" />
-        </svg>
-      </button>
-    </div>
-  {/if}
-
   <!-- Foam bubbles background -->
   <div aria-hidden="true" class="bubbles-wrap">
     {#each bubbles as b (b.id)}
@@ -160,36 +136,6 @@
       0 0 0 1px rgba(245, 158, 11, 0.08),
       0 8px 48px rgba(0, 0, 0, 0.6),
       inset 0 1px 0 rgba(245, 158, 11, 0.12);
-  }
-
-  .hero-controls {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    z-index: 10;
-  }
-
-  .hero-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    background: rgba(30, 20, 8, 0.8);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    color: var(--color-text-muted);
-    cursor: pointer;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transition:
-      background 150ms ease,
-      color 150ms ease;
-  }
-
-  .hero-btn:hover {
-    background: rgba(245, 158, 11, 0.15);
-    color: var(--color-beer-amber);
   }
 
   .bubbles-wrap {

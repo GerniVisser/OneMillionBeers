@@ -2,6 +2,18 @@ import { z } from 'zod'
 import { UuidSchema, IsoDatetimeSchema } from './primitives.js'
 import { UserSummarySchema } from './user.js'
 
+// GET /v1/users/search
+export const UserSearchQuerySchema = z.object({
+  q: z.string().min(4).max(100),
+  limit: z.coerce.number().int().min(1).max(5).default(3),
+})
+export type UserSearchQuery = z.infer<typeof UserSearchQuerySchema>
+
+export const UserSearchResponseSchema = z.object({
+  results: z.array(UserSummarySchema),
+})
+export type UserSearchResponse = z.infer<typeof UserSearchResponseSchema>
+
 // Offset-based pagination query params (MVP)
 export const PaginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),

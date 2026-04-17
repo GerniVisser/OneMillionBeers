@@ -1,13 +1,21 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import type { PageData } from './$types'
   import StatCard from '$lib/components/StatCard.svelte'
-  import GroupSearch from '$lib/components/GroupSearch.svelte'
   import { getInitials, formatHour } from '$lib/utils'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import { getUserStats } from '$lib/api'
+  import { addRecentUser } from '$lib/recents'
 
   let { data }: { data: PageData } = $props()
+
+  onMount(() =>
+    addRecentUser({
+      slug: data.profile.slug,
+      pseudoName: data.profile.pseudoName ?? null,
+      countryCode: data.profile.countryCode ?? null,
+    }),
+  )
 
   let stats = $state(untrack(() => data.stats))
 
@@ -59,37 +67,6 @@
   />
 </svelte:head>
 
-<!-- Page header -->
-<header class="page-header">
-  <a
-    href="/"
-    class="page-header-btn back-btn"
-    aria-label="Go back"
-    onclick={(e) => {
-      e.preventDefault()
-      history.back()
-    }}
-  >
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M15 18l-6-6 6-6" />
-    </svg>
-    Back
-  </a>
-  <div class="header-search">
-    <GroupSearch />
-  </div>
-</header>
-
 <!-- Profile header -->
 <section class="profile-hero">
   <div class="profile-hero-inner">
@@ -123,48 +100,6 @@
 </section>
 
 <style>
-  .page-header {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.75rem 1.25rem;
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--color-border);
-    min-height: 3.25rem;
-  }
-
-  .page-header-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    color: var(--color-cream-faint);
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.25rem;
-    text-decoration: none;
-    font-size: 0.85rem;
-    transition: color 120ms ease;
-  }
-
-  .page-header-btn:hover {
-    color: var(--color-beer-amber);
-  }
-
-  .back-btn {
-    flex-shrink: 0;
-  }
-
-  .header-search {
-    flex: 1;
-    max-width: 320px;
-  }
-
   .profile-hero {
     background: linear-gradient(180deg, #fef3c7 0%, #fafaf9 100%);
     border-bottom: 1px solid #fde68a;

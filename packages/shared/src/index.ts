@@ -83,6 +83,8 @@ export {
   LeaderboardResponseSchema,
   GlobalCountResponseSchema,
   UserStatsResponseSchema,
+  UserSearchQuerySchema,
+  UserSearchResponseSchema,
   SseEventSchema,
   type PaginationQuery,
   type GroupSearchQuery,
@@ -90,5 +92,7 @@ export {
   type LeaderboardResponse,
   type GlobalCountResponse,
   type UserStatsResponse,
+  type UserSearchQuery,
+  type UserSearchResponse,
   type SseEvent,
 } from './api.js'

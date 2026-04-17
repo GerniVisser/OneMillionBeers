@@ -11,6 +11,7 @@ import type {
   GroupListItem,
   UserProfileResponse,
   UserStatsResponse,
+  UserSearchResponse,
   GroupStatsResponse,
   GroupActivityResponse,
   GroupHourlyResponse,
@@ -164,6 +165,14 @@ export function getGroupMonthly(
   slug: string,
 ): Promise<GroupMonthlyResponse> {
   return get<GroupMonthlyResponse>(fetch, `/groups/${slug}/monthly`)
+}
+
+export function searchUsers(
+  fetch: typeof globalThis.fetch,
+  q: string,
+  limit = 3,
+): Promise<UserSearchResponse> {
+  return get<UserSearchResponse>(fetch, '/users/search', { q, limit })
 }
 
 export function getUserProfile(

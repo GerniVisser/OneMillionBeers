@@ -19,6 +19,7 @@
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "imagesloaded": "^5.0.0",
+    "libphonenumber-js": "^1.12.41",
     "masonry-layout": "^4.2.2",
     "svelte": "^5.0.0",
     "tailwindcss": "^4.0.0",
