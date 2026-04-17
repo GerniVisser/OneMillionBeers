@@ -7,6 +7,11 @@ import {
   UserProfileResponseSchema,
   UserStatsResponseSchema,
   UserSearchResponseSchema,
+  UserActivityResponseSchema,
+  UserHourlyResponseSchema,
+  UserMonthlyResponseSchema,
+  FeedItemSchema,
+  PaginatedResponseSchema,
 } from '@omb/shared'
 
 let pool: pg.Pool
@@ -197,5 +202,92 @@ describe('GET /v1/users/:userId/stats', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data?.totalBeers).toBe(3)
     expect(parsed.data?.userId).toBe(id)
+  })
+})
+
+describe('GET /v1/users/:userId/feed', () => {
+  it('returns 404 for unknown user', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/users/no-such-user/feed' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns paginated feed matching FeedItem schema', async () => {
+    await seedBeerLog('feed-user-1', '2024-06-01T12:00:00.000Z')
+    await seedBeerLog('feed-user-1', '2024-06-02T12:00:00.000Z')
+    const { slug } = await getUserSlugAndId()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/feed?limit=20&offset=0` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = PaginatedResponseSchema(FeedItemSchema).safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.total).toBe(2)
+    expect(parsed.data?.items).toHaveLength(2)
+  })
+
+  it('only returns feed items for the requested user', async () => {
+    await seedBeerLog('user-a', '2024-06-01T12:00:00.000Z')
+    await seedBeerLog('user-b', '2024-06-02T12:00:00.000Z')
+    const { slug } = await getUserSlugAndId()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/feed` })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().total).toBe(1)
+  })
+})
+
+describe('GET /v1/users/:userId/activity', () => {
+  it('returns 404 for unknown user', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/users/no-such-user/activity' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns activity matching UserActivityResponseSchema', async () => {
+    await seedBeerLog('act-user', '2024-06-01T12:00:00.000Z')
+    const { slug } = await getUserSlugAndId()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/activity` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = UserActivityResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+  })
+})
+
+describe('GET /v1/users/:userId/hourly', () => {
+  it('returns 404 for unknown user', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/users/no-such-user/hourly' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 24 hour buckets matching UserHourlyResponseSchema', async () => {
+    await seedBeerLog('hourly-user', '2024-06-01T14:00:00.000Z')
+    const { slug } = await getUserSlugAndId()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/hourly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = UserHourlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.hours).toHaveLength(24)
+  })
+})
+
+describe('GET /v1/users/:userId/monthly', () => {
+  it('returns 404 for unknown user', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/users/no-such-user/monthly' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns monthly buckets matching UserMonthlyResponseSchema', async () => {
+    await seedBeerLog('monthly-user', '2024-06-01T12:00:00.000Z')
+    const { slug } = await getUserSlugAndId()
+
+    const res = await app.inject({ method: 'GET', url: `/v1/users/${slug}/monthly` })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = UserMonthlyResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.months.length).toBeGreaterThanOrEqual(1)
   })
 })

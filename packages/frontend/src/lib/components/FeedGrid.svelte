@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from 'svelte'
-  import { browser } from '$app/environment'
   import type { FeedItem } from '@omb/shared'
   import BeerCard from './BeerCard.svelte'
 
@@ -15,51 +13,10 @@
     newestId?: string
     onlongpress?: (item: FeedItem) => void
   } = $props()
-
-  let gridEl = $state<HTMLElement | undefined>()
-  let masonry: import('masonry-layout') | undefined
-
-  onMount(() => {
-    if (!browser) return
-
-    // Tick ensures Svelte has committed the current items to the DOM.
-    // Because BeerCard uses a fixed aspect-ratio, every item already has a
-    // real, measurable height — Masonry can position the grid correctly on
-    // the very first call without waiting for any images to load.
-    tick().then(async () => {
-      if (!gridEl) return
-      const Masonry = (await import('masonry-layout')).default
-      masonry = new Masonry(gridEl, {
-        itemSelector: '.item',
-        columnWidth: '.sizer',
-        percentPosition: true,
-        gutter: 10,
-        transitionDuration: '0.15s',
-      })
-    })
-
-    return () => masonry?.destroy?.()
-  })
-
-  // Re-layout whenever the items array changes (load-more appends or
-  // navigation replaces the list). With fixed-ratio cards all items have
-  // stable heights so a single reloadItems + layout is sufficient —
-  // no per-image relayout is needed.
-  $effect(() => {
-    void items // reactive dependency
-    untrack(async () => {
-      if (!masonry) return
-      await tick() // wait for Svelte to add/remove DOM nodes
-      masonry.reloadItems?.()
-      masonry.layout?.()
-    })
-  })
 </script>
 
 {#if loading}
-  <!-- Skeleton grid uses plain CSS grid — no Masonry needed since all
-       cards are the same fixed ratio. -->
-  <div class="skeleton-grid" aria-busy="true" aria-label="Loading feed">
+  <div class="grid" aria-busy="true" aria-label="Loading feed">
     {#each { length: 9 } as _, i}
       <div class="skeleton-card" style="animation-delay: {(i % 3) * 120}ms"></div>
     {/each}
@@ -67,66 +24,36 @@
 {:else if items.length === 0}
   <p class="empty">No beers logged yet. Be the first!</p>
 {:else}
-  <div class="grid" bind:this={gridEl}>
-    <!-- Zero-width sizer element tells Masonry the column width -->
-    <div class="sizer" aria-hidden="true"></div>
+  <div class="grid">
     {#each items as item (item.id)}
-      <div class="item">
-        <BeerCard {item} isNew={item.id === newestId} {onlongpress} />
-      </div>
+      <BeerCard {item} isNew={item.id === newestId} {onlongpress} />
     {/each}
   </div>
 {/if}
 
 <style>
-  /* ── Masonry grid ───────────────────────────────────────────────────── */
+  /* ── Feed grid ──────────────────────────────────────────────────────── */
 
   .grid {
-    /* Masonry absolutely positions children; this anchors them */
-    position: relative;
-    width: 100%;
-  }
-
-  /* 2 columns on mobile, 3 on tablet, 4 on large screens */
-  .sizer,
-  :global(.item) {
-    width: calc(50% - 5px);
-    margin-bottom: 10px;
-  }
-
-  @media (min-width: 600px) {
-    .sizer,
-    :global(.item) {
-      width: calc(33.333% - 7px);
-    }
-  }
-
-  @media (min-width: 900px) {
-    .sizer,
-    :global(.item) {
-      width: calc(25% - 7.5px);
-    }
-  }
-
-  /* ── Skeleton loading state ─────────────────────────────────────────── */
-
-  .skeleton-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
+    width: 100%;
   }
 
   @media (min-width: 600px) {
-    .skeleton-grid {
+    .grid {
       grid-template-columns: repeat(3, 1fr);
     }
   }
 
   @media (min-width: 900px) {
-    .skeleton-grid {
+    .grid {
       grid-template-columns: repeat(4, 1fr);
     }
   }
+
+  /* ── Skeleton loading state ─────────────────────────────────────────── */
 
   .skeleton-card {
     /* Match BeerCard's fixed aspect-ratio so the skeleton has the same size */

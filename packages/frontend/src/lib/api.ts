@@ -11,6 +11,9 @@ import type {
   GroupListItem,
   UserProfileResponse,
   UserStatsResponse,
+  UserActivityResponse,
+  UserHourlyResponse,
+  UserMonthlyResponse,
   UserSearchResponse,
   GroupStatsResponse,
   GroupActivityResponse,
@@ -187,4 +190,36 @@ export function getUserStats(
   slug: string,
 ): Promise<UserStatsResponse> {
   return get<UserStatsResponse>(fetch, `/users/${slug}/stats`)
+}
+
+export function getUserFeed(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+  pagination?: Pagination,
+): Promise<PaginatedResponse<FeedItem>> {
+  return get<PaginatedResponse<FeedItem>>(fetch, `/users/${slug}/feed`, {
+    limit: pagination?.limit ?? 20,
+    offset: pagination?.offset ?? 0,
+  })
+}
+
+export function getUserActivity(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<UserActivityResponse> {
+  return get<UserActivityResponse>(fetch, `/users/${slug}/activity`)
+}
+
+export function getUserHourly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<UserHourlyResponse> {
+  return get<UserHourlyResponse>(fetch, `/users/${slug}/hourly`)
+}
+
+export function getUserMonthly(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<UserMonthlyResponse> {
+  return get<UserMonthlyResponse>(fetch, `/users/${slug}/monthly`)
 }

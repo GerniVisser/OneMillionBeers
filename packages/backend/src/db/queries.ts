@@ -510,6 +510,69 @@ export async function getGroupLeaderboard(
   }))
 }
 
+export async function getUserFeed(
+  pool: pg.Pool,
+  userId: string,
+  limit: number,
+  offset: number,
+): Promise<{ items: FeedItem[]; total: number }> {
+  const { rows: countRows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM beer_logs WHERE user_id = $1`,
+    [userId],
+  )
+  const total = parseInt(countRows[0].count, 10)
+
+  const { rows } = await pool.query<FeedItem>(
+    `SELECT
+       bl.id,
+       bl.photo_url AS "photoUrl",
+       bl.logged_at AS "loggedAt",
+       json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
+       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
+     FROM beer_logs bl
+     JOIN users u ON bl.user_id = u.id
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1
+     ORDER BY bl.logged_at DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset],
+  )
+  return { items: rows, total }
+}
+
+export async function getUserActivity(pool: pg.Pool, userId: string): Promise<ActivityDay[]> {
+  const { rows } = await pool.query<{ date: string; count: number }>(
+    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs
+     WHERE user_id = $1 AND logged_at >= NOW() - INTERVAL '182 days'
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [userId],
+  )
+  return rows
+}
+
+export async function getUserHourly(pool: pg.Pool, userId: string): Promise<HourBucket[]> {
+  const { rows } = await pool.query<{ hour: number; count: number }>(
+    `SELECT EXTRACT(HOUR FROM logged_at)::int AS hour, COUNT(*)::int AS count
+     FROM beer_logs WHERE user_id = $1
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [userId],
+  )
+  const map = new Map(rows.map((r) => [r.hour, r.count]))
+  return Array.from({ length: 24 }, (_, h) => ({ hour: h, count: map.get(h) ?? 0 }))
+}
+
+export async function getUserMonthly(pool: pg.Pool, userId: string): Promise<MonthBucket[]> {
+  const { rows } = await pool.query<{ month: string; count: number }>(
+    `SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') AS month,
+            COUNT(*)::int AS count
+     FROM beer_logs WHERE user_id = $1
+     GROUP BY 1 ORDER BY 1 ASC`,
+    [userId],
+  )
+  return rows
+}
+
 // ─── Global count ─────────────────────────────────────────────────────────────
 
 export async function getGlobalCount(pool: pg.Pool): Promise<number> {

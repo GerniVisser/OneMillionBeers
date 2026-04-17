@@ -55,6 +55,21 @@ export const GlobalCountResponseSchema = z.object({
 })
 export type GlobalCountResponse = z.infer<typeof GlobalCountResponseSchema>
 
+// GET /v1/users/:userId/feed — re-uses the same FeedItem / paginated shape as group feed
+// (no new schema needed; callers use PaginatedResponseSchema(FeedItemSchema))
+
+// GET /v1/users/:userId/activity
+import { ActivityDaySchema, HourBucketSchema, MonthBucketSchema } from './group-stats.js'
+
+export const UserActivityResponseSchema = z.object({ days: z.array(ActivityDaySchema) })
+export type UserActivityResponse = z.infer<typeof UserActivityResponseSchema>
+
+export const UserHourlyResponseSchema = z.object({ hours: z.array(HourBucketSchema) })
+export type UserHourlyResponse = z.infer<typeof UserHourlyResponseSchema>
+
+export const UserMonthlyResponseSchema = z.object({ months: z.array(MonthBucketSchema) })
+export type UserMonthlyResponse = z.infer<typeof UserMonthlyResponseSchema>
+
 // GET /v1/users/:userId/stats
 export const UserStatsResponseSchema = z.object({
   userId: UuidSchema,
