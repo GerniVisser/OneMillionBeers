@@ -2,7 +2,13 @@
   import { onMount, untrack } from 'svelte'
   import { browser } from '$app/environment'
   import type { PageData } from './$types'
-  import type { FeedItem } from '@omb/shared'
+  import type {
+    FeedItem,
+    GlobalActivityResponse,
+    GlobalHourlyResponse,
+    GlobalMonthlyResponse,
+    GlobalCountriesResponse,
+  } from '@omb/shared'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import {
     getGlobalCount,
@@ -36,10 +42,11 @@
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
-  let activity = $state(untrack(() => data.activity))
-  let hourly = $state(untrack(() => data.hourly))
-  let monthly = $state(untrack(() => data.monthly))
-  let countries = $state(untrack(() => data.countries))
+  // Deferred chart data — populated after initial render (see onMount)
+  let activity = $state<GlobalActivityResponse>({ days: [] })
+  let hourly = $state<GlobalHourlyResponse>({ hours: [] })
+  let monthly = $state<GlobalMonthlyResponse>({ months: [] })
+  let countries = $state<GlobalCountriesResponse>([])
   let loadingMore = $state(false)
   let sessionCount = $state(0)
 
@@ -210,6 +217,16 @@
   }
 
   onMount(() => {
+    // Resolve deferred chart data (non-blocking; page renders without it)
+    void Promise.all([data.activity, data.hourly, data.monthly, data.countries]).then(
+      ([a, h, m, c]) => {
+        activity = a
+        hourly = h
+        monthly = m
+        countries = c
+      },
+    )
+
     // Establish initial scroll state immediately
     handleScroll()
     window.addEventListener('scroll', handleScroll, { passive: true })

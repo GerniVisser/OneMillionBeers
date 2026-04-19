@@ -10,22 +10,19 @@ import {
 } from '$lib/api'
 
 export const load: PageLoad = async ({ fetch }) => {
-  const [countData, feedData, stats, activity, hourly, monthly, countries] = await Promise.all([
+  const [countData, feedData, stats] = await Promise.all([
     getGlobalCount(fetch),
     getGlobalFeed(fetch, { limit: 20, offset: 0 }),
     getGlobalStats(fetch),
-    getGlobalActivity(fetch),
-    getGlobalHourly(fetch),
-    getGlobalMonthly(fetch),
-    getGlobalCountries(fetch),
   ])
   return {
     count: countData.count,
     feed: feedData,
     stats,
-    activity,
-    hourly,
-    monthly,
-    countries,
+    // Deferred: resolved in the page component after initial render
+    activity: getGlobalActivity(fetch),
+    hourly: getGlobalHourly(fetch),
+    monthly: getGlobalMonthly(fetch),
+    countries: getGlobalCountries(fetch),
   }
 }

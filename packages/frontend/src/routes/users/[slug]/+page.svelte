@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
   import type { PageData } from './$types'
-  import type { FeedItem } from '@omb/shared'
+  import type {
+    FeedItem,
+    UserActivityResponse,
+    UserHourlyResponse,
+    UserMonthlyResponse,
+  } from '@omb/shared'
   import { getInitials, formatHour, getThisWeekBreakdown, getThisWeekTotal } from '$lib/utils'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import { getUserStats, getUserFeed } from '$lib/api'
@@ -19,6 +24,13 @@
       slug: data.profile.slug,
       pseudoName: data.profile.pseudoName ?? null,
       countryCode: data.profile.countryCode ?? null,
+    })
+
+    // Resolve deferred chart data (non-blocking; page renders without it)
+    void Promise.all([data.activity, data.hourly, data.monthly]).then(([a, h, m]) => {
+      activity = a
+      hourly = h
+      monthly = m
     })
 
     // Animate the hero count in
@@ -40,6 +52,10 @@
   })
 
   let stats = $state(untrack(() => data.stats))
+  // Deferred chart data — populated after initial render (see onMount)
+  let activity = $state<UserActivityResponse>({ days: [] })
+  let hourly = $state<UserHourlyResponse>({ hours: [] })
+  let monthly = $state<UserMonthlyResponse>({ months: [] })
   let displayedCount = $state(0)
 
   let refetchTimer: ReturnType<typeof setTimeout> | null = null
@@ -202,13 +218,13 @@
   }
 
   // ── Weekday breakdown (derived from activity) ─────────────────
-  const weekdayEntries = $derived(getThisWeekBreakdown(data.activity.days))
+  const weekdayEntries = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayEntries.length > 0
       ? weekdayEntries.reduce((a, b) => (b.count > a.count ? b : a))
       : undefined,
   )
-  const beersThisWeek = $derived(getThisWeekTotal(data.activity.days))
+  const beersThisWeek = $derived(getThisWeekTotal(activity.days))
 
   // ── Tabs ──────────────────────────────────────────────────────
   let activeTab = $state<'feed' | 'stats'>('feed')
@@ -388,10 +404,10 @@
   {#if activeTab === 'stats'}
     <div class="tab-panel">
       <!-- Monthly trend -->
-      {#if data.monthly.months.length > 1}
+      {#if monthly.months.length > 1}
         <div class="chart-card card">
           <span class="stat-label chart-label">Your Journey</span>
-          <MonthlyChart months={data.monthly.months} />
+          <MonthlyChart months={monthly.months} />
         </div>
       {/if}
 
@@ -399,7 +415,7 @@
       <div class="charts-row">
         <div class="chart-card card">
           <span class="stat-label chart-label">Peak Hours</span>
-          <HourlyChart hours={data.hourly.hours} />
+          <HourlyChart hours={hourly.hours} />
         </div>
         <div class="chart-card card">
           <span class="stat-label chart-label">This Week by Day</span>
