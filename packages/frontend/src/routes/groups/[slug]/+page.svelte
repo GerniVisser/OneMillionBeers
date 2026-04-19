@@ -2,7 +2,12 @@
   import { browser } from '$app/environment'
   import { onMount, untrack } from 'svelte'
   import type { PageData } from './$types'
-  import type { FeedItem } from '@omb/shared'
+  import type {
+    FeedItem,
+    GroupActivityResponse,
+    GroupHourlyResponse,
+    GroupMonthlyResponse,
+  } from '@omb/shared'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
   import LeaderboardTable from '$lib/components/LeaderboardTable.svelte'
   import ProgressBar from '$lib/components/ProgressBar.svelte'
@@ -15,7 +20,7 @@
   import {
     formatDate,
     getInitials,
-    getWeekdayBreakdown,
+    getThisWeekBreakdown,
     getPeakHour,
     transformSseToFeedItem,
   } from '$lib/utils'
@@ -46,22 +51,28 @@
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
   let leaderboard = $state(untrack(() => data.leaderboard))
-  let activity = $state(untrack(() => data.activity))
-  let hourly = $state(untrack(() => data.hourly))
-  let monthly = $state(untrack(() => data.monthly))
+  // Deferred chart data — populated after initial render
+  let activity = $state<GroupActivityResponse>({ days: [] })
+  let hourly = $state<GroupHourlyResponse>({ hours: [] })
+  let monthly = $state<GroupMonthlyResponse>({ months: [] })
 
   $effect(() => {
     // Track the slug so this runs on group-to-group navigation
     const _ = data.profile.slug
-    untrack(() => {
+    untrack(async () => {
       feedItems = data.feed.items
       feedOffset = data.feed.items.length
       feedTotal = data.feed.total
       stats = data.stats
       leaderboard = data.leaderboard
-      activity = data.activity
-      hourly = data.hourly
-      monthly = data.monthly
+      // Reset to empty while deferred data loads for the new group
+      activity = { days: [] }
+      hourly = { hours: [] }
+      monthly = { months: [] }
+      const [a, h, m] = await Promise.all([data.activity, data.hourly, data.monthly])
+      activity = a
+      hourly = h
+      monthly = m
     })
   })
   let loadingMore = $state(false)
@@ -167,7 +178,7 @@
   })
 
   const peakHour = $derived(getPeakHour(hourly.hours))
-  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
+  const weekdayData = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
@@ -407,7 +418,7 @@
           </div>
 
           <div class="chart-card">
-            <h3 class="chart-title">Busiest Days of the Week</h3>
+            <h3 class="chart-title">This Week by Day</h3>
             {#if weekdayData.some((d) => d.count > 0)}
               <WeekdayBars days={weekdayData} peakDay={peakWeekday} />
             {:else}

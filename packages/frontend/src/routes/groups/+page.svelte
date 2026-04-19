@@ -101,7 +101,7 @@
     display: flex;
     gap: 0.75rem;
     overflow-x: auto;
-    padding-bottom: 0.25rem;
+    padding: 4px 4px 0.5rem;
     scrollbar-width: none;
   }
 

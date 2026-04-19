@@ -2,7 +2,13 @@
   import { onMount, untrack } from 'svelte'
   import { browser } from '$app/environment'
   import type { PageData } from './$types'
-  import type { FeedItem } from '@omb/shared'
+  import type {
+    FeedItem,
+    GlobalActivityResponse,
+    GlobalHourlyResponse,
+    GlobalMonthlyResponse,
+    GlobalCountriesResponse,
+  } from '@omb/shared'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import {
     getGlobalCount,
@@ -26,7 +32,7 @@
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import WorldMap from '$lib/components/WorldMap.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
-  import { getWeekdayBreakdown, getPeakHour } from '$lib/utils'
+  import { getThisWeekBreakdown, getThisWeekTotal, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -36,10 +42,11 @@
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
-  let activity = $state(untrack(() => data.activity))
-  let hourly = $state(untrack(() => data.hourly))
-  let monthly = $state(untrack(() => data.monthly))
-  let countries = $state(untrack(() => data.countries))
+  // Deferred chart data — populated after initial render (see onMount)
+  let activity = $state<GlobalActivityResponse>({ days: [] })
+  let hourly = $state<GlobalHourlyResponse>({ hours: [] })
+  let monthly = $state<GlobalMonthlyResponse>({ months: [] })
+  let countries = $state<GlobalCountriesResponse>([])
   let loadingMore = $state(false)
   let sessionCount = $state(0)
 
@@ -62,12 +69,15 @@
 
   const hasMore = $derived(feedOffset < feedTotal)
 
+  const beersThisWeek = $derived(getThisWeekTotal(activity.days))
+
   // Stat cards for the infinite carousel
   type StatItem = { value: string; label: string; dim?: boolean }
   const statItems = $derived(
     (() => {
       const items: StatItem[] = [
         { value: stats.totalBeers.toLocaleString(), label: 'Total Beers' },
+        { value: beersThisWeek.toLocaleString(), label: 'This Week' },
         { value: stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
         { value: stats.activeGroupCount.toLocaleString(), label: 'Groups' },
         { value: String(stats.avgPerDay), label: 'Avg / Day' },
@@ -85,7 +95,7 @@
   )
 
   // Derived stats from activity data — no extra endpoint needed
-  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
+  const weekdayData = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
@@ -207,6 +217,16 @@
   }
 
   onMount(() => {
+    // Resolve deferred chart data (non-blocking; page renders without it)
+    void Promise.all([data.activity, data.hourly, data.monthly, data.countries]).then(
+      ([a, h, m, c]) => {
+        activity = a
+        hourly = h
+        monthly = m
+        countries = c
+      },
+    )
+
     // Establish initial scroll state immediately
     handleScroll()
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -437,7 +457,7 @@
 
             <div class="chart-card">
               <h3 class="chart-title">
-                Busiest Days of the Week{peakWeekday && peakWeekday.count > 0
+                This Week by Day{peakWeekday && peakWeekday.count > 0
                   ? ` · ${peakWeekday.name}`
                   : ''}
               </h3>

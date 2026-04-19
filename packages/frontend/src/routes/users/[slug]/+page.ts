@@ -10,14 +10,18 @@ import {
 
 export const load: PageLoad = async ({ fetch, params }) => {
   try {
-    const [profile, stats, activity, hourly, monthly] = await Promise.all([
+    const [profile, stats] = await Promise.all([
       getUserProfile(fetch, params.slug),
       getUserStats(fetch, params.slug),
-      getUserActivity(fetch, params.slug),
-      getUserHourly(fetch, params.slug),
-      getUserMonthly(fetch, params.slug),
     ])
-    return { profile, stats, activity, hourly, monthly }
+    return {
+      profile,
+      stats,
+      // Deferred: resolved in the page component after initial render
+      activity: getUserActivity(fetch, params.slug),
+      hourly: getUserHourly(fetch, params.slug),
+      monthly: getUserMonthly(fetch, params.slug),
+    }
   } catch (e: unknown) {
     const err = e as { status?: number; message?: string }
     error(err.status ?? 500, err.message ?? 'Unknown error')

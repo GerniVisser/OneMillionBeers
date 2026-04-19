@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { page } from '$app/stores'
+  import { page, navigating } from '$app/stores'
   import AboutModal from '$lib/components/AboutModal.svelte'
 
   const VISITED_KEY = 'omb:visited'
@@ -43,7 +43,12 @@
 
   <nav class="sidebar-nav">
     <div class="sidebar-section">
-      <a href="/" class="sidebar-link" class:active={isActive('/')}>
+      <a
+        href="/"
+        class="sidebar-link"
+        class:active={isActive('/')}
+        class:nav-loading={$navigating && isActive('/')}
+      >
         <svg
           width="18"
           height="18"
@@ -62,7 +67,12 @@
         Global
       </a>
 
-      <a href="/groups" class="sidebar-link" class:active={isActive('/groups')}>
+      <a
+        href="/groups"
+        class="sidebar-link"
+        class:active={isActive('/groups')}
+        class:nav-loading={$navigating && isActive('/groups')}
+      >
         <svg
           width="18"
           height="18"
@@ -81,7 +91,12 @@
         Groups
       </a>
 
-      <a href="/users" class="sidebar-link" class:active={isActive('/users')}>
+      <a
+        href="/users"
+        class="sidebar-link"
+        class:active={isActive('/users')}
+        class:nav-loading={$navigating && isActive('/users')}
+      >
         <svg
           width="18"
           height="18"
@@ -120,7 +135,7 @@
       </button>
 
       <a
-        href="https://github.com/GerniVisser/OMB/issues/new"
+        href="https://docs.google.com/forms/d/e/1FAIpQLScZHV8PuPnhIclwHLZT9ltZ8oGGcPLY975bCMjRwnRePgmXEQ/viewform?usp=publish-editor"
         target="_blank"
         rel="noopener"
         class="sidebar-link sidebar-link--muted"
@@ -146,7 +161,12 @@
 
 <!-- Mobile bottom bar -->
 <nav class="bottom-nav">
-  <a href="/" class="nav-item" class:active={isActive('/')}>
+  <a
+    href="/"
+    class="nav-item"
+    class:active={isActive('/')}
+    class:nav-loading={$navigating && isActive('/')}
+  >
     <svg
       width="19"
       height="19"
@@ -165,7 +185,12 @@
     <span>Global</span>
   </a>
 
-  <a href="/groups" class="nav-item" class:active={isActive('/groups')}>
+  <a
+    href="/groups"
+    class="nav-item"
+    class:active={isActive('/groups')}
+    class:nav-loading={$navigating && isActive('/groups')}
+  >
     <svg
       width="19"
       height="19"
@@ -184,7 +209,12 @@
     <span>Groups</span>
   </a>
 
-  <a href="/users" class="nav-item" class:active={isActive('/users')}>
+  <a
+    href="/users"
+    class="nav-item"
+    class:active={isActive('/users')}
+    class:nav-loading={$navigating && isActive('/users')}
+  >
     <svg
       width="19"
       height="19"
@@ -265,7 +295,7 @@
     </button>
 
     <a
-      href="https://github.com/GerniVisser/OMB/issues/new"
+      href="https://docs.google.com/forms/d/e/1FAIpQLScZHV8PuPnhIclwHLZT9ltZ8oGGcPLY975bCMjRwnRePgmXEQ/viewform?usp=publish-editor"
       target="_blank"
       rel="noopener"
       class="sheet-item"
@@ -569,5 +599,18 @@
     cursor: pointer;
     width: 100%;
     text-align: left;
+  }
+
+  .nav-loading {
+    animation: nav-pulse 0.8s ease-in-out infinite alternate;
+  }
+
+  @keyframes nav-pulse {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.45;
+    }
   }
 </style>

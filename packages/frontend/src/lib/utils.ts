@@ -44,6 +44,27 @@ export function getWeekdayBreakdown(days: ActivityDay[]): WeekdayEntry[] {
   return names.map((name, i) => ({ name, count: counts[i], pct: counts[i] / max }))
 }
 
+function getWeekStart(): Date {
+  const now = new Date()
+  const daysFromMonday = (now.getDay() + 6) % 7
+  const start = new Date(now)
+  start.setDate(now.getDate() - daysFromMonday)
+  start.setHours(0, 0, 0, 0)
+  return start
+}
+
+export function getThisWeekTotal(days: ActivityDay[]): number {
+  const weekStart = getWeekStart()
+  return days
+    .filter((d) => new Date(d.date + 'T12:00:00') >= weekStart)
+    .reduce((sum, d) => sum + d.count, 0)
+}
+
+export function getThisWeekBreakdown(days: ActivityDay[]): WeekdayEntry[] {
+  const weekStart = getWeekStart()
+  return getWeekdayBreakdown(days.filter((d) => new Date(d.date + 'T12:00:00') >= weekStart))
+}
+
 export function getPeakHour(hours: HourBucket[]): string | null {
   const max = hours.reduce((a, b) => (b.count > a.count ? b : a), { hour: -1, count: 0 })
   if (max.count === 0) return null
