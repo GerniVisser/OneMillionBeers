@@ -16,7 +16,7 @@
 
 <Nav />
 
-<main class="layout-main">
+<main class="layout-main" class:loading={$navigating}>
   {@render children()}
 </main>
 
@@ -27,8 +27,11 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 4px;
     z-index: 200;
+    box-shadow:
+      0 0 8px var(--color-beer-amber),
+      0 0 2px var(--color-beer-dark);
     background: linear-gradient(
       90deg,
       transparent 0%,
@@ -53,6 +56,12 @@
   /* Mobile: clear the fixed bottom bar */
   .layout-main {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+    transition: opacity 0.15s ease;
+  }
+
+  .layout-main.loading {
+    opacity: 0.4;
+    pointer-events: none;
   }
 
   /* Desktop: indent content past the sidebar */
