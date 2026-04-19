@@ -2,7 +2,7 @@
   import { onMount, untrack } from 'svelte'
   import type { PageData } from './$types'
   import type { FeedItem } from '@omb/shared'
-  import { getInitials, formatHour, getWeekdayBreakdown } from '$lib/utils'
+  import { getInitials, formatHour, getThisWeekBreakdown, getThisWeekTotal } from '$lib/utils'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import { getUserStats, getUserFeed } from '$lib/api'
   import { addRecentUser } from '$lib/recents'
@@ -202,12 +202,13 @@
   }
 
   // ── Weekday breakdown (derived from activity) ─────────────────
-  const weekdayEntries = $derived(getWeekdayBreakdown(data.activity.days))
+  const weekdayEntries = $derived(getThisWeekBreakdown(data.activity.days))
   const peakWeekday = $derived(
     weekdayEntries.length > 0
       ? weekdayEntries.reduce((a, b) => (b.count > a.count ? b : a))
       : undefined,
   )
+  const beersThisWeek = $derived(getThisWeekTotal(data.activity.days))
 
   // ── Tabs ──────────────────────────────────────────────────────
   let activeTab = $state<'feed' | 'stats'>('feed')
@@ -401,13 +402,17 @@
           <HourlyChart hours={data.hourly.hours} />
         </div>
         <div class="chart-card card">
-          <span class="stat-label chart-label">Best Days</span>
+          <span class="stat-label chart-label">This Week by Day</span>
           <WeekdayBars days={weekdayEntries} peakDay={peakWeekday} />
         </div>
       </div>
 
       <!-- Numbers -->
       <div class="stats-grid">
+        <div class="card stat-box">
+          <span class="stat-label">This Week</span>
+          <span class="stat-val">{beersThisWeek.toLocaleString()}</span>
+        </div>
         <div class="card stat-box">
           <span class="stat-label">This Month</span>
           <span class="stat-val">{stats.thisMonth.toLocaleString()}</span>

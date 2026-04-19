@@ -26,7 +26,7 @@
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import WorldMap from '$lib/components/WorldMap.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
-  import { getWeekdayBreakdown, getPeakHour } from '$lib/utils'
+  import { getThisWeekBreakdown, getThisWeekTotal, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -62,12 +62,15 @@
 
   const hasMore = $derived(feedOffset < feedTotal)
 
+  const beersThisWeek = $derived(getThisWeekTotal(activity.days))
+
   // Stat cards for the infinite carousel
   type StatItem = { value: string; label: string; dim?: boolean }
   const statItems = $derived(
     (() => {
       const items: StatItem[] = [
         { value: stats.totalBeers.toLocaleString(), label: 'Total Beers' },
+        { value: beersThisWeek.toLocaleString(), label: 'This Week' },
         { value: stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
         { value: stats.activeGroupCount.toLocaleString(), label: 'Groups' },
         { value: String(stats.avgPerDay), label: 'Avg / Day' },
@@ -85,7 +88,7 @@
   )
 
   // Derived stats from activity data — no extra endpoint needed
-  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
+  const weekdayData = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
@@ -437,7 +440,7 @@
 
             <div class="chart-card">
               <h3 class="chart-title">
-                Busiest Days of the Week{peakWeekday && peakWeekday.count > 0
+                This Week by Day{peakWeekday && peakWeekday.count > 0
                   ? ` · ${peakWeekday.name}`
                   : ''}
               </h3>

@@ -15,7 +15,7 @@
   import {
     formatDate,
     getInitials,
-    getWeekdayBreakdown,
+    getThisWeekBreakdown,
     getPeakHour,
     transformSseToFeedItem,
   } from '$lib/utils'
@@ -167,7 +167,7 @@
   })
 
   const peakHour = $derived(getPeakHour(hourly.hours))
-  const weekdayData = $derived(getWeekdayBreakdown(activity.days))
+  const weekdayData = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
@@ -407,7 +407,7 @@
           </div>
 
           <div class="chart-card">
-            <h3 class="chart-title">Busiest Days of the Week</h3>
+            <h3 class="chart-title">This Week by Day</h3>
             {#if weekdayData.some((d) => d.count > 0)}
               <WeekdayBars days={weekdayData} peakDay={peakWeekday} />
             {:else}

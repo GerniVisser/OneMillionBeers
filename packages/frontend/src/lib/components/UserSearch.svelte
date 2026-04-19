@@ -479,10 +479,10 @@
     padding: 0;
     font-size: inherit;
     font-family: inherit;
-    color: var(--color-text-muted);
+    color: var(--color-beer-amber);
     cursor: pointer;
     text-decoration: underline;
-    text-decoration-color: transparent;
+    text-decoration-color: rgba(212, 136, 58, 0.4);
     text-underline-offset: 2px;
     transition:
       color 120ms ease,
@@ -490,8 +490,8 @@
   }
 
   .mode-link:hover {
-    color: var(--color-beer-amber);
-    text-decoration-color: var(--color-beer-amber);
+    color: var(--color-beer-foam);
+    text-decoration-color: var(--color-beer-foam);
   }
 
   /* ── Country prefix ─────────────────────────────────────── */

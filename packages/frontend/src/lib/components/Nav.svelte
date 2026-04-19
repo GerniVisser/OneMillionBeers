@@ -120,7 +120,7 @@
       </button>
 
       <a
-        href="https://github.com/GerniVisser/OMB/issues/new"
+        href="https://docs.google.com/forms/d/e/1FAIpQLScZHV8PuPnhIclwHLZT9ltZ8oGGcPLY975bCMjRwnRePgmXEQ/viewform?usp=publish-editor"
         target="_blank"
         rel="noopener"
         class="sidebar-link sidebar-link--muted"
@@ -265,7 +265,7 @@
     </button>
 
     <a
-      href="https://github.com/GerniVisser/OMB/issues/new"
+      href="https://docs.google.com/forms/d/e/1FAIpQLScZHV8PuPnhIclwHLZT9ltZ8oGGcPLY975bCMjRwnRePgmXEQ/viewform?usp=publish-editor"
       target="_blank"
       rel="noopener"
       class="sheet-item"
