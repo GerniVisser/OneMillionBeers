@@ -1,6 +1,6 @@
 import { type Logger } from 'pino'
 import { uploadGroupAvatar, coreConfig } from '@omb/collector-core'
-import { getGroupPictureUrl, listAllGroups } from './waha-client.js'
+import { getGroupPictureUrl, getGroupInviteCode, listAllGroups } from './waha-client.js'
 import { config } from './config.js'
 
 async function downloadBuffer(url: string): Promise<Buffer | null> {
@@ -17,13 +17,14 @@ async function pushGroupSync(
   sourceGroupId: string,
   name: string,
   avatarUrl: string | null,
+  inviteCode: string | null,
   logger: Logger,
 ): Promise<void> {
   const url = `${coreConfig.BACKEND_URL}/v1/internal/groups/${encodeURIComponent(sourceGroupId)}`
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, avatarUrl }),
+    body: JSON.stringify({ name, avatarUrl, inviteCode }),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) {
@@ -56,9 +57,16 @@ export async function syncGroup(
     logger.warn({ err, rawGroupId }, 'Failed to sync group avatar — proceeding with name only')
   }
 
+  let inviteCode: string | null = null
   try {
-    await pushGroupSync(sourceGroupId, subject, avatarUrl, logger)
-    logger.info({ sourceGroupId, avatarUrl: !!avatarUrl }, 'Group synced')
+    inviteCode = await getGroupInviteCode(rawGroupId)
+  } catch (err) {
+    logger.warn({ err, rawGroupId }, 'Failed to fetch invite code — proceeding without it')
+  }
+
+  try {
+    await pushGroupSync(sourceGroupId, subject, avatarUrl, inviteCode, logger)
+    logger.info({ sourceGroupId, avatarUrl: !!avatarUrl, inviteCode: !!inviteCode }, 'Group synced')
   } catch (err) {
     logger.error({ err, sourceGroupId }, 'Failed to push group sync to backend')
   }

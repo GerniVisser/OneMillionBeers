@@ -308,3 +308,71 @@ describe('GET /v1/global/countries', () => {
     expect(res.json()).toHaveLength(0)
   })
 })
+
+describe('disabled group data suppression', () => {
+  async function seedGroupWithFlag(
+    sourceGroupId: string,
+    name: string,
+    disabled: boolean,
+  ): Promise<string> {
+    const slug = name.toLowerCase().replace(/\s+/g, '-')
+    await pool.query(
+      `INSERT INTO groups (source_group_id, name, slug, disabled)
+       VALUES ($1, $2, $3, $4)`,
+      [sourceGroupId, name, slug, disabled],
+    )
+    const { rows } = await pool.query('SELECT id FROM groups WHERE source_group_id = $1', [
+      sourceGroupId,
+    ])
+    return rows[0].id as string
+  }
+
+  async function seedUserAndBeerLog(groupId: string, senderId: string) {
+    const { rows: userRows } = await pool.query(
+      `INSERT INTO users (identity_hash, push_name, slug)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (identity_hash) DO UPDATE SET push_name = EXCLUDED.push_name
+       RETURNING id`,
+      [senderId, 'Test User', senderId],
+    )
+    await pool.query(
+      `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at)
+       VALUES ($1, $2, 'https://example.com/beer.jpg', NOW())`,
+      [userRows[0].id, groupId],
+    )
+  }
+
+  it('excludes disabled group logs from GET /v1/global/feed and reduces total', async () => {
+    await seedBeerLog('sender-visible')
+    const disabledGroupId = await seedGroupWithFlag('group-disabled', 'Disabled Group', true)
+    await seedUserAndBeerLog(disabledGroupId, 'sender-disabled')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/feed' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.total).toBe(1)
+    const groupNames = body.items.map((item: { group: { name: string } }) => item.group.name)
+    expect(groupNames).not.toContain('Disabled Group')
+  })
+
+  it('excludes disabled group logs from GET /v1/global/count', async () => {
+    await seedBeerLog('sender-visible')
+    const disabledGroupId = await seedGroupWithFlag('group-disabled2', 'Disabled Group 2', true)
+    await seedUserAndBeerLog(disabledGroupId, 'sender-disabled2')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/count' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().count).toBe(1)
+  })
+
+  it('hidden group logs still appear in GET /v1/global/feed', async () => {
+    const hiddenGroupId = await seedGroupWithFlag('group-hidden', 'Hidden Group', false)
+    await pool.query(`UPDATE groups SET hidden = TRUE WHERE id = $1`, [hiddenGroupId])
+    await seedUserAndBeerLog(hiddenGroupId, 'sender-hidden')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/feed' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.total).toBe(1)
+  })
+})

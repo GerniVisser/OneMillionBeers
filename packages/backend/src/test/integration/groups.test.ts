@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify'
 import {
   GroupProfileResponseSchema,
   GroupListItemSchema,
+  GroupInviteResponseSchema,
   PaginatedResponseSchema,
   FeedItemSchema,
   LeaderboardResponseSchema,
@@ -61,7 +62,7 @@ describe('GET /v1/groups', () => {
     expect(body.total).toBe(0)
   })
 
-  it('returns groups with correct memberCount', async () => {
+  it('returns groups with correct memberCount and joinable:false by default', async () => {
     await seedBeerLog('+15551111111')
     await seedBeerLog('+15552222222')
 
@@ -73,6 +74,7 @@ describe('GET /v1/groups', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data?.items).toHaveLength(1)
     expect(parsed.data?.items[0].memberCount).toBe(2)
+    expect(parsed.data?.items[0].joinable).toBe(false)
     expect(parsed.data?.total).toBe(1)
   })
 
@@ -141,7 +143,7 @@ describe('GET /v1/groups/:groupId', () => {
     expect(res.statusCode).toBe(404)
   })
 
-  it('returns group profile with totalBeers', async () => {
+  it('returns group profile with totalBeers and joinable:false by default', async () => {
     await seedBeerLog()
     await seedBeerLog()
     const slug = await getGroupSlug()
@@ -153,6 +155,7 @@ describe('GET /v1/groups/:groupId', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data?.totalBeers).toBe(2)
     expect(parsed.data?.name).toBe('Test Group')
+    expect(parsed.data?.joinable).toBe(false)
   })
 })
 
@@ -356,5 +359,170 @@ describe('GET /v1/groups/:groupId/monthly', () => {
     const months = parsed.data!.months
     expect(months.find((m) => m.month === '2024-06')?.count).toBe(2)
     expect(months.find((m) => m.month === '2024-07')?.count).toBe(1)
+  })
+})
+
+describe('group flag filtering', () => {
+  async function seedVisibleGroup() {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      payload: {
+        sourceGroupId: 'group-visible',
+        groupName: 'Visible Group',
+        senderId: 'sender-visible',
+        timestamp: '2024-06-01T12:00:00.000Z',
+        photoUrl: 'https://example.com/beer.jpg',
+      },
+    })
+  }
+
+  async function seedGroup(
+    sourceGroupId: string,
+    name: string,
+    flags: Record<string, boolean>,
+    inviteCode?: string,
+  ) {
+    await pool.query(
+      `INSERT INTO groups (source_group_id, name, slug, hidden, disabled, favorite, joinable, invite_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (source_group_id) DO UPDATE SET
+         hidden = EXCLUDED.hidden, disabled = EXCLUDED.disabled,
+         favorite = EXCLUDED.favorite, joinable = EXCLUDED.joinable,
+         invite_code = EXCLUDED.invite_code`,
+      [
+        sourceGroupId,
+        name,
+        name.toLowerCase().replace(/\s+/g, '-'),
+        flags.hidden ?? false,
+        flags.disabled ?? false,
+        flags.favorite ?? false,
+        flags.joinable ?? false,
+        inviteCode ?? null,
+      ],
+    )
+  }
+
+  it('hidden group is absent from GET /v1/groups listing', async () => {
+    await seedVisibleGroup()
+    await seedGroup('group-hidden', 'Hidden Group', { hidden: true })
+
+    const res = await app.inject({ method: 'GET', url: '/v1/groups' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    const names = body.items.map((g: { name: string }) => g.name)
+    expect(names).not.toContain('Hidden Group')
+    expect(names).toContain('Visible Group')
+    expect(body.total).toBe(1)
+  })
+
+  it('hidden group returns 404 on GET /v1/groups/:slug', async () => {
+    await seedGroup('group-hidden2', 'Hidden Group Two', { hidden: true })
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/hidden-group-two' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('hidden group sub-routes return 404', async () => {
+    await seedGroup('group-hidden3', 'Hidden Group Three', { hidden: true })
+    for (const sub of ['feed', 'leaderboard', 'stats', 'activity', 'hourly', 'monthly']) {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/v1/groups/hidden-group-three/${sub}`,
+      })
+      expect(res.statusCode).toBe(404)
+    }
+  })
+
+  it('disabled group is absent from GET /v1/groups listing', async () => {
+    await seedVisibleGroup()
+    await seedGroup('group-disabled', 'Disabled Group', { disabled: true })
+
+    const res = await app.inject({ method: 'GET', url: '/v1/groups' })
+    const body = res.json()
+    const names = body.items.map((g: { name: string }) => g.name)
+    expect(names).not.toContain('Disabled Group')
+    expect(body.total).toBe(1)
+  })
+
+  it('disabled group returns 404 on GET /v1/groups/:slug', async () => {
+    await seedGroup('group-disabled2', 'Disabled Group Two', { disabled: true })
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/disabled-group-two' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('favorite group appears first in GET /v1/groups and has favorite:true', async () => {
+    await seedVisibleGroup()
+    await seedGroup('group-fav', 'A Favorite Group', { favorite: true })
+
+    const res = await app.inject({ method: 'GET', url: '/v1/groups' })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.items[0].name).toBe('A Favorite Group')
+    expect(body.items[0].favorite).toBe(true)
+    expect(body.items[1].favorite).toBe(false)
+  })
+
+  it('joinable group has joinable:true in GET /v1/groups and GET /v1/groups/:slug', async () => {
+    await seedGroup('group-joinable', 'Joinable Group', { joinable: true }, 'abc123')
+
+    const listRes = await app.inject({ method: 'GET', url: '/v1/groups' })
+    expect(listRes.statusCode).toBe(200)
+    const item = listRes.json().items.find((g: { name: string }) => g.name === 'Joinable Group')
+    expect(item?.joinable).toBe(true)
+
+    const profileRes = await app.inject({ method: 'GET', url: '/v1/groups/joinable-group' })
+    expect(profileRes.statusCode).toBe(200)
+    expect(profileRes.json().joinable).toBe(true)
+  })
+})
+
+describe('GET /v1/groups/:groupId/invite-code', () => {
+  it('returns 404 for unknown group', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-such-group/invite-code' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 404 when group is not joinable', async () => {
+    await pool.query(
+      `INSERT INTO groups (source_group_id, name, slug, joinable, invite_code)
+       VALUES ('group-not-joinable', 'Not Joinable', 'not-joinable', FALSE, 'abc123')`,
+    )
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/not-joinable/invite-code' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns 404 when group is joinable but has no invite code stored', async () => {
+    await pool.query(
+      `INSERT INTO groups (source_group_id, name, slug, joinable)
+       VALUES ('group-no-code', 'No Code Group', 'no-code-group', TRUE)`,
+    )
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/no-code-group/invite-code' })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('returns invite URL when group is joinable and has a stored invite code', async () => {
+    await pool.query(
+      `INSERT INTO groups (source_group_id, name, slug, joinable, invite_code)
+       VALUES ('group-joinable-with-code', 'Open Group', 'open-group', TRUE, 'XYZ789abc')`,
+    )
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/open-group/invite-code' })
+    expect(res.statusCode).toBe(200)
+
+    const parsed = GroupInviteResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.inviteUrl).toBe('https://chat.whatsapp.com/XYZ789abc')
+  })
+
+  it('group-sync stores invite code and it is served by invite-code endpoint', async () => {
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/internal/groups/wa:sync-group',
+      payload: { name: 'Sync Group', avatarUrl: null, inviteCode: 'syncCode99' },
+    })
+    await pool.query(`UPDATE groups SET joinable = TRUE WHERE source_group_id = 'wa:sync-group'`)
+
+    const res = await app.inject({ method: 'GET', url: '/v1/groups/sync-group/invite-code' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().inviteUrl).toBe('https://chat.whatsapp.com/syncCode99')
   })
 })

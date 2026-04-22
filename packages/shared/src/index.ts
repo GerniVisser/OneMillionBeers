@@ -15,11 +15,13 @@ export {
   GroupSummarySchema,
   GroupProfileResponseSchema,
   GroupListItemSchema,
+  GroupInviteResponseSchema,
   GroupSyncRequestSchema,
   type Group,
   type GroupSummary,
   type GroupProfileResponse,
   type GroupListItem,
+  type GroupInviteResponse,
   type GroupSyncRequest,
 } from './group.js'
 

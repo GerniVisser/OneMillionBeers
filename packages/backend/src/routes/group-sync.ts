@@ -13,8 +13,9 @@ export const groupSyncRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app
       if (!parse.success) {
         return reply.status(400).send({ error: 'Invalid request', issues: parse.error.issues })
       }
-      const { name, avatarUrl } = parse.data
-      await upsertGroup(pool, sourceGroupId, name, avatarUrl)
+
+      const { name, avatarUrl, inviteCode } = parse.data
+      await upsertGroup(pool, sourceGroupId, name, avatarUrl, inviteCode)
       return reply.status(204).send()
     },
   )

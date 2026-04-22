@@ -58,6 +58,12 @@ export function addRecentUser(u: Omit<RecentUser, 'visitedAt'>): void {
   write(USERS_KEY, [{ ...u, visitedAt: Date.now() }, ...existing].slice(0, MAX))
 }
 
+export function pruneRecentUsers(validSlugs: Set<string>): void {
+  const current = read<RecentUser>(USERS_KEY)
+  const pruned = current.filter((u) => validSlugs.has(u.slug))
+  if (pruned.length !== current.length) write(USERS_KEY, pruned)
+}
+
 export function getRecentGroups(): RecentGroup[] {
   return read<RecentGroup>(GROUPS_KEY)
 }
@@ -65,4 +71,10 @@ export function getRecentGroups(): RecentGroup[] {
 export function addRecentGroup(g: Omit<RecentGroup, 'visitedAt'>): void {
   const existing = read<RecentGroup>(GROUPS_KEY).filter((r) => r.slug !== g.slug)
   write(GROUPS_KEY, [{ ...g, visitedAt: Date.now() }, ...existing].slice(0, MAX))
+}
+
+export function pruneRecentGroups(validSlugs: Set<string>): void {
+  const current = read<RecentGroup>(GROUPS_KEY)
+  const pruned = current.filter((g) => validSlugs.has(g.slug))
+  if (pruned.length !== current.length) write(GROUPS_KEY, pruned)
 }

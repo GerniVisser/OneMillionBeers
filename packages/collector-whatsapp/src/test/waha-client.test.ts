@@ -179,4 +179,38 @@ describe('waha-client', () => {
     const result = await ensureWebhookConfigured()
     expect(result).toBe(false)
   })
+
+  it('listAllGroups returns groups from an array response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ id: '123@g.us', subject: 'Beer Crew' }],
+      }),
+    )
+    const { listAllGroups } = await import('../waha-client.js')
+    const groups = await listAllGroups()
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toEqual({ id: '123@g.us', subject: 'Beer Crew' })
+  })
+
+  it('listAllGroups returns groups from an object-map response (WAHA NOWEB)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ '123@g.us': { id: '123@g.us', subject: 'Beer Crew' } }),
+      }),
+    )
+    const { listAllGroups } = await import('../waha-client.js')
+    const groups = await listAllGroups()
+    expect(groups).toHaveLength(1)
+    expect(groups[0].subject).toBe('Beer Crew')
+  })
+
+  it('listAllGroups returns empty array on non-2xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    const { listAllGroups } = await import('../waha-client.js')
+    expect(await listAllGroups()).toEqual([])
+  })
 })

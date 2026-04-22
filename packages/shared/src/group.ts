@@ -23,6 +23,7 @@ export type GroupSummary = z.infer<typeof GroupSummarySchema>
 // GET /v1/groups/:groupId
 export const GroupProfileResponseSchema = GroupSchema.extend({
   totalBeers: z.number().int().nonnegative(),
+  joinable: z.boolean(),
 })
 export type GroupProfileResponse = z.infer<typeof GroupProfileResponseSchema>
 
@@ -33,12 +34,21 @@ export const GroupListItemSchema = z.object({
   slug: SlugSchema,
   avatarUrl: z.string().url().nullable().optional(),
   memberCount: z.number().int().nonnegative(),
+  favorite: z.boolean(),
+  joinable: z.boolean(),
 })
 export type GroupListItem = z.infer<typeof GroupListItemSchema>
+
+// GET /v1/groups/:groupId/invite-code
+export const GroupInviteResponseSchema = z.object({
+  inviteUrl: z.string().url(),
+})
+export type GroupInviteResponse = z.infer<typeof GroupInviteResponseSchema>
 
 // PUT /v1/internal/groups/:sourceGroupId — collector group metadata sync
 export const GroupSyncRequestSchema = z.object({
   name: z.string().min(1).max(512),
   avatarUrl: z.string().url().nullable(),
+  inviteCode: z.string().nullable().optional(),
 })
 export type GroupSyncRequest = z.infer<typeof GroupSyncRequestSchema>

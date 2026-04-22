@@ -9,6 +9,7 @@ import type {
   LeaderboardResponse,
   GroupProfileResponse,
   GroupListItem,
+  GroupInviteResponse,
   UserProfileResponse,
   UserStatsResponse,
   UserActivityResponse,
@@ -168,6 +169,13 @@ export function getGroupMonthly(
   slug: string,
 ): Promise<GroupMonthlyResponse> {
   return get<GroupMonthlyResponse>(fetch, `/groups/${slug}/monthly`)
+}
+
+export function getGroupInviteCode(
+  fetch: typeof globalThis.fetch,
+  slug: string,
+): Promise<GroupInviteResponse> {
+  return get<GroupInviteResponse>(fetch, `/groups/${slug}/invite-code`)
 }
 
 export function searchUsers(

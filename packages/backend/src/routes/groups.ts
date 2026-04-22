@@ -11,6 +11,7 @@ import {
   getGroupActivity,
   getGroupHourly,
   getGroupMonthly,
+  getGroupInviteCode,
 } from '../db/queries.js'
 
 export const groupRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
@@ -28,6 +29,13 @@ export const groupRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { 
     if (!group) return reply.status(404).send({ error: 'Group not found' })
     const totalBeers = await getGroupTotalBeers(pool, group.id)
     return reply.send({ ...group, totalBeers })
+  })
+
+  app.get('/v1/groups/:groupId/invite-code', async (request, reply) => {
+    const { groupId } = request.params as { groupId: string }
+    const inviteCode = await getGroupInviteCode(pool, groupId)
+    if (!inviteCode) return reply.status(404).send({ error: 'Invite link not available' })
+    return reply.send({ inviteUrl: `https://chat.whatsapp.com/${inviteCode}` })
   })
 
   app.get('/v1/groups/:groupId/feed', async (request, reply) => {

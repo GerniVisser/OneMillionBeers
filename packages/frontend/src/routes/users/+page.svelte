@@ -3,11 +3,22 @@
   import UserSearch from '$lib/components/UserSearch.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
   import { getInitials } from '$lib/utils'
-  import { getRecentUsers, type RecentUser } from '$lib/recents'
+  import { getRecentUsers, pruneRecentUsers, type RecentUser } from '$lib/recents'
 
   let recentUsers = $state<RecentUser[]>([])
 
-  onMount(() => {
+  onMount(async () => {
+    const stored = getRecentUsers()
+    if (stored.length > 0) {
+      const checks = await Promise.all(
+        stored.map((u) =>
+          fetch(`/api/v1/users/${u.slug}`)
+            .then((r) => (r.ok ? u.slug : null))
+            .catch(() => null),
+        ),
+      )
+      pruneRecentUsers(new Set(checks.filter((s): s is string => s !== null)))
+    }
     recentUsers = getRecentUsers()
   })
 

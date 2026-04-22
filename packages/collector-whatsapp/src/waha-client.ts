@@ -109,6 +109,20 @@ export async function getGroupPictureUrl(groupId: string): Promise<string | null
   }
 }
 
+export async function getGroupInviteCode(groupId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups/${groupId}/invite-code`,
+      { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
+    )
+    if (!res.ok) return null
+    const code = (await res.text()).trim()
+    return code || null
+  } catch {
+    return null
+  }
+}
+
 export async function listAllGroups(): Promise<Array<{ id: string; subject: string }>> {
   try {
     const res = await fetch(`${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups`, {
