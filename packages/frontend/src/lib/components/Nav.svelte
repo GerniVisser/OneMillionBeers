@@ -114,6 +114,16 @@
       </a>
     </div>
 
+    <a
+      href="/join"
+      class="join-cta"
+      class:active={isActive('/join')}
+      class:nav-loading={$navigating && isActive('/join')}
+    >
+      <span class="join-cta-text">Join a Group</span>
+      <span class="join-cta-arrow">→</span>
+    </a>
+
     <div class="sidebar-divider"></div>
 
     <div class="sidebar-section sidebar-section--bottom">
@@ -207,6 +217,24 @@
       <path d="M22 20c0-2.5-2-4.5-5-5.2" />
     </svg>
     <span>Groups</span>
+  </a>
+
+  <a
+    href="/join"
+    class="nav-item nav-item--join"
+    class:active={isActive('/join')}
+    class:nav-loading={$navigating && isActive('/join')}
+  >
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" fill="rgba(245, 158, 11, 0.55)" />
+      <path
+        d="M12 8v8M8 12h8"
+        stroke="rgba(18, 10, 3, 0.8)"
+        stroke-width="2.2"
+        stroke-linecap="round"
+      />
+    </svg>
+    <span>Join</span>
   </a>
 
   <a
@@ -435,6 +463,49 @@
     font-weight: 500;
   }
 
+  .join-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0.75rem 0;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--color-beer-amber);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background 120ms ease;
+  }
+
+  .join-cta:hover {
+    background: var(--color-bg-surface);
+    color: var(--color-beer-amber);
+  }
+
+  .join-cta.active {
+    background: rgba(245, 158, 11, 0.08);
+  }
+
+  .join-cta-text {
+    flex: 1;
+  }
+
+  .join-cta-arrow {
+    font-size: 0.85rem;
+    opacity: 0.6;
+    transition:
+      transform 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .join-cta:hover .join-cta-arrow {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+
   /* ── Bottom nav (mobile only) ─────────────────────── */
   .bottom-nav {
     display: none;
@@ -484,6 +555,28 @@
   .nav-item:hover,
   .nav-item.active {
     color: var(--color-beer-amber);
+  }
+
+  .nav-item--join {
+    color: var(--color-beer-amber);
+    flex: none;
+    padding: 0.25rem 0.875rem;
+  }
+
+  .nav-item--join svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .nav-item--join span {
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+
+  .nav-item--join:hover,
+  .nav-item--join.active {
+    color: var(--color-beer-amber);
+    opacity: 0.85;
   }
 
   /* ── More sheet (mobile only) ─────────────────────── */

@@ -1,12 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { PageData } from './$types'
+  import type { GroupListItem } from '@omb/shared'
   import { getInitials } from '$lib/utils'
   import { getRecentGroups, pruneRecentGroups, type RecentGroup } from '$lib/recents'
+  import JoinModal from '$lib/components/JoinModal.svelte'
 
   let { data }: { data: PageData } = $props()
 
   let recentGroups = $state<RecentGroup[]>([])
+  let selectedGroup = $state<GroupListItem | null>(null)
 
   onMount(() => {
     if (data.total <= data.groups.length) {
@@ -53,41 +56,44 @@
     {:else}
       <div class="groups-grid">
         {#each data.groups as group (group.id)}
-          <a href="/groups/{group.slug}" class="group-card card card-hover">
-            <div class="card-avatar">
-              {#if group.avatarUrl}
-                <img src={group.avatarUrl} alt="" class="avatar-img" />
-              {:else}
-                <span class="avatar-initials">{getInitials(group.name)}</span>
-              {/if}
-            </div>
-            <div class="card-body">
-              <div class="card-name-row">
-                <span class="card-name">{group.name}</span>
-                {#if group.joinable}
-                  <span class="joinable-badge">
-                    <svg
-                      class="badge-icon"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
-                      />
-                    </svg>
-                    Join
-                  </span>
+          <div class="group-card card card-hover">
+            <a href="/groups/{group.slug}" class="card-link">
+              <div class="card-avatar">
+                {#if group.avatarUrl}
+                  <img src={group.avatarUrl} alt="" class="avatar-img" />
+                {:else}
+                  <span class="avatar-initials">{getInitials(group.name)}</span>
                 {/if}
               </div>
-              <span class="card-meta">{group.memberCount.toLocaleString()} contributors</span>
-            </div>
-          </a>
+              <div class="card-body">
+                <span class="card-name">{group.name}</span>
+                <span class="card-meta">{group.memberCount.toLocaleString()} contributors</span>
+              </div>
+            </a>
+            {#if group.joinable}
+              <button
+                class="joinable-btn"
+                onclick={() => (selectedGroup = group)}
+                aria-label="Join {group.name}"
+              >
+                <svg class="badge-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path
+                    d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
+                  />
+                </svg>
+                Join
+              </button>
+            {/if}
+          </div>
         {/each}
       </div>
     {/if}
   </section>
 </div>
+
+{#if selectedGroup}
+  <JoinModal group={selectedGroup} onclose={() => (selectedGroup = null)} />
+{/if}
 
 <style>
   .page-wrap {
@@ -149,10 +155,20 @@
   .group-card {
     display: flex;
     align-items: center;
-    gap: 0.875rem;
     padding: 0.875rem 1rem;
-    text-decoration: none;
     border-radius: 0.75rem;
+    text-decoration: none;
+    gap: 0;
+  }
+
+  /* Stretched link covers the card minus the join button */
+  .card-link {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    flex: 1;
+    min-width: 0;
+    text-decoration: none;
   }
 
   .card-avatar {
@@ -188,13 +204,6 @@
     min-width: 0;
   }
 
-  .card-name-row {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    min-width: 0;
-  }
-
   .card-name {
     font-size: 0.9rem;
     font-weight: 600;
@@ -204,7 +213,13 @@
     text-overflow: ellipsis;
   }
 
-  .joinable-badge {
+  .card-meta {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+  }
+
+  /* Join button — right-aligned, no nesting inside <a> */
+  .joinable-btn {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -217,19 +232,24 @@
     background: rgba(37, 211, 102, 0.1);
     border: 1px solid rgba(37, 211, 102, 0.3);
     border-radius: 0.3rem;
-    padding: 0.1rem 0.35rem;
+    padding: 0.2rem 0.45rem;
     line-height: 1.4;
+    cursor: pointer;
+    transition:
+      background 120ms ease,
+      border-color 120ms ease;
+    margin-left: auto;
+  }
+
+  .joinable-btn:hover {
+    background: rgba(37, 211, 102, 0.18);
+    border-color: rgba(37, 211, 102, 0.55);
   }
 
   .badge-icon {
     width: 8px;
     height: 8px;
     flex-shrink: 0;
-  }
-
-  .card-meta {
-    font-size: 0.72rem;
-    color: var(--color-text-muted);
   }
 
   .empty {
