@@ -75,18 +75,20 @@ export async function upsertGroup(
   sourceGroupId: string,
   name: string,
   avatarUrl?: string | null,
+  inviteCode?: string | null,
 ): Promise<Group> {
   const slug = toSlug(name)
   try {
     const { rows } = await pool.query<Group>(
-      `INSERT INTO groups (source_group_id, name, slug, avatar_url)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO groups (source_group_id, name, slug, avatar_url, invite_code)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (source_group_id) DO UPDATE SET
          name = EXCLUDED.name,
-         avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
+         avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url),
+         invite_code = COALESCE(EXCLUDED.invite_code, groups.invite_code)
        RETURNING id, source_group_id AS "sourceGroupId", name, slug,
                  avatar_url AS "avatarUrl", created_at AS "createdAt"`,
-      [sourceGroupId, name, slug, avatarUrl ?? null],
+      [sourceGroupId, name, slug, avatarUrl ?? null, inviteCode ?? null],
     )
     return rows[0]
   } catch (err: unknown) {
@@ -99,14 +101,15 @@ export async function upsertGroup(
         .toLowerCase()
       const uniqueSlug = (slug + '-' + suffix).slice(0, 128)
       const { rows } = await pool.query<Group>(
-        `INSERT INTO groups (source_group_id, name, slug, avatar_url)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO groups (source_group_id, name, slug, avatar_url, invite_code)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (source_group_id) DO UPDATE SET
            name = EXCLUDED.name,
-           avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url)
+           avatar_url = COALESCE(EXCLUDED.avatar_url, groups.avatar_url),
+           invite_code = COALESCE(EXCLUDED.invite_code, groups.invite_code)
          RETURNING id, source_group_id AS "sourceGroupId", name, slug,
                    avatar_url AS "avatarUrl", created_at AS "createdAt"`,
-        [sourceGroupId, name, uniqueSlug, avatarUrl ?? null],
+        [sourceGroupId, name, uniqueSlug, avatarUrl ?? null, inviteCode ?? null],
       )
       return rows[0]
     }
@@ -124,14 +127,28 @@ export async function findGroupById(pool: pg.Pool, id: string): Promise<Group | 
   return rows[0] ?? null
 }
 
-export async function findGroupBySlug(pool: pg.Pool, slug: string): Promise<Group | null> {
-  const { rows } = await pool.query<Group>(
+export async function findGroupBySlug(
+  pool: pg.Pool,
+  slug: string,
+): Promise<(Group & { joinable: boolean }) | null> {
+  const { rows } = await pool.query<Group & { joinable: boolean }>(
     `SELECT id, source_group_id AS "sourceGroupId", name, slug,
-            avatar_url AS "avatarUrl", created_at AS "createdAt"
-     FROM groups WHERE slug = $1`,
+            avatar_url AS "avatarUrl", created_at AS "createdAt", joinable
+     FROM groups WHERE slug = $1 AND hidden = FALSE AND disabled = FALSE`,
     [slug],
   )
   return rows[0] ?? null
+}
+
+export async function getGroupInviteCode(pool: pg.Pool, slug: string): Promise<string | null> {
+  const { rows } = await pool.query<{ inviteCode: string | null }>(
+    `SELECT invite_code AS "inviteCode"
+     FROM groups
+     WHERE slug = $1 AND joinable = TRUE AND hidden = FALSE AND disabled = FALSE`,
+    [slug],
+  )
+  if (!rows[0]) return null
+  return rows[0].inviteCode
 }
 
 export async function getGroupTotalBeers(pool: pg.Pool, groupId: string): Promise<number> {
@@ -152,7 +169,8 @@ export async function listGroups(
   const { rows: countRows } = await pool.query<{ count: string }>(
     `SELECT COUNT(DISTINCT g.id)::text AS count
      FROM groups g
-     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')`,
+     WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')
+       AND g.hidden = FALSE AND g.disabled = FALSE`,
     [filter],
   )
   const total = parseInt(countRows[0].count, 10)
@@ -163,12 +181,15 @@ export async function listGroups(
        g.name,
        g.slug,
        g.avatar_url AS "avatarUrl",
+       g.favorite,
+       g.joinable,
        COUNT(DISTINCT bl.user_id)::int AS "memberCount"
      FROM groups g
      LEFT JOIN beer_logs bl ON bl.group_id = g.id
      WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')
-     GROUP BY g.id, g.avatar_url
-     ORDER BY g.name ASC
+       AND g.hidden = FALSE AND g.disabled = FALSE
+     GROUP BY g.id, g.avatar_url, g.favorite, g.joinable
+     ORDER BY g.favorite DESC, g.name ASC
      LIMIT $2 OFFSET $3`,
     [filter, limit, offset],
   )
@@ -376,7 +397,10 @@ export async function getGlobalFeed(
   offset: number,
 ): Promise<{ items: FeedItem[]; total: number }> {
   const { rows: countRows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM beer_logs`,
+    `SELECT COUNT(*)::text AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE`,
   )
   const total = parseInt(countRows[0].count, 10)
 
@@ -390,6 +414,7 @@ export async function getGlobalFeed(
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      ORDER BY bl.logged_at DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset],
@@ -449,6 +474,8 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
        u.country_code AS "countryCode"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      GROUP BY u.id, u.display_name, u.pseudo_name, u.slug, u.country_code
      ORDER BY COUNT(*) DESC
      LIMIT $1`,
@@ -517,7 +544,10 @@ export async function getUserFeed(
   offset: number,
 ): Promise<{ items: FeedItem[]; total: number }> {
   const { rows: countRows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM beer_logs WHERE user_id = $1`,
+    `SELECT COUNT(*)::text AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1 AND g.disabled = FALSE`,
     [userId],
   )
   const total = parseInt(countRows[0].count, 10)
@@ -532,7 +562,7 @@ export async function getUserFeed(
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
-     WHERE bl.user_id = $1
+     WHERE bl.user_id = $1 AND g.disabled = FALSE
      ORDER BY bl.logged_at DESC
      LIMIT $2 OFFSET $3`,
     [userId, limit, offset],
@@ -542,9 +572,10 @@ export async function getUserFeed(
 
 export async function getUserActivity(pool: pg.Pool, userId: string): Promise<ActivityDay[]> {
   const { rows } = await pool.query<{ date: string; count: number }>(
-    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
-     FROM beer_logs
-     WHERE user_id = $1 AND logged_at >= NOW() - INTERVAL '182 days'
+    `SELECT bl.logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1 AND bl.logged_at >= NOW() - INTERVAL '182 days' AND g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
     [userId],
   )
@@ -553,8 +584,10 @@ export async function getUserActivity(pool: pg.Pool, userId: string): Promise<Ac
 
 export async function getUserHourly(pool: pg.Pool, userId: string): Promise<HourBucket[]> {
   const { rows } = await pool.query<{ hour: number; count: number }>(
-    `SELECT EXTRACT(HOUR FROM logged_at)::int AS hour, COUNT(*)::int AS count
-     FROM beer_logs WHERE user_id = $1
+    `SELECT EXTRACT(HOUR FROM bl.logged_at)::int AS hour, COUNT(*)::int AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1 AND g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
     [userId],
   )
@@ -564,9 +597,11 @@ export async function getUserHourly(pool: pg.Pool, userId: string): Promise<Hour
 
 export async function getUserMonthly(pool: pg.Pool, userId: string): Promise<MonthBucket[]> {
   const { rows } = await pool.query<{ month: string; count: number }>(
-    `SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') AS month,
+    `SELECT TO_CHAR(DATE_TRUNC('month', bl.logged_at), 'YYYY-MM') AS month,
             COUNT(*)::int AS count
-     FROM beer_logs WHERE user_id = $1
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1 AND g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
     [userId],
   )
@@ -577,7 +612,10 @@ export async function getUserMonthly(pool: pg.Pool, userId: string): Promise<Mon
 
 export async function getGlobalCount(pool: pg.Pool): Promise<number> {
   const { rows } = await pool.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM beer_logs`,
+    `SELECT COUNT(*)::text AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE`,
   )
   return parseInt(rows[0].count, 10)
 }
@@ -593,18 +631,22 @@ export async function getGlobalStats(pool: pg.Pool): Promise<GlobalStatsResponse
     firstLog: string | null
   }>(
     `SELECT
-       COUNT(*)::int                        AS "totalBeers",
-       COUNT(DISTINCT user_id)::int         AS "activeMemberCount",
-       COUNT(DISTINCT group_id)::int        AS "activeGroupCount",
-       COUNT(DISTINCT logged_at::date)::int AS "daysActive",
-       MIN(logged_at)::text                 AS "firstLog"
-     FROM beer_logs`,
+       COUNT(*)::int                           AS "totalBeers",
+       COUNT(DISTINCT bl.user_id)::int         AS "activeMemberCount",
+       COUNT(DISTINCT bl.group_id)::int        AS "activeGroupCount",
+       COUNT(DISTINCT bl.logged_at::date)::int AS "daysActive",
+       MIN(bl.logged_at)::text                 AS "firstLog"
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE`,
   )
   const agg = aggRows[0]
 
   const { rows: peakRows } = await pool.query<{ date: string; count: number }>(
-    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
-     FROM beer_logs
+    `SELECT bl.logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      GROUP BY 1 ORDER BY 2 DESC LIMIT 1`,
   )
 
@@ -625,9 +667,10 @@ export async function getGlobalStats(pool: pg.Pool): Promise<GlobalStatsResponse
 
 export async function getGlobalActivity(pool: pg.Pool): Promise<ActivityDay[]> {
   const { rows } = await pool.query<{ date: string; count: number }>(
-    `SELECT logged_at::date::text AS date, COUNT(*)::int AS count
-     FROM beer_logs
-     WHERE logged_at >= NOW() - INTERVAL '365 days'
+    `SELECT bl.logged_at::date::text AS date, COUNT(*)::int AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.logged_at >= NOW() - INTERVAL '365 days' AND g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
   )
   return rows
@@ -635,8 +678,10 @@ export async function getGlobalActivity(pool: pg.Pool): Promise<ActivityDay[]> {
 
 export async function getGlobalHourly(pool: pg.Pool): Promise<HourBucket[]> {
   const { rows } = await pool.query<{ hour: number; count: number }>(
-    `SELECT EXTRACT(HOUR FROM logged_at)::int AS hour, COUNT(*)::int AS count
-     FROM beer_logs
+    `SELECT EXTRACT(HOUR FROM bl.logged_at)::int AS hour, COUNT(*)::int AS count
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
   )
   const map = new Map(rows.map((r) => [r.hour, r.count]))
@@ -645,9 +690,11 @@ export async function getGlobalHourly(pool: pg.Pool): Promise<HourBucket[]> {
 
 export async function getGlobalMonthly(pool: pg.Pool): Promise<MonthBucket[]> {
   const { rows } = await pool.query<{ month: string; count: number }>(
-    `SELECT TO_CHAR(DATE_TRUNC('month', logged_at), 'YYYY-MM') AS month,
+    `SELECT TO_CHAR(DATE_TRUNC('month', bl.logged_at), 'YYYY-MM') AS month,
             COUNT(*)::int AS count
-     FROM beer_logs
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      GROUP BY 1 ORDER BY 1 ASC`,
   )
   return rows
@@ -662,7 +709,8 @@ export async function getGlobalCountries(pool: pg.Pool): Promise<CountryStat[]> 
             COUNT(DISTINCT bl.user_id)::int AS "userCount"
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
-     WHERE u.country_code IS NOT NULL
+     JOIN groups g ON bl.group_id = g.id
+     WHERE u.country_code IS NOT NULL AND g.disabled = FALSE
      GROUP BY u.country_code
      ORDER BY COUNT(*) DESC`,
   )
@@ -676,7 +724,11 @@ export async function getUserStats(
   userId: string,
 ): Promise<Omit<UserStatsResponse, 'userId'>> {
   const { rows } = await pool.query<{ logged_at: string }>(
-    `SELECT logged_at FROM beer_logs WHERE user_id = $1 ORDER BY logged_at ASC`,
+    `SELECT bl.logged_at
+     FROM beer_logs bl
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.user_id = $1 AND g.disabled = FALSE
+     ORDER BY bl.logged_at ASC`,
     [userId],
   )
 
@@ -715,6 +767,7 @@ export async function getLatestBeer(pool: pg.Pool): Promise<{
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
+     WHERE g.disabled = FALSE
      ORDER BY bl.logged_at DESC LIMIT 1`,
   )
   return rows[0] ?? null
