@@ -183,7 +183,8 @@ export async function listGroups(
        g.avatar_url AS "avatarUrl",
        g.favorite,
        g.joinable,
-       COUNT(DISTINCT bl.user_id)::int AS "memberCount"
+       COUNT(DISTINCT bl.user_id)::int AS "memberCount",
+       COUNT(bl.id)::int AS "totalBeers"
      FROM groups g
      LEFT JOIN beer_logs bl ON bl.group_id = g.id
      WHERE ($1::text IS NULL OR g.name ILIKE '%' || $1 || '%')

@@ -34,6 +34,7 @@ export const GroupListItemSchema = z.object({
   slug: SlugSchema,
   avatarUrl: z.string().url().nullable().optional(),
   memberCount: z.number().int().nonnegative(),
+  totalBeers: z.number().int().nonnegative(),
   favorite: z.boolean(),
   joinable: z.boolean(),
 })

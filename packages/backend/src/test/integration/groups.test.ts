@@ -74,6 +74,7 @@ describe('GET /v1/groups', () => {
     expect(parsed.success).toBe(true)
     expect(parsed.data?.items).toHaveLength(1)
     expect(parsed.data?.items[0].memberCount).toBe(2)
+    expect(parsed.data?.items[0].totalBeers).toBe(2)
     expect(parsed.data?.items[0].joinable).toBe(false)
     expect(parsed.data?.total).toBe(1)
   })
