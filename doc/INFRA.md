@@ -143,7 +143,9 @@ All services in `docker-compose.yml` use `restart: unless-stopped`. Containers r
 
 ### SSL certificates
 
-Certbot sidecar handles auto-renewal. Certs stored in Docker volume `certbot-certs`. Survives container restarts. Re-issue required if Elastic IP changes (DNS must point to new IP first).
+Certbot runs as a one-shot Docker container (not a long-running sidecar). Certs are stored in Docker volume `onemillionbeers_certbot-certs` and survive container restarts. A cron job on the EC2 triggers renewal twice a month — certbot only actually renews when fewer than 30 days remain, so running it twice a month gives a safe buffer within the 90-day Let's Encrypt validity window.
+
+Re-issue required if Elastic IP changes (DNS must point to new IP first).
 
 ---
 
@@ -306,18 +308,122 @@ docker compose run --rm certbot certonly --webroot \
   -d www.onemillionbeers.co.za
 ```
 
-**9. GitHub Secrets**
+**9. SSL auto-renewal cron job**
+
+Set up a cron job that renews the cert twice a month and reloads nginx if renewed:
+
+```bash
+(crontab -l 2>/dev/null; echo "0 3 1,15 * * cd /opt/onemillionbeers && docker compose run --rm certbot renew --cert-name onemillionbeers.co.za && docker exec onemillionbeers-nginx-1 nginx -s reload") | crontab -
+```
+
+Verify it was added:
+
+```bash
+crontab -l
+```
+
+**11. GitHub Secrets**
 Set `EC2_HOST` (Elastic IP), `EC2_USER` (`ubuntu`), `EC2_SSH_KEY` (private key PEM).
 
-**10. Verify**
+**12. Verify**
 
 ```bash
 curl https://onemillionbeers.co.za/api/health
 # → {"status":"ok"}
 ```
 
-**11. First automated deploy**
+**13. First automated deploy**
 Push a commit to main → GitHub Actions completes end-to-end.
+
+---
+
+## Database Access (Operator)
+
+RDS is in a private subnet with no public endpoint. Access is via an SSH tunnel through the EC2 instance, using SSM Session Manager as the SSH transport — no port 22 exposed, no static IP required.
+
+### Prerequisites
+
+- AWS CLI configured with credentials that have SSM access
+- [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) installed
+- SSH keypair at `~/.ssh/omb` (private) — one-time setup below
+
+### One-time setup
+
+**1. Generate an SSH keypair locally:**
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/omb -C "omb-db-access"
+```
+
+**2. Install the public key on EC2 via SSM Run Command:**
+
+```bash
+aws ssm send-command \
+  --instance-ids "$(aws ec2 describe-instances \
+    --filters "Name=tag:Name,Values=omb-app" "Name=instance-state-name,Values=running" \
+    --query "Reservations[0].Instances[0].InstanceId" --output text)" \
+  --document-name "AWS-RunShellScript" \
+  --parameters "commands=[\"mkdir -p /home/ubuntu/.ssh && chmod 700 /home/ubuntu/.ssh && echo '$(cat ~/.ssh/omb.pub)' >> /home/ubuntu/.ssh/authorized_keys && chmod 600 /home/ubuntu/.ssh/authorized_keys\"]"
+```
+
+**3. Add to `~/.ssh/config`:**
+
+```
+Host omb-ec2
+  HostName i-01f6dd64f9a0d4f29
+  User ubuntu
+  IdentityFile ~/.ssh/omb
+  ProxyCommand aws ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'
+```
+
+Test it: `ssh omb-ec2` — you should land on the EC2 shell.
+
+### Reconnecting (every session)
+
+**1. Open the SSM port-forward tunnel in a terminal and keep it open:**
+
+```bash
+aws ssm start-session --target i-01f6dd64f9a0d4f29 \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters '{"portNumber":["22"],"localPortNumber":["2222"]}'
+```
+
+**2. Connect DBeaver** using the saved connection profile (see below). The tunnel must be running before clicking Connect.
+
+**3. When done**, close DBeaver and `Ctrl+C` the terminal to tear down the tunnel.
+
+### DBeaver connection profile
+
+| Tab  | Field          | Value                                                   |
+| ---- | -------------- | ------------------------------------------------------- |
+| Main | Host           | `omb-postgres.c1iu6gyko09u.us-east-1.rds.amazonaws.com` |
+| Main | Port           | `5432`                                                  |
+| Main | Database       | `omb`                                                   |
+| Main | Username       | `omb`                                                   |
+| Main | Password       | from `/omb/DATABASE_URL` in SSM Parameter Store         |
+| SSH  | Host/IP        | `localhost`                                             |
+| SSH  | Port           | `2222`                                                  |
+| SSH  | Username       | `ubuntu`                                                |
+| SSH  | Auth method    | Public Key                                              |
+| SSH  | Private key    | `/home/gerni/.ssh/omb`                                  |
+| SSH  | Implementation | SSHJ                                                    |
+
+**To retrieve the password:**
+
+```bash
+aws ssm get-parameter --name "/omb/DATABASE_URL" --with-decryption --query "Parameter.Value" --output text
+# Format: postgres://omb:<password>@<endpoint>:5432/omb?sslmode=require
+```
+
+### How it works
+
+```
+DBeaver → localhost:2222
+              ↓ SSM port-forward tunnel
+          EC2 sshd (port 22) → RDS :5432
+```
+
+SSM authenticates via AWS credentials. SSH authenticates via the `~/.ssh/omb` keypair. No inbound ports are opened in the security group.
 
 ---
 
