@@ -34,7 +34,8 @@ services:
       "
 
   waha:
-    image: devlikeapro/waha
+    # Keep in step with docker-compose.yml so local dev reproduces production.
+    image: devlikeapro/waha:latest-2026.7.2
     network_mode: host
     environment:
       PORT: '3100'
