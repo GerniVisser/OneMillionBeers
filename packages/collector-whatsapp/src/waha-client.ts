@@ -29,6 +29,20 @@ export async function getSessionStatus(): Promise<SessionStatus> {
   return data.status
 }
 
+/**
+ * Restarts the session in place, reusing the stored credentials. Recovers a
+ * FAILED session caused by a transient WhatsApp-side disconnect; does not help
+ * when WhatsApp has de-authorized the linked device (that needs a QR re-scan).
+ */
+export async function restartSession(): Promise<void> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}/restart`, {
+    method: 'POST',
+    headers: wahaHeaders(),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!res.ok) throw new Error(`WAHA restartSession returned ${res.status}`)
+}
+
 export async function startSession(): Promise<void> {
   const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/start`, {
     method: 'POST',

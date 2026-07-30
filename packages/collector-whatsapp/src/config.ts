@@ -7,11 +7,23 @@ const WhatsAppConfigSchema = CoreConfigSchema.extend({
   WAHA_SESSION: z.string().min(1).default('default'),
   WAHA_WEBHOOK_URL: z.string().url(),
   WAHA_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1_800_000),
+  // Auto-recovery for a FAILED session. Capped, because a de-authorized device
+  // never recovers by restarting and would otherwise loop forever.
+  WAHA_MAX_RESTART_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  // Consecutive-attempt counter resets after this long without a restart.
+  WAHA_RESTART_RESET_MS: z.coerce.number().int().positive().default(21_600_000),
+  // How often a still-broken session re-alerts, so an outage cannot go quiet.
+  ALERT_REPEAT_INTERVAL_MS: z.coerce.number().int().positive().default(21_600_000),
   COLLECTOR_PORT: z.coerce.number().int().positive().default(8080),
   PUBLIC_BASE_URL: z.string().url(),
   STATUS_TOKEN: z.string().min(1),
   // Alert feature — disabled by default (dev). Set ENABLE_ALERTS=true in production.
-  ENABLE_ALERTS: z.coerce.boolean().default(false),
+  // NOTE: not z.coerce.boolean() — that treats any non-empty string as true,
+  // so the literal "false" would enable alerts.
+  ENABLE_ALERTS: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
   ALERT_EMAIL: z.string().email().optional(),
   SES_FROM_EMAIL: z.string().email().optional(),
   AWS_REGION: z.string().min(1).optional(),
