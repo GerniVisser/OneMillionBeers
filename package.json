@@ -30,6 +30,7 @@
     "db:migrate": "bash scripts/dev-db-migrate.sh",
     "db:seed": "dotenv -e .env.local -- tsx db/seeds/seed.ts",
     "db:reset": "pnpm db:migrate && pnpm db:seed",
+    "db:tunnel": "bash scripts/db-tunnel.sh",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
