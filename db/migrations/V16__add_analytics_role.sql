@@ -16,7 +16,15 @@ BEGIN
 END
 $$;
 
-GRANT CONNECT ON DATABASE omb TO analytics;
+-- Resolved at run time rather than hardcoded: production is `omb`, but the
+-- backend integration tests apply this same chain to a Testcontainers database
+-- named `test`.
+DO $$
+BEGIN
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO analytics', current_database());
+END
+$$;
+
 GRANT USAGE ON SCHEMA public TO analytics;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO analytics;
