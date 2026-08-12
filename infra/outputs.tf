@@ -8,6 +8,11 @@ output "rds_endpoint" {
   value       = aws_db_instance.postgres.endpoint
 }
 
+output "ec2_instance_id" {
+  description = "EC2 instance ID — SSM Session Manager target for scripts/db-tunnel.sh"
+  value       = aws_instance.app.id
+}
+
 output "s3_bucket_name" {
   description = "Photos S3 bucket name"
   value       = aws_s3_bucket.photos.id
