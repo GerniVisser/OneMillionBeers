@@ -91,23 +91,29 @@ Ad-hoc analytical queries run against production over an SSM Session Manager por
 - AWS CLI configured with credentials that allow `ssm:StartSession` on the instance
 - [`session-manager-plugin`](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) installed locally
 
-**Set the `analytics` password (once).** Migration `V16` creates the role with grants but deliberately no password, so it cannot authenticate until you set one. This keeps the credential out of git. Open a shell on the instance and set it as the `omb` master user:
-
-```bash
-aws ssm start-session --target "$(terraform -chdir=infra output -raw ec2_instance_id)"
-# then, on the instance:
-docker compose -f /opt/onemillionbeers/docker-compose.yml exec backend \
-  psql "$DATABASE_URL" -c "ALTER ROLE analytics PASSWORD '<generated-password>';"
-```
-
-Store the password in your own password manager — it is not in SSM Parameter Store, because no service needs it.
-
 **Open a tunnel:**
 
 ```bash
 pnpm db:tunnel          # localhost:15432 -> production:5432, foreground, Ctrl-C to close
 LOCAL_PORT=6543 pnpm db:tunnel
 ```
+
+**Set the `analytics` password (once).** Migration `V16` creates the role with grants but deliberately no password, so it cannot authenticate until you set one. This keeps the credential out of git.
+
+Do it through the tunnel as the `omb` master user — no shell on the instance required. In a second terminal, with the tunnel open:
+
+```bash
+# Master credentials live in SSM Parameter Store; rewrite the host to the tunnel.
+MASTER=$(aws ssm get-parameter --name /omb/DATABASE_URL --with-decryption \
+  --region us-east-1 --query 'Parameter.Value' --output text \
+  | sed -E 's#@[^:/]+:[0-9]+/#@localhost:15432/#')
+
+NEW_PW=$(openssl rand -base64 24)
+psql "$MASTER" -c "ALTER ROLE analytics PASSWORD '${NEW_PW}';"
+echo "$NEW_PW"   # store this in your password manager, then clear your scrollback
+```
+
+The password is not written to SSM Parameter Store, because no service needs it — it is an operator credential only.
 
 **Query from a second shell:**
 
