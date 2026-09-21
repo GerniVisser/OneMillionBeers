@@ -45,7 +45,19 @@ services:
         tag: backend/{{.ID}}
 
   waha:
-    image: devlikeapro/waha
+    # Pinned deliberately. WAHA is NOT in the deploy.yml pull/up list, because the
+    # container has no volume — recreating it wipes the WhatsApp session and forces
+    # a QR re-scan, which needs a human with the phone. Upgrade as a planned action:
+    #   docker compose --env-file .env --env-file .env.sha pull waha
+    #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
+    # then re-pair at /whatsapp/status?token=...
+    #
+    # Keep this current. WhatsApp periodically invalidates the WhatsApp Web version
+    # baked into the NOWEB engine, which breaks login with a registration loop
+    # (`not logged in, attempting registration...` -> `Connection Failure`) that no
+    # amount of restarting fixes — only a newer image does. That took production
+    # down for ~46h on 2026-07-28; 2026.7.2 is the release that fixed it.
+    image: devlikeapro/waha:latest-2026.7.2
     expose:
       - '3000'
     restart: unless-stopped
