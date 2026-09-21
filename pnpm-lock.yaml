@@ -152,46 +152,6 @@ importers:
         specifier: ^3.0.8
         version: 3.2.4(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/collector-telegram:
-    dependencies:
-      '@grammyjs/auto-retry':
-        specifier: ^2.0.2
-        version: 2.0.2(grammy@1.41.1)
-      '@grammyjs/files':
-        specifier: ^1.2.0
-        version: 1.2.0(grammy@1.41.1)
-      '@omb/collector-core':
-        specifier: workspace:*
-        version: link:../collector-core
-      '@omb/shared':
-        specifier: workspace:*
-        version: link:../shared
-      grammy:
-        specifier: ^1.0.0
-        version: 1.41.1
-      pino:
-        specifier: ^9.6.0
-        version: 9.14.0
-      pino-pretty:
-        specifier: ^13.0.0
-        version: 13.1.3
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      tsx:
-        specifier: ^4.19.3
-        version: 4.21.0
-      typescript:
-        specifier: '*'
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.8
-        version: 3.2.4(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
-
   packages/collector-whatsapp:
     dependencies:
       '@aws-sdk/client-ses':
@@ -944,21 +904,6 @@ packages:
 
   '@fastify/swagger@9.7.0':
     resolution: {integrity: sha512-Vp1SC1GC2Hrkd3faFILv86BzUNyFz5N4/xdExqtCgkGASOzn/x+eMe4qXIGq7cdT6wif/P/oa6r1Ruqx19paZA==}
-
-  '@grammyjs/auto-retry@2.0.2':
-    resolution: {integrity: sha512-b4A4p5jlYDiQtW0c0FXYe11WMkYoiW+5rvOaDMCOk1h7Pu2SDl7B7gmFF8cthWCx2+M2nWLOsBxAgbBG4kKWYg==}
-    engines: {node: '>=12.20.0 || >=14.13.1'}
-    peerDependencies:
-      grammy: ^1.10.0
-
-  '@grammyjs/files@1.2.0':
-    resolution: {integrity: sha512-UhQNGe2gpGgGMdrAUFXrZld3qQjt/3oYBHIo1aU0zIrKKvI5bgxzXSjPaJpx69HUO9mM7TbOaSsJL8lWbqnzJw==}
-    engines: {node: ^12.20.0 || >=14.13.1}
-    peerDependencies:
-      grammy: ^1.3.0
-
-  '@grammyjs/types@3.25.0':
-    resolution: {integrity: sha512-iN9i5p+8ZOu9OMxWNcguojQfz4K/PDyMPOnL7PPCON+SoA/F8OKMH3uR7CVUkYfdNe0GCz8QOzAWrnqusQYFOg==}
 
   '@grpc/grpc-js@1.14.3':
     resolution: {integrity: sha512-Iq8QQQ/7X3Sac15oB6p0FmUg/klxQvXLeileoqrTRGJYLV+/9tubbr9ipz0GKHjmXVsgFPo/+W+2cA8eNcR+XA==}
@@ -2502,10 +2447,6 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  grammy@1.41.1:
-    resolution: {integrity: sha512-wcHAQ1e7svL3fJMpDchcQVcWUmywhuepOOjHUHmMmWAwUJEIyK5ea5sbSjZd+Gy1aMpZeP8VYJa+4tP+j1YptQ==}
-    engines: {node: ^12.20.0 || >=14.13.1}
-
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
@@ -2872,15 +2813,6 @@ packages:
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
-
-  node-fetch@2.7.0:
-    resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
-    engines: {node: 4.x || >=6.0.0}
-    peerDependencies:
-      encoding: ^0.1.0
-    peerDependenciesMeta:
-      encoding:
-        optional: true
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -3500,9 +3432,6 @@ packages:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
 
-  tr46@0.0.3:
-    resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
-
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
@@ -3633,12 +3562,6 @@ packages:
         optional: true
       jsdom:
         optional: true
-
-  webidl-conversions@3.0.1:
-    resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
-
-  whatwg-url@5.0.0:
-    resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
 
   which-module@2.0.1:
     resolution: {integrity: sha512-iBdZ57RDvnOR9AGBhML2vFZf7h8vmBjhoaZqODJBFWHVtKkDmKuHai3cx5PgVMrX5YDNp27AofYbAwctSS+vhQ==}
@@ -4713,19 +4636,6 @@ snapshots:
       yaml: 2.8.2
     transitivePeerDependencies:
       - supports-color
-
-  '@grammyjs/auto-retry@2.0.2(grammy@1.41.1)':
-    dependencies:
-      debug: 4.4.3
-      grammy: 1.41.1
-    transitivePeerDependencies:
-      - supports-color
-
-  '@grammyjs/files@1.2.0(grammy@1.41.1)':
-    dependencies:
-      grammy: 1.41.1
-
-  '@grammyjs/types@3.25.0': {}
 
   '@grpc/grpc-js@1.14.3':
     dependencies:
@@ -6465,16 +6375,6 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  grammy@1.41.1:
-    dependencies:
-      '@grammyjs/types': 3.25.0
-      abort-controller: 3.0.0
-      debug: 4.4.3
-      node-fetch: 2.7.0
-    transitivePeerDependencies:
-      - encoding
-      - supports-color
-
   has-flag@4.0.0: {}
 
   hasown@2.0.2:
@@ -6777,10 +6677,6 @@ snapshots:
   nanoid@3.3.11: {}
 
   natural-compare@1.4.0: {}
-
-  node-fetch@2.7.0:
-    dependencies:
-      whatwg-url: 5.0.0
 
   normalize-path@3.0.0: {}
 
@@ -7454,8 +7350,6 @@ snapshots:
 
   totalist@3.0.1: {}
 
-  tr46@0.0.3: {}
-
   tree-kill@1.2.2: {}
 
   ts-api-utils@2.4.0(typescript@5.9.3):
@@ -7574,13 +7468,6 @@ snapshots:
       - terser
       - tsx
       - yaml
-
-  webidl-conversions@3.0.1: {}
-
-  whatwg-url@5.0.0:
-    dependencies:
-      tr46: 0.0.3
-      webidl-conversions: 3.0.1
 
   which-module@2.0.1: {}
 

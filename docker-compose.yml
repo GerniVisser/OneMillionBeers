@@ -44,28 +44,6 @@ services:
         awslogs-group: /omb/backend
         tag: backend/{{.ID}}
 
-  collector-telegram:
-    image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector-telegram:${GIT_SHA}
-    environment:
-      BACKEND_URL: http://backend:3000
-      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
-      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
-      STORAGE_BUCKET: ${STORAGE_BUCKET}
-      STORAGE_KEY: ${STORAGE_KEY}
-      STORAGE_SECRET: ${STORAGE_SECRET}
-      STORAGE_REGION: ${STORAGE_REGION:-auto}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-    depends_on:
-      - backend
-    restart: unless-stopped
-    logging:
-      driver: awslogs
-      options:
-        awslogs-region: us-east-1
-        awslogs-group: /omb/collector-telegram
-        tag: collector-telegram/{{.ID}}
-
   waha:
     image: devlikeapro/waha
     expose:

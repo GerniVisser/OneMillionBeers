@@ -68,12 +68,12 @@ Access: security group allows port 5432 from EC2 security group only.
 
 **sg-ec2-omb**
 
-| Direction | Port | Source               | Reason                                      |
-| --------- | ---- | -------------------- | ------------------------------------------- |
-| Inbound   | 80   | 0.0.0.0/0            | HTTP → HTTPS redirect                       |
-| Inbound   | 443  | 0.0.0.0/0            | Public HTTPS                                |
-| Inbound   | 22   | GitHub Actions CIDRs | Deploy pipeline SSH                         |
-| Outbound  | all  | 0.0.0.0/0            | GHCR pulls, Let's Encrypt, S3, Telegram API |
+| Direction | Port | Source               | Reason                                  |
+| --------- | ---- | -------------------- | --------------------------------------- |
+| Inbound   | 80   | 0.0.0.0/0            | HTTP → HTTPS redirect                   |
+| Inbound   | 443  | 0.0.0.0/0            | Public HTTPS                            |
+| Inbound   | 22   | GitHub Actions CIDRs | Deploy pipeline SSH                     |
+| Outbound  | all  | 0.0.0.0/0            | GHCR pulls, Let's Encrypt, S3, WhatsApp |
 
 **Operator shell access: AWS SSM Session Manager**
 No inbound port 22 for operators. SSM Session Manager provides shell access via AWS API (outbound HTTPS from EC2). Requires `AmazonSSMManagedInstanceCore` policy on EC2 role and AWS CLI + Session Manager plugin installed locally.
@@ -187,8 +187,6 @@ Push to main
 
 ```bash
 DATABASE_URL=postgres://omb:PASSWORD@<RDS_ENDPOINT>:5432/omb?sslmode=require
-COLLECTOR=telegram
-TELEGRAM_BOT_TOKEN=<secret>
 STORAGE_ENDPOINT=https://s3.amazonaws.com
 STORAGE_PUBLIC_URL=https://onemillionbeers-photos-prod.s3.amazonaws.com
 STORAGE_BUCKET=onemillionbeers-photos-prod

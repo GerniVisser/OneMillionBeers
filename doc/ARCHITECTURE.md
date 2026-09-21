@@ -6,8 +6,8 @@ Last updated: 2026-03-18
 
 ```
 Messaging platform ──> [ Collector Service ] ──> S3-compatible
- (e.g. Telegram,                │                   object storage
-   WhatsApp)              HTTP POST                  (beer photos)
+   (WhatsApp)                   │                   object storage
+                          HTTP POST                  (beer photos)
                           (metadata + photoUrl)
                                 │
                                 ▼
@@ -22,12 +22,12 @@ Browser ──(HTTPS)──> [ nginx ] ──/api/──> [ Backend API Service 
 
 ## Service responsibilities
 
-| Service             | Owns                                                                                                       | Does NOT own                                            |
-| ------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Collectors**      | Platform connection (e.g. Telegram, WhatsApp), photo upload to storage, forwarding metadata to Backend API | Business logic, database, any data beyond what it sends |
-| **Backend API**     | All business logic, database reads/writes, REST API, SSE stream                                            | Image data — photos arrive as a URL only                |
-| **Frontend**        | Display layer, SSR rendering, real-time UI updates                                                         | Business logic — all data comes from the API            |
-| **Gateway (nginx)** | SSL termination, routing `/api/*` to backend, `/` to frontend                                              | Any application logic                                   |
+| Service             | Owns                                                                                             | Does NOT own                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| **Collectors**      | Platform connection (e.g. WhatsApp), photo upload to storage, forwarding metadata to Backend API | Business logic, database, any data beyond what it sends |
+| **Backend API**     | All business logic, database reads/writes, REST API, SSE stream                                  | Image data — photos arrive as a URL only                |
+| **Frontend**        | Display layer, SSR rendering, real-time UI updates                                               | Business logic — all data comes from the API            |
+| **Gateway (nginx)** | SSL termination, routing `/api/*` to backend, `/` to frontend                                    | Any application logic                                   |
 
 The Collector is not exposed via nginx — it has no public interface.
 
@@ -54,7 +54,7 @@ Three entities. See `db/migrations/` for schemas.
 
 **Group** — a messaging group connected to the platform. Has a slug used in public URLs (`/groups/[slug]`). Identified internally by the platform-specific group ID (`source_group_id`).
 
-**User** — a participant who has logged at least one beer. Identified by a SHA-256 hash of their platform identity (e.g. phone number, Telegram user ID) — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on first beer log — no signup.
+**User** — a participant who has logged at least one beer. Identified by a SHA-256 hash of their platform identity (e.g. phone number) — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on first beer log — no signup.
 
 **BeerLog** — a single beer photo. Belongs to one User and one Group. Stores the public photo URL and two timestamps: when the WhatsApp message was sent, and when the record was inserted.
 
@@ -101,7 +101,7 @@ The Backend API has no S3 credentials and no image handling code. The Collector 
 
 ### Collector design
 
-Each collector is a standalone deployable service backed by its own package and Docker image. Shared infrastructure — S3 upload, backend forwarding, base config validation — lives in `@omb/collector-core`. Platform-specific code lives in a dedicated package (e.g. `@omb/collector-telegram`).
+Each collector is a standalone deployable service backed by its own package and Docker image. Shared infrastructure — S3 upload, backend forwarding, base config validation — lives in `@omb/collector-core`. Platform-specific code lives in a dedicated package (e.g. `@omb/collector-whatsapp`).
 
 There is no `COLLECTOR` env var. The image itself is the collector type. Adding a new messaging platform means creating a new package that depends on `@omb/collector-core`, with its own `Dockerfile` that produces an independent image.
 
@@ -152,7 +152,7 @@ Treat these as decided unless there is a compelling reason to revisit:
 | Logging            | Pino (structured JSON to stdout)                                             |
 | HTTP client        | Native fetch (Node 18+)                                                      |
 | Testing            | Vitest + Testcontainers (@testcontainers/postgresql)                         |
-| Telegram Collector | Telegram Bot API via grammY (`@omb/collector-telegram`)                      |
+| WhatsApp Collector | WAHA (WhatsApp HTTP API) webhooks via Fastify (`@omb/collector-whatsapp`)    |
 | Object storage     | S3-compatible (MinIO local, AWS S3 prod)                                     |
 | Frontend framework | SvelteKit + `@sveltejs/adapter-node`                                         |
 | Styling            | Tailwind CSS v4                                                              |

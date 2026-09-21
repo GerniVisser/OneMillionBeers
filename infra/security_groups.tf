@@ -22,7 +22,7 @@ resource "aws_security_group" "ec2" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # All outbound — GHCR pulls, Let's Encrypt, S3, Telegram API, SSM endpoints
+  # All outbound — GHCR pulls, Let's Encrypt, S3, WhatsApp (WAHA), SSM endpoints
   egress {
     from_port   = 0
     to_port     = 0

@@ -157,8 +157,8 @@ async function seedUsers(client: pg.PoolClient) {
 
   for (let i = 0; i < NUM_USERS; i++) {
     const id = randomUUID()
-    const telegramId = faker.string.numeric(10)
-    const hash = identityHash(telegramId)
+    const phoneNumber = faker.string.numeric(10)
+    const hash = identityHash(phoneNumber)
     const displayName = Math.random() > 0.15 ? faker.person.firstName() : null
     const slug = `user-${id.slice(0, 8)}`
     const countryCode = COUNTRY_POOL[Math.floor(Math.random() * COUNTRY_POOL.length)]
