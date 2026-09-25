@@ -15,7 +15,12 @@ export async function buildApp(
   logLevel = 'info',
   nodeEnv = process.env.NODE_ENV ?? 'development',
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: logLevel } })
+  // Nothing reaches this process directly — nginx (and, for SSR loads, the frontend)
+  // sits in front, and the real client address arrives as the last X-Forwarded-For
+  // entry. Trusting exactly one hop makes request.ip that address instead of the
+  // proxy's container address; without it the rate limiter below keys every request
+  // in the world the same and degrades into a single global bucket.
+  const app = Fastify({ logger: { level: logLevel }, trustProxy: 1 })
 
   await app.register(cors)
 
