@@ -12,6 +12,7 @@ describe('shared config', () => {
 
   function stubValidEnv() {
     vi.stubEnv('BACKEND_URL', 'http://localhost:3000')
+    vi.stubEnv('INTERNAL_API_TOKEN', 'test-internal-token-at-least-32-chars-long')
     vi.stubEnv('STORAGE_ENDPOINT', 'http://localhost:9000')
     vi.stubEnv('STORAGE_PUBLIC_URL', 'http://localhost:9000')
     vi.stubEnv('STORAGE_BUCKET', 'omb-photos')
@@ -44,10 +45,23 @@ describe('shared config', () => {
       throw new Error('process.exit called')
     })
     // Omit BACKEND_URL intentionally
+    vi.stubEnv('INTERNAL_API_TOKEN', 'test-internal-token-at-least-32-chars-long')
     vi.stubEnv('STORAGE_ENDPOINT', 'http://localhost:9000')
     vi.stubEnv('STORAGE_BUCKET', 'omb-photos')
     vi.stubEnv('STORAGE_KEY', 'key')
     vi.stubEnv('STORAGE_SECRET', 'secret')
+
+    await expect(import('../config.js')).rejects.toThrow('process.exit called')
+    expect(exitSpy).toHaveBeenCalledWith(1)
+    exitSpy.mockRestore()
+  })
+
+  it('calls process.exit(1) when INTERNAL_API_TOKEN is too short', async () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called')
+    })
+    stubValidEnv()
+    vi.stubEnv('INTERNAL_API_TOKEN', 'too-short')
 
     await expect(import('../config.js')).rejects.toThrow('process.exit called')
     expect(exitSpy).toHaveBeenCalledWith(1)
@@ -59,6 +73,7 @@ describe('shared config', () => {
       throw new Error('process.exit called')
     })
     vi.stubEnv('BACKEND_URL', 'http://localhost:3000')
+    vi.stubEnv('INTERNAL_API_TOKEN', 'test-internal-token-at-least-32-chars-long')
     vi.stubEnv('STORAGE_ENDPOINT', 'not-a-url')
     vi.stubEnv('STORAGE_BUCKET', 'omb-photos')
     vi.stubEnv('STORAGE_KEY', 'key')

@@ -2,8 +2,14 @@ import type { FastifyPluginAsync } from 'fastify'
 import type pg from 'pg'
 import { GroupSyncRequestSchema } from '@omb/shared'
 import { upsertGroup } from '../db/queries.js'
+import { requireInternalToken } from '../lib/internal-auth.js'
 
-export const groupSyncRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
+export const groupSyncRoutes: FastifyPluginAsync<{
+  pool: pg.Pool
+  internalToken: string
+}> = async (app, { pool, internalToken }) => {
+  app.addHook('onRequest', requireInternalToken(internalToken))
+
   app.put(
     '/v1/internal/groups/:sourceGroupId',
     { config: { rateLimit: false } },

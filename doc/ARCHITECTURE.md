@@ -64,16 +64,27 @@ Three entities. See `db/migrations/` for schemas.
 
 All endpoints are prefixed `/v1/`. Breaking changes introduce `/v2/` without removing `/v1/`.
 
-| Group        | Endpoints                                                 | Consumer                                                      |
-| ------------ | --------------------------------------------------------- | ------------------------------------------------------------- |
-| **Internal** | Beer log ingestion                                        | Collector only — not routed via nginx, not publicly reachable |
-| **Groups**   | Group info, photo feed, leaderboard                       | Frontend                                                      |
-| **Users**    | User profile, stats                                       | Frontend                                                      |
-| **Global**   | Global count, global feed, global leaderboard, SSE stream | Frontend                                                      |
+| Group        | Endpoints                                                 | Consumer                                                            |
+| ------------ | --------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Internal** | Beer log ingestion, group metadata sync                   | Collector only — blocked at the gateway, bearer-token authenticated |
+| **Groups**   | Group info, photo feed, leaderboard                       | Frontend                                                            |
+| **Users**    | User profile, stats                                       | Frontend                                                            |
+| **Global**   | Global count, global feed, global leaderboard, SSE stream | Frontend                                                            |
 
 Full endpoint shapes are defined in `packages/shared/src/` (Zod schemas). The schema is the contract — this document does not duplicate it.
 
 A `/health` endpoint is registered at the root (no version prefix) and returns `{ status: "ok" }`. It is used by infrastructure health checks and is not part of the versioned API contract.
+
+### Internal API protection
+
+`/v1/internal/*` is the write surface — it creates and deletes beer logs and rewrites group metadata. Only a collector on the Docker network ever calls it. It is protected by two independent layers, because until v0.6.6 it was protected by neither:
+
+1. **Gateway.** `location ~* ^/api/v1/internal { return 404; }` in every nginx config, matched before the general `/api/` proxy. A case-insensitive regex, so the block does not depend on the backend's router also being case-sensitive.
+2. **Application.** Both internal route plugins register an `onRequest` hook (`lib/internal-auth.ts`) requiring `Authorization: Bearer $INTERNAL_API_TOKEN`, compared in constant time. It fails closed: an unset token rejects every request rather than accepting anonymous writes.
+
+The collector reaches the backend directly at `http://backend:3000`, never through nginx, so the gateway block costs nothing legitimate.
+
+**Do not rely on either layer alone.** The original design relied solely on "not routed via nginx" — a claim this document asserted and the deployed `location /api/` block silently contradicted, leaving forged and deleted beer logs one unauthenticated request away from the open internet.
 
 ---
 

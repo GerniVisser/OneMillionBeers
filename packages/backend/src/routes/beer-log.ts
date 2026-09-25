@@ -12,8 +12,14 @@ import {
 import { hashIdentity } from '../lib/hash.js'
 import { extractCountryCode } from '../lib/phone.js'
 import { broadcast } from '../lib/sse.js'
+import { requireInternalToken } from '../lib/internal-auth.js'
 
-export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { pool }) => {
+export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: string }> = async (
+  app,
+  { pool, internalToken },
+) => {
+  app.addHook('onRequest', requireInternalToken(internalToken))
+
   app.post('/v1/internal/beer-log', { config: { rateLimit: false } }, async (request, reply) => {
     const parse = BeerLogRequestSchema.safeParse(request.body)
     if (!parse.success) {

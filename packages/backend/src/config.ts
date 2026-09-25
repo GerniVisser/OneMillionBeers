@@ -5,6 +5,7 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  INTERNAL_API_TOKEN: z.string().min(32),
 })
 
 const result = ConfigSchema.safeParse(process.env)

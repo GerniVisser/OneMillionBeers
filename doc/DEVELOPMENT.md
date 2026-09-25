@@ -50,6 +50,8 @@ Never duplicate values into docs — read the file that owns them:
 
 **Zod env validation on startup:** Both services validate all required env vars via Zod before doing anything else. The process exits immediately if any are missing or wrongly typed — fail fast, not at runtime.
 
+**The internal API needs a shared secret locally too.** `INTERNAL_API_TOKEN` is required by both `@omb/backend` and every collector, must be identical for both, and must be at least 32 characters. `.env.local.example` ships a fixed development value; production uses a random one from SSM Parameter Store. Without it the backend exits at startup, and with a mismatch every beer log is rejected with 401.
+
 **Git hooks registration:** `simple-git-hooks` must be registered once after `pnpm install` with `pnpm exec simple-git-hooks`. The hooks are not installed automatically by pnpm install.
 
 **`@omb/shared` consumption:** Other packages consume `@omb/shared` via the workspace protocol (`workspace:*`). It is not published to any registry. All Dockerfiles that consume it use the repo root as the build context.

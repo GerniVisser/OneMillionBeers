@@ -1,5 +1,5 @@
 import { type Logger } from 'pino'
-import { uploadGroupAvatar, coreConfig } from '@omb/collector-core'
+import { uploadGroupAvatar, coreConfig, internalAuthHeader } from '@omb/collector-core'
 import { getGroupPictureUrl, getGroupInviteCode, listAllGroups } from './waha-client.js'
 import { config } from './config.js'
 
@@ -23,7 +23,7 @@ async function pushGroupSync(
   const url = `${coreConfig.BACKEND_URL}/v1/internal/groups/${encodeURIComponent(sourceGroupId)}`
   const res = await fetch(url, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...internalAuthHeader() },
     body: JSON.stringify({ name, avatarUrl, inviteCode }),
     signal: AbortSignal.timeout(10_000),
   })

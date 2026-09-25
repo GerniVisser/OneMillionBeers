@@ -4,6 +4,11 @@ import { pino } from 'pino'
 
 const logger = pino({ name: 'forwarder', level: config.LOG_LEVEL })
 
+/** Auth for /v1/internal/* — see packages/backend/src/lib/internal-auth.ts. */
+export function internalAuthHeader(): Record<string, string> {
+  return { Authorization: `Bearer ${config.INTERNAL_API_TOKEN}` }
+}
+
 export async function forwardBeerLog(payload: BeerLogRequest): Promise<void> {
   // Belt-and-suspenders: validate outbound payload before sending
   BeerLogRequestSchema.parse(payload)
@@ -11,7 +16,7 @@ export async function forwardBeerLog(payload: BeerLogRequest): Promise<void> {
   const url = `${config.BACKEND_URL}/v1/internal/beer-log`
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...internalAuthHeader() },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(10_000),
   })
@@ -27,6 +32,7 @@ export async function forwardDeleteBeerLog(sourceMessageId: string): Promise<str
   const url = `${config.BACKEND_URL}/v1/internal/beer-log/by-message/${encodeURIComponent(sourceMessageId)}`
   const response = await fetch(url, {
     method: 'DELETE',
+    headers: internalAuthHeader(),
     signal: AbortSignal.timeout(10_000),
   })
 

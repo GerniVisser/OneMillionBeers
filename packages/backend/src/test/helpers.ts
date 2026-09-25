@@ -4,6 +4,12 @@ import { join } from 'path'
 import { createPool } from '../db/client.js'
 import type pg from 'pg'
 
+/** Any 32+ char string — buildApp takes the token explicitly, so no env needed. */
+export const INTERNAL_TEST_TOKEN = 'test-internal-token-at-least-32-chars-long'
+
+/** Bearer header the collector sends on every /v1/internal/* call. */
+export const internalHeaders = { authorization: `Bearer ${INTERNAL_TEST_TOKEN}` }
+
 let container: StartedPostgreSqlContainer | null = null
 let pool: pg.Pool | null = null
 

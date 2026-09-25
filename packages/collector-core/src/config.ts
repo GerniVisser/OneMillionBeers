@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const CoreConfigSchema = z.object({
   BACKEND_URL: z.string().url(),
+  INTERNAL_API_TOKEN: z.string().min(32),
   STORAGE_ENDPOINT: z.string().url(),
   STORAGE_PUBLIC_URL: z.string().url(),
   STORAGE_BUCKET: z.string().min(1),

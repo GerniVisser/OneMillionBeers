@@ -14,6 +14,7 @@ export async function buildApp(
   pool: pg.Pool,
   logLevel = 'info',
   nodeEnv = process.env.NODE_ENV ?? 'development',
+  internalToken = process.env.INTERNAL_API_TOKEN ?? '',
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: { level: logLevel } })
 
@@ -49,8 +50,8 @@ export async function buildApp(
 
   app.get('/health', async () => ({ status: 'ok' }))
 
-  await app.register(beerLogRoutes, { pool })
-  await app.register(groupSyncRoutes, { pool })
+  await app.register(beerLogRoutes, { pool, internalToken })
+  await app.register(groupSyncRoutes, { pool, internalToken })
   await app.register(groupRoutes, { pool })
   await app.register(userRoutes, { pool })
   await app.register(globalRoutes, { pool })

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type pg from 'pg'
 import { buildApp } from '../../app.js'
-import { startDb, stopDb, clearTables } from '../helpers.js'
+import { startDb, stopDb, clearTables, internalHeaders, INTERNAL_TEST_TOKEN } from '../helpers.js'
 import type { FastifyInstance } from 'fastify'
 import {
   GroupProfileResponseSchema,
@@ -21,7 +21,7 @@ let app: FastifyInstance
 
 beforeAll(async () => {
   pool = await startDb()
-  app = await buildApp(pool, 'silent')
+  app = await buildApp(pool, 'silent', 'test', INTERNAL_TEST_TOKEN)
   await app.ready()
 }, 60000)
 
@@ -38,6 +38,7 @@ async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000
   return app.inject({
     method: 'POST',
     url: '/v1/internal/beer-log',
+    headers: internalHeaders,
     payload: {
       sourceGroupId: 'group-tg-1',
       groupName: 'Test Group',
@@ -85,6 +86,7 @@ describe('GET /v1/groups', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: {
         sourceGroupId: 'group-other',
         groupName: 'Other Crew',
@@ -108,6 +110,7 @@ describe('GET /v1/groups', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: {
         sourceGroupId: 'group-b',
         groupName: 'Beta Group',
@@ -368,6 +371,7 @@ describe('group flag filtering', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: {
         sourceGroupId: 'group-visible',
         groupName: 'Visible Group',
@@ -518,6 +522,7 @@ describe('GET /v1/groups/:groupId/invite-code', () => {
     await app.inject({
       method: 'PUT',
       url: '/v1/internal/groups/wa:sync-group',
+      headers: internalHeaders,
       payload: { name: 'Sync Group', avatarUrl: null, inviteCode: 'syncCode99' },
     })
     await pool.query(`UPDATE groups SET joinable = TRUE WHERE source_group_id = 'wa:sync-group'`)
