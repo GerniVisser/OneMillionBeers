@@ -5,9 +5,6 @@ const ConfigSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  // Shared secret the collector presents on /v1/internal/*. Required — the
-  // backend must not start without it, or ingestion would be open to anyone
-  // who can reach the container.
   INTERNAL_API_TOKEN: z.string().min(32),
 })
 

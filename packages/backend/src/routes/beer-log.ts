@@ -18,7 +18,6 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
   app,
   { pool, internalToken },
 ) => {
-  // Encapsulated: covers every route in this plugin, including ones added later.
   app.addHook('onRequest', requireInternalToken(internalToken))
 
   app.post('/v1/internal/beer-log', { config: { rateLimit: false } }, async (request, reply) => {
