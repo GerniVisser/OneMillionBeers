@@ -46,19 +46,22 @@ services:
         tag: backend/{{.ID}}
 
   waha:
-    # Pinned deliberately. WAHA is NOT in the deploy.yml pull/up list, because the
-    # container has no volume — recreating it wipes the WhatsApp session and forces
-    # a QR re-scan, which needs a human with the phone. Upgrade as a planned action:
+    # Pinned deliberately so the running version is reproducible. Upgrade as a
+    # planned action (WAHA is NOT in the deploy.yml pull/up list):
     #   docker compose --env-file .env --env-file .env.sha pull waha
     #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
-    # then re-pair at /whatsapp/status?token=...
+    # The session lives in the waha-sessions volume, so recreating the container
+    # keeps the pairing. If the status page shows SCAN_QR_CODE afterwards, re-pair
+    # at /whatsapp/status?token=...
     #
-    # Keep this current. WhatsApp periodically invalidates the WhatsApp Web version
-    # baked into the NOWEB engine, which breaks login with a registration loop
+    # WhatsApp periodically invalidates the WhatsApp Web version baked into the
+    # NOWEB engine, which breaks login with a registration loop
     # (`not logged in, attempting registration...` -> `Connection Failure`) that no
-    # amount of restarting fixes — only a newer image does. That took production
-    # down for ~46h on 2026-07-28; 2026.7.2 is the release that fixed it.
-    image: devlikeapro/waha:latest-2026.7.2
+    # amount of restarting fixes. That took production down for ~46h on 2026-07-28.
+    # WAHA_NOWEB_WA_VERSION=auto-web fetches the current version on start (falls
+    # back to the built-in one if the fetch fails or is older) so a stale image no
+    # longer strands the session. Do not change it after the QR has been scanned.
+    image: devlikeapro/waha:latest-2026.8.2
     expose:
       - '3000'
     restart: unless-stopped
@@ -66,7 +69,12 @@ services:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: ${WAHA_API_KEY}
       WHATSAPP_START_SESSION: default
-      WHATSAPP_DOWNLOAD_MEDIA: 'true'
+      WAHA_NOWEB_WA_VERSION: auto-web
+      # Only images reach the collector; skip downloading video/audio/documents.
+      WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
+      WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+    volumes:
+      - waha-sessions:/app/.sessions
     logging:
       driver: awslogs
       options:
@@ -128,3 +136,4 @@ services:
 volumes:
   certbot-www:
   certbot-certs:
+  waha-sessions:
