@@ -36,6 +36,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       NODE_ENV: production
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
     restart: unless-stopped
     logging:
       driver: awslogs
@@ -83,6 +84,7 @@ services:
       - backend
     environment:
       BACKEND_URL: http://backend:3000
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT}
       STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL}
       STORAGE_BUCKET: ${STORAGE_BUCKET}

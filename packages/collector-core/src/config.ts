@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 export const CoreConfigSchema = z.object({
   BACKEND_URL: z.string().url(),
+  // Presented as a bearer token on every /v1/internal/* call. Must match the
+  // backend's INTERNAL_API_TOKEN or ingestion is rejected with 401.
+  INTERNAL_API_TOKEN: z.string().min(32),
   STORAGE_ENDPOINT: z.string().url(),
   STORAGE_PUBLIC_URL: z.string().url(),
   STORAGE_BUCKET: z.string().min(1),

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const REQUIRED_ENV = {
   BACKEND_URL: 'http://backend:3000',
+  INTERNAL_API_TOKEN: 'test-internal-token-at-least-32-chars-long',
   STORAGE_ENDPOINT: 'http://minio:9000',
   STORAGE_PUBLIC_URL: 'http://localhost:9000',
   STORAGE_BUCKET: 'omb-photos',

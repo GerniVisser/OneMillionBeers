@@ -195,8 +195,18 @@ STORAGE_SECRET=     # empty — IAM instance profile provides credentials
 STORAGE_REGION=us-east-1
 ORIGIN=https://onemillionbeers.co.za
 BACKEND_INTERNAL_URL=http://backend:3000
+INTERNAL_API_TOKEN=   # 32+ byte random shared secret for /v1/internal/*
 LOG_LEVEL=info
 ```
+
+**`INTERNAL_API_TOKEN` must exist in SSM Parameter Store before the deploy that introduces it.** The deploy builds `.env` from `/omb/*`, and both the backend and the collector validate their environment with Zod at startup — a missing token means both containers exit immediately and crash-loop. Create it first:
+
+```bash
+aws ssm put-parameter --name /omb/INTERNAL_API_TOKEN --type SecureString \
+  --value "$(openssl rand -hex 32)" --region us-east-1
+```
+
+Rotating it means updating the parameter and redeploying; backend and collector come up together in the same `docker compose up -d`, so the mismatch window is only as long as the container restart.
 
 `STORAGE_KEY` and `STORAGE_SECRET` are intentionally empty in production. The collector's S3 client omits explicit credentials when these are empty, falling back to the AWS SDK credential chain (EC2 instance profile → IMDS).
 

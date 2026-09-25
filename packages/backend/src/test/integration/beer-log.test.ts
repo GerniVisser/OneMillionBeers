@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type pg from 'pg'
 import { buildApp } from '../../app.js'
-import { startDb, stopDb, clearTables } from '../helpers.js'
+import { startDb, stopDb, clearTables, internalHeaders, INTERNAL_TEST_TOKEN } from '../helpers.js'
 import type { FastifyInstance } from 'fastify'
 
 let pool: pg.Pool
@@ -9,7 +9,7 @@ let app: FastifyInstance
 
 beforeAll(async () => {
   pool = await startDb()
-  app = await buildApp(pool, 'silent')
+  app = await buildApp(pool, 'silent', 'test', INTERNAL_TEST_TOKEN)
   await app.ready()
 }, 60000)
 
@@ -50,6 +50,7 @@ describe('POST /v1/internal/beer-log', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: validPayload,
     })
     expect(res.statusCode).toBe(201)
@@ -57,8 +58,18 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('upserts group and user, inserts beer log', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
 
     const { rows: groups } = await pool.query('SELECT * FROM groups')
     const { rows: users } = await pool.query('SELECT * FROM users')
@@ -70,20 +81,35 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('hashes the sender identity — never stores plaintext', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT identity_hash FROM users')
     expect(rows[0].identity_hash).not.toBe(validPayload.senderId)
     expect(rows[0].identity_hash).toMatch(/^[0-9a-f]{64}$/)
   })
 
   it('stores phone_number stripped of wa: prefix', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows } = await pool.query('SELECT phone_number FROM users')
     expect(rows[0].phone_number).toBe('27831234567')
   })
 
   it('stores null phone_number for senderId without wa: prefix', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT phone_number FROM users')
     expect(rows[0].phone_number).toBeNull()
   })
@@ -92,6 +118,7 @@ describe('POST /v1/internal/beer-log', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...zaPayload, pushName: 'Marco Wouda' },
     })
     const { rows } = await pool.query('SELECT push_name FROM users')
@@ -99,18 +126,29 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('stores null push_name when not provided', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows } = await pool.query('SELECT push_name FROM users')
     expect(rows[0].push_name).toBeNull()
   })
 
   it('backfills phone_number and push_name on second log from existing user', async () => {
     // First log: no phone_number or push_name (simulates an existing hashed-only user)
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     // Second log: same sender via wa: prefix, with push_name
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, senderId: 'wa:27831234567', pushName: 'Test User' },
     })
     // Each senderId hashes to a different identity_hash, so we get two users here.
@@ -124,22 +162,42 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('stores country code from phone number prefix', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows } = await pool.query('SELECT country_code FROM users')
     expect(rows[0].country_code).toBe('ZA')
   })
 
   it('sets country code once and does not overwrite it', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     // Second log with same sender — country_code must remain 'ZA'
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows } = await pool.query('SELECT country_code FROM users')
     expect(rows).toHaveLength(1)
     expect(rows[0].country_code).toBe('ZA')
   })
 
   it('stores null country code for unparseable senderId', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT country_code FROM users')
     expect(rows[0].country_code).toBeNull()
   })
@@ -148,6 +206,7 @@ describe('POST /v1/internal/beer-log', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { sourceGroupId: 'x' },
     })
     expect(res.statusCode).toBe(400)
@@ -157,6 +216,7 @@ describe('POST /v1/internal/beer-log', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: payloadWithMessageId,
     })
     const { rows } = await pool.query('SELECT source_message_id FROM beer_logs')
@@ -164,7 +224,12 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('stores null source_message_id when not provided', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT source_message_id FROM beer_logs')
     expect(rows[0].source_message_id).toBeNull()
   })
@@ -173,6 +238,7 @@ describe('POST /v1/internal/beer-log', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoHash: HASH_A },
     })
     const { rows } = await pool.query('SELECT photo_hash FROM beer_logs')
@@ -180,7 +246,12 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('stores null photo_hash when not provided', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT photo_hash FROM beer_logs')
     expect(rows[0].photo_hash).toBeNull()
   })
@@ -191,11 +262,13 @@ describe('POST /v1/internal/beer-log — photo deduplication', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoHash: HASH_A },
     })
     const res = await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoUrl: 'https://example.com/other.jpg', photoHash: HASH_A },
     })
     expect(res.statusCode).toBe(201)
@@ -206,11 +279,13 @@ describe('POST /v1/internal/beer-log — photo deduplication', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoHash: HASH_A },
     })
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoHash: HASH_A },
     })
     const { rows } = await pool.query('SELECT * FROM beer_logs')
@@ -221,11 +296,13 @@ describe('POST /v1/internal/beer-log — photo deduplication', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, sourceGroupId: 'group-a', photoHash: HASH_A },
     })
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, sourceGroupId: 'group-b', photoHash: HASH_A },
     })
     const { rows } = await pool.query('SELECT * FROM beer_logs')
@@ -236,11 +313,13 @@ describe('POST /v1/internal/beer-log — photo deduplication', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoHash: HASH_A },
     })
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, photoUrl: 'https://example.com/beer2.jpg', photoHash: HASH_B },
     })
     const { rows } = await pool.query('SELECT * FROM beer_logs')
@@ -248,8 +327,18 @@ describe('POST /v1/internal/beer-log — photo deduplication', () => {
   })
 
   it('allows multiple rows without a photo_hash (legacy / no dedup)', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query('SELECT * FROM beer_logs')
     expect(rows).toHaveLength(2)
   })
@@ -260,11 +349,13 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: payloadWithMessageId,
     })
     const res = await app.inject({
       method: 'DELETE',
       url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+      headers: internalHeaders,
     })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ ok: true, photoUrl: payloadWithMessageId.photoUrl })
@@ -274,11 +365,13 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: payloadWithMessageId,
     })
     await app.inject({
       method: 'DELETE',
       url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+      headers: internalHeaders,
     })
     const { rows } = await pool.query('SELECT * FROM beer_logs')
     expect(rows).toHaveLength(0)
@@ -288,6 +381,7 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
     const res = await app.inject({
       method: 'DELETE',
       url: '/v1/internal/beer-log/by-message/unknown-message-id',
+      headers: internalHeaders,
     })
     expect(res.statusCode).toBe(404)
     expect(res.json()).toEqual({ ok: false })
@@ -297,15 +391,18 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: payloadWithMessageId,
     })
     await app.inject({
       method: 'DELETE',
       url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+      headers: internalHeaders,
     })
     const res = await app.inject({
       method: 'DELETE',
       url: `/v1/internal/beer-log/by-message/${encodeURIComponent(payloadWithMessageId.sourceMessageId)}`,
+      headers: internalHeaders,
     })
     expect(res.statusCode).toBe(404)
   })
@@ -313,20 +410,35 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
 
 describe('pseudo_name generation', () => {
   it('sets pseudo_name on new user creation', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query<{ pseudo_name: string }>('SELECT pseudo_name FROM users')
     expect(rows[0].pseudo_name).toBeTruthy()
     expect(typeof rows[0].pseudo_name).toBe('string')
   })
 
   it('pseudo_name is at most 20 characters', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query<{ pseudo_name: string }>('SELECT pseudo_name FROM users')
     expect(rows[0].pseudo_name.length).toBeLessThanOrEqual(20)
   })
 
   it('slug is derived from pseudo_name in kebab-case', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
     const { rows } = await pool.query<{ pseudo_name: string; slug: string }>(
       'SELECT pseudo_name, slug FROM users',
     )
@@ -335,13 +447,23 @@ describe('pseudo_name generation', () => {
   })
 
   it('pseudo_name is not overwritten on subsequent upserts', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows: first } = await pool.query<{ pseudo_name: string }>(
       'SELECT pseudo_name FROM users',
     )
     const originalName = first[0].pseudo_name
 
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: zaPayload })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: zaPayload,
+    })
     const { rows: second } = await pool.query<{ pseudo_name: string }>(
       'SELECT pseudo_name FROM users',
     )
@@ -349,10 +471,16 @@ describe('pseudo_name generation', () => {
   })
 
   it('pseudo_name is unique across different users', async () => {
-    await app.inject({ method: 'POST', url: '/v1/internal/beer-log', payload: validPayload })
     await app.inject({
       method: 'POST',
       url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: validPayload,
+    })
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
       payload: { ...validPayload, senderId: 'wa:27831234567' },
     })
     const { rows } = await pool.query<{ pseudo_name: string }>(

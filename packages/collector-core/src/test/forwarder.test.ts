@@ -4,6 +4,7 @@ import type { BeerLogRequest } from '@omb/shared'
 vi.mock('../config.js', () => ({
   config: {
     BACKEND_URL: 'http://localhost:3000',
+    INTERNAL_API_TOKEN: 'test-internal-token-at-least-32-chars-long',
     LOG_LEVEL: 'silent',
     STORAGE_ENDPOINT: 'http://localhost:9000',
     STORAGE_BUCKET: 'omb-photos',
@@ -55,6 +56,18 @@ describe('forwardBeerLog', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
     expect(JSON.parse(init.body as string)).toMatchObject(validPayload)
     expect(init.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('presents the internal API token as a bearer header', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"ok":true}', { status: 201 }))
+
+    const { forwardBeerLog } = await import('../forwarder.js')
+    await forwardBeerLog(validPayload)
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      'Bearer test-internal-token-at-least-32-chars-long',
+    )
   })
 
   it('body matches BeerLogRequestSchema', async () => {
