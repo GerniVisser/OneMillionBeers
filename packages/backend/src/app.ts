@@ -16,7 +16,7 @@ export async function buildApp(
   nodeEnv = process.env.NODE_ENV ?? 'development',
   internalToken = process.env.INTERNAL_API_TOKEN ?? '',
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: logLevel } })
+  const app = Fastify({ logger: { level: logLevel }, trustProxy: 1 })
 
   await app.register(cors)
 
