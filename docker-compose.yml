@@ -15,6 +15,8 @@ services:
       - backend
       - frontend
       - collector-whatsapp
+    restart: unless-stopped
+    mem_limit: 128m
     logging:
       driver: awslogs
       options:
@@ -38,6 +40,7 @@ services:
       NODE_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
     restart: unless-stopped
+    mem_limit: 256m
     logging:
       driver: awslogs
       options:
@@ -67,6 +70,10 @@ services:
       WAHA_API_KEY: ${WAHA_API_KEY}
       WHATSAPP_START_SESSION: default
       WHATSAPP_DOWNLOAD_MEDIA: 'true'
+    # Capped because an unbounded WAHA leaked until the kernel OOM-killer took the
+    # whole t3.small down on 2026-10-06. Restarting it costs nothing; losing the
+    # host costs the site.
+    mem_limit: 640m
     logging:
       driver: awslogs
       options:
@@ -100,6 +107,7 @@ services:
       ALERT_EMAIL: ${ALERT_EMAIL}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL}
       AWS_REGION: ${AWS_REGION}
+    mem_limit: 256m
     logging:
       driver: awslogs
       options:
@@ -118,6 +126,7 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    mem_limit: 256m
     logging:
       driver: awslogs
       options:
