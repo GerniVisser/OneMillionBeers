@@ -15,7 +15,6 @@ vi.mock('../waha-client.js', () => ({
 const testConfig = {
   ENABLE_ALERTS: true,
   PUBLIC_BASE_URL: 'https://example.com',
-  STATUS_TOKEN: 'mytoken',
   WAHA_POLL_INTERVAL_MS: 300_000,
   WAHA_MAX_RESTART_ATTEMPTS: 3,
   WAHA_RESTART_RESET_MS: 21_600_000,
@@ -40,7 +39,6 @@ describe('session-monitor', () => {
     mockRestartSession.mockResolvedValue(undefined)
     testConfig.ENABLE_ALERTS = true
     testConfig.PUBLIC_BASE_URL = 'https://example.com'
-    testConfig.STATUS_TOKEN = 'mytoken'
     testConfig.WAHA_POLL_INTERVAL_MS = 300_000
     testConfig.WAHA_MAX_RESTART_ATTEMPTS = 3
     testConfig.WAHA_RESTART_RESET_MS = 21_600_000
@@ -53,14 +51,12 @@ describe('session-monitor', () => {
   })
 
   describe('handleSessionStatusChange', () => {
-    it('calls sendReauthAlert with correct URL when SCAN_QR_CODE and ENABLE_ALERTS=true', async () => {
+    it('alerts with a link to the admin page (no secret in it) when SCAN_QR_CODE', async () => {
       mockSendReauthAlert.mockResolvedValue(undefined)
       const { handleSessionStatusChange } = await import('../session-monitor.js')
       await handleSessionStatusChange('SCAN_QR_CODE', logger)
       expect(mockSendReauthAlert).toHaveBeenCalledOnce()
-      expect(mockSendReauthAlert).toHaveBeenCalledWith(
-        'https://example.com/whatsapp/status?token=mytoken',
-      )
+      expect(mockSendReauthAlert).toHaveBeenCalledWith('https://example.com/admin')
     })
 
     it('does not call sendReauthAlert when ENABLE_ALERTS=false', async () => {

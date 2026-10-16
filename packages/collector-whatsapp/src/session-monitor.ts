@@ -2,6 +2,7 @@ import { type Logger } from 'pino'
 import { config } from './config.js'
 import { sendReauthAlert } from './mailer.js'
 import { getSessionStatus, restartSession } from './waha-client.js'
+import { recordStatus } from './activity.js'
 
 // Module-level — tracks last status we alerted for, and when, so a persistent
 // failure re-alerts periodically instead of going quiet after the first email.
@@ -68,10 +69,11 @@ async function maybeAlert(status: string, logger: Logger): Promise<void> {
     return
   }
 
-  const statusPageUrl = `${config.PUBLIC_BASE_URL}/whatsapp/status?token=${config.STATUS_TOKEN}`
+  // Links to the admin page, which needs a login: no secret travels in the email.
+  const adminUrl = `${config.PUBLIC_BASE_URL}/admin`
   try {
-    await sendReauthAlert(statusPageUrl)
-    logger.warn({ statusPageUrl }, 'Re-auth alert sent')
+    await sendReauthAlert(adminUrl)
+    logger.warn({ adminUrl }, 'Re-auth alert sent')
   } catch (err) {
     // Reset so the next poll retries rather than staying silent for the full
     // repeat interval — a bad SES config previously silenced alerts entirely.
@@ -111,6 +113,7 @@ export function startPolling(logger: Logger): () => void {
   const timer = setInterval(async () => {
     try {
       const status = await getSessionStatus()
+      recordStatus(config.WAHA_SESSION, status, 'poll')
       if (status !== 'WORKING') {
         await handleSessionStatusChange(status, logger)
       }

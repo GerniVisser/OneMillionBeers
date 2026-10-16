@@ -9,20 +9,20 @@ function getSes(): SESClient {
   return ses
 }
 
-export async function sendReauthAlert(statusPageUrl: string): Promise<void> {
+export async function sendReauthAlert(adminUrl: string): Promise<void> {
   if (!config.ENABLE_ALERTS) return
 
-  const textBody = `The WhatsApp session has dropped and requires re-authentication.
+  const textBody = `The WhatsApp session has dropped and needs attention.
 
-Scan the QR code at: ${statusPageUrl}
+Open the admin page: ${adminUrl}
 
-The page refreshes automatically every 15 seconds to keep the QR code current.
-Open the link on your computer and scan with your phone.`
+Log in, then restart the session or re-link it with a pairing code (works from
+the phone itself) or a QR code (scan from a second screen).`
 
-  const htmlBody = `<p>The WhatsApp session has dropped and requires re-authentication.</p>
-<p>Scan the QR code at: <a href="${statusPageUrl}">${statusPageUrl}</a></p>
-<p>The page refreshes automatically every 15 seconds to keep the QR code current.
-Open the link on your computer and scan with your phone.</p>`
+  const htmlBody = `<p>The WhatsApp session has dropped and needs attention.</p>
+<p>Open the admin page: <a href="${adminUrl}">${adminUrl}</a></p>
+<p>Log in, then restart the session or re-link it with a pairing code (works from
+the phone itself) or a QR code (scan from a second screen).</p>`
 
   await getSes().send(
     new SendEmailCommand({

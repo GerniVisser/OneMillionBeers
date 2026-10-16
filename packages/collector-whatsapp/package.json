@@ -4,11 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/admin/static','dist/admin/static',{recursive:true})\"",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "admin:hash-password": "tsx src/admin/hash-password-cli.ts"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.0.0",
