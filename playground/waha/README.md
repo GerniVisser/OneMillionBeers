@@ -44,6 +44,21 @@ the other. That is still enough to compare message ids, image hashes and timing,
 but a third member posting gives the cleanest picture. Real groups both numbers
 are in are recorded too, which gives passive soak data for free.
 
+## Admin page and the real app (`./lab.sh app up`)
+
+`docker-compose.app.yml` runs the production collector image, which serves the admin page, behind the
+gateway's `nginx.dev.conf`, with the backend, Postgres (migrated) and MinIO, all against the
+lab's WAHA:
+
+- **Admin page:** http://localhost:3202/admin. Log in as `admin` / `local-admin-password`.
+- **Read-only API:** `curl -H 'Authorization: Bearer lab-read-only-token-for-diagnostics-0000' localhost:3202/admin/api/overview`
+- **Ingestion:** the collector ingests through its own session, `omb`, so it never changes the
+  webhooks of `personal`/`prod`. Link `omb` from the admin page to send real beers into the local
+  database; leave it unlinked to only exercise the admin page.
+- **Re-linking:** a session in `SCAN_QR_CODE` shows its re-link panel by itself (pairing code by
+  default, QR as a tab). **Re-link** on a `FAILED` session logs it out first, discarding
+  dead credentials, and WAHA restarts it ready to pair.
+
 ## Dashboard
 
 - **Sessions:** current status of each session, paired number, last webhook, QR when unpaired.
@@ -111,3 +126,5 @@ Record results here as they come in.
 | 2026-10-15 | —         | **Revoke can arrive before the message.** Production would then ingest an already-deleted photo (its delete-by-message-id finds nothing). Remember revoked ids briefly and drop late arrivals.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 2026-10-15 | reactions | 25 distinct reactions in shared groups, all seen by both sessions. **Reactions carry only the reactor's `@lid`**: there is no `participantAlt` in any of 93 payloads. They cannot be joined to users (keyed by phone) without a LID→phone mapping, e.g. WAHA's `/api/{session}/lids`, which is untested. The target is the message id inside `reaction.messageId` (`{fromMe}_{chat}_{keyId}_{participant}`). No reaction removals seen yet.                                                                                                                                                                                      |
 | 2026-10-15 | 2         | Memory: WAHA at 319 MiB with both sessions, `prod` with the full store (~7,000 history messages synced). Fits the 640 MiB cap. The busiest bot group, "1 million beers" (206 messages), has only the prod number, so it has no redundancy.                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-10-16 | admin     | After a laptop reboot, `prod` came back `FAILED`: "Connection Failure … do not reconnect" at login, which is WhatsApp rejecting the stored credentials. `restart` cannot fix that. `logout` discards the credentials, and WAHA restarts the session into `SCAN_QR_CODE` within ~2 s, so the admin page's **Re-link** does `logout` and then shows the pairing code / QR.                                                                                                                                                                                                                                                         |
+| 2026-10-16 | admin     | End-to-end through nginx: login lockout after 5 failures (collector) plus nginx's limit (10/min, burst 5), and an existing cookie keeps working while locked out. Cross-origin, form-encoded and Origin-less POSTs get 403/415. The read-only token gets 403 on actions, QR and pairing code. A spoofed `X-Real-IP` is overwritten by nginx. `../` in a session name gets 400. Headless Chromium on desktop and phone: no CSP violations, login/QR/logout work.                                                                                                                                                                  |

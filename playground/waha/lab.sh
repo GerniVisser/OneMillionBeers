@@ -3,7 +3,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-COMPOSE=(docker compose -p waha-lab -f docker-compose.yml)
+# The app stack (docker-compose.app.yml) only runs under its "app" profile.
+COMPOSE=(docker compose -p waha-lab -f docker-compose.yml -f docker-compose.app.yml)
 WAHA=http://127.0.0.1:3200
 REC=http://127.0.0.1:3201
 KEY=lab-api-key
@@ -20,7 +21,15 @@ case "$cmd" in
   up) "${COMPOSE[@]}" up -d && echo "dashboard: $REC   waha: $WAHA/dashboard (lab/lab)" ;;
   down) "${COMPOSE[@]}" down ;;
   logs) "${COMPOSE[@]}" logs -f --tail 100 "$@" ;;
-  ps) "${COMPOSE[@]}" ps ;;
+  ps) "${COMPOSE[@]}" --profile app ps ;;
+  # The real app (collector with admin page, gateway, backend) against lab WAHA.
+  app)
+    case "${1:-up}" in
+      up) "${COMPOSE[@]}" --profile app up -d --build && echo "admin page: http://localhost:3202/admin (admin / local-admin-password)" ;;
+      down) "${COMPOSE[@]}" --profile app stop postgres migrate minio minio-init backend collector-whatsapp gateway ;;
+      logs) "${COMPOSE[@]}" --profile app logs -f --tail 100 collector-whatsapp backend gateway ;;
+      *) echo "usage: ./lab.sh app up|down|logs" >&2; exit 1 ;;
+    esac ;;
 
   sessions) api "$WAHA/api/sessions?all=true" | python3 -c '
 import json, sys
@@ -73,6 +82,7 @@ for e in reversed(json.load(sys.stdin)):
   *) cat <<'EOF'
 usage: ./lab.sh <command>
   up | down | ps | logs [service]       manage the lab stack
+  app up|down|logs                       real collector + admin page on :3202 against lab WAHA
   sessions                               list sessions, status, paired number
   start|stop|restart|logout <session>    session lifecycle
   me <session>                           paired account info
