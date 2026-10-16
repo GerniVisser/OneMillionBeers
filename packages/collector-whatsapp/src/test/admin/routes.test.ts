@@ -409,6 +409,20 @@ describe('admin routes', () => {
       expect(overview.body).not.toContain('ABCD-1234')
     })
 
+    it('rejects a local number with a leading 0 and says how to fix it', async () => {
+      const server = await build()
+      const cookie = await login(server)
+      const res = await server.inject({
+        method: 'POST',
+        url: '/admin/api/sessions/backup/pairing-code',
+        headers: { ...JSON_POST, cookie },
+        payload: { phoneNumber: '073 351 4583' },
+      })
+      expect(res.statusCode).toBe(400)
+      expect(res.json().error).toContain('without the leading 0')
+      expect(mockRequestPairingCode).not.toHaveBeenCalled()
+    })
+
     it.each(['', '123', 'abc', '1'.repeat(16)])('rejects phone number %j', async (phoneNumber) => {
       const server = await build()
       const cookie = await login(server)

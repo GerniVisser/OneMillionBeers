@@ -299,10 +299,18 @@ export function registerAdminRoutes(server: FastifyInstance, logger: Logger): vo
 
     const raw = (req.body as { phoneNumber?: unknown } | undefined)?.phoneNumber
     const phoneNumber = typeof raw === 'string' ? raw.replace(/[\s()+-]/g, '') : ''
+    // International format only: a local number (leading 0) reaches WhatsApp as a
+    // different number, the code is never accepted and the pairing window just
+    // expires, which is what happened with 0733514583 in the lab.
+    if (phoneNumber.startsWith('0')) {
+      return reply.status(400).send({
+        error: 'Use the international format without the leading 0, e.g. 27733514583',
+      })
+    }
     if (!/^\d{8,15}$/.test(phoneNumber)) {
       return reply
         .status(400)
-        .send({ error: 'Phone number in international format, e.g. 27821234567' })
+        .send({ error: 'Phone number in international format, e.g. 27733514583' })
     }
     try {
       const code = await requestPairingCode(name, phoneNumber)

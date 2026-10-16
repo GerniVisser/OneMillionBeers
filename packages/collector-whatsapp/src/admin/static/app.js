@@ -243,7 +243,7 @@
         '" />'
     } else {
       body =
-        '<div class="row"><label>Phone number (international, no +)' +
+        '<div class="row"><label>Phone number with country code (27…, no leading 0)' +
         '<input data-phone inputmode="tel" autocomplete="off" value="' +
         esc(r.phone) +
         '" /></label>' +
