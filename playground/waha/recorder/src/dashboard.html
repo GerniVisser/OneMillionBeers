@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WAHA Lab</title>
+    <style>
+      :root {
+        --bg: #f7f7f5;
+        --panel: #ffffff;
+        --text: #1d1d1b;
+        --muted: #6b6b66;
+        --line: #e3e2dd;
+        --ok: #1f7a4d;
+        --ok-bg: #e3f3ea;
+        --warn: #8a5a00;
+        --warn-bg: #fbefd5;
+        --bad: #a3271f;
+        --bad-bg: #fbe3e0;
+        --info-bg: #e6eefb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #161614;
+          --panel: #1f1f1d;
+          --text: #ecebe6;
+          --muted: #9a9993;
+          --line: #33332f;
+          --ok: #6fd3a0;
+          --ok-bg: #173527;
+          --warn: #f0c46a;
+          --warn-bg: #3a2f17;
+          --bad: #f08a80;
+          --bad-bg: #3d1e1b;
+          --info-bg: #1d2a3d;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 24px 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 15px;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .card img {
+        width: 100%;
+        max-width: 260px;
+        display: block;
+        margin-top: 8px;
+        background: #fff;
+      }
+      .pill {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 99px;
+        white-space: nowrap;
+      }
+      .s-WORKING,
+      .s-UP {
+        background: var(--ok-bg);
+        color: var(--ok);
+      }
+      .s-SCAN_QR_CODE,
+      .s-STARTING {
+        background: var(--warn-bg);
+        color: var(--warn);
+      }
+      .s-FAILED,
+      .s-STOPPED,
+      .s-UNREACHABLE {
+        background: var(--bad-bg);
+        color: var(--bad);
+      }
+      .scroll {
+        overflow-x: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        white-space: nowrap;
+      }
+      th {
+        font-weight: 600;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .seen {
+        color: var(--ok);
+      }
+      .miss {
+        background: var(--bad-bg);
+        color: var(--bad);
+        font-weight: 600;
+      }
+      .fromme {
+        background: var(--info-bg);
+      }
+      tr.divergent td {
+        background: var(--warn-bg);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      input,
+      button {
+        font: inherit;
+        padding: 4px 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel);
+        color: var(--text);
+      }
+      button {
+        cursor: pointer;
+      }
+      .legend span {
+        margin-right: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WAHA Lab</h1>
+    <div class="sub" id="meta">loading…</div>
+    <div class="controls">
+      <label
+        >Webhook fail rate
+        <input id="rate" type="number" min="0" max="1" step="0.1" style="width: 70px"
+      /></label>
+      <button id="setRate">Set</button>
+      <button id="syncGroups">Refresh group names</button>
+    </div>
+
+    <h2>Sessions</h2>
+    <div class="cards" id="sessions"></div>
+
+    <h2>Bot groups — which lab numbers are members</h2>
+    <div class="scroll"><table id="groups"></table></div>
+
+    <h2>Per-session totals (group messages, all time)</h2>
+    <div class="scroll"><table id="stats"></table></div>
+
+    <h2>Coverage — latest group messages</h2>
+    <div class="sub legend">
+      <span class="seen">✓ +delay</span> seen (delay after first session)
+      <span class="miss">✗</span> missed <span class="fromme">me</span> own post (production's
+      <code>message</code> event would skip it)
+      <span style="background: var(--warn-bg)">row</span> sessions disagree on image hash or sender
+    </div>
+    <div class="scroll"><table id="coverage"></table></div>
+
+    <h2>Reactions — latest per person per message</h2>
+    <div class="scroll"><table id="reactions"></table></div>
+
+    <h2>Status timeline</h2>
+    <div class="scroll"><table id="timeline"></table></div>
+
+    <script>
+      const $ = (id) => document.getElementById(id)
+      const esc = (s) =>
+        String(s ?? '').replace(
+          /[&<>"]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+        )
+      const time = (ms) => (ms ? new Date(ms).toLocaleString() : '–')
+      const ago = (ms, now) => {
+        if (!ms) return '–'
+        const s = Math.round((now - ms) / 1000)
+        return s < 60
+          ? `${s}s ago`
+          : s < 3600
+            ? `${Math.round(s / 60)}m ago`
+            : `${(s / 3600).toFixed(1)}h ago`
+      }
+      const delay = (ms) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`)
+
+      async function refresh() {
+        const d = await fetch('/api/summary?limit=150').then((r) => r.json())
+        const names = d.sessions.map((s) => s.session).filter((s) => s !== '_waha')
+        $('meta').textContent =
+          `updated ${new Date(d.now).toLocaleTimeString()} · fail rate ${d.failRate}`
+        if (document.activeElement !== $('rate')) $('rate').value = d.failRate
+
+        $('sessions').innerHTML = d.sessions
+          .map(
+            (
+              s,
+            ) => `<div class="card"><h3>${esc(s.session)}<span class="pill s-${esc(s.status)}">${esc(s.status)}</span></h3>
+              <div class="sub">${s.me ? esc(s.me) + '<br>' : ''}since ${time(s.at)}<br>last webhook ${ago(s.last_event_at, d.now)}</div>
+              ${s.status === 'SCAN_QR_CODE' ? `<img src="/qr/${encodeURIComponent(s.session)}?t=${d.now}" alt="QR for ${esc(s.session)}"><div class="sub">Unscanned QR codes expire after ~2.5 min and the session goes FAILED.</div>` : ''}
+              ${['FAILED', 'STOPPED'].includes(s.status) ? `<div class="controls"><button data-restart="${esc(s.session)}">Start${s.me ? '' : ' (new QR)'}</button></div>` : ''}</div>`,
+          )
+          .join('')
+
+        $('groups').innerHTML =
+          `<tr><th>group</th>${names.map((n) => `<th>${esc(n)}</th>`).join('')}<th>listeners</th></tr>` +
+          d.groups
+            .map((g) => {
+              const members = (g.sessions ?? '').split(',').filter(Boolean)
+              return `<tr><td title="${esc(g.chat_id)}">${esc(g.subject ?? g.chat_id)}</td>
+                ${names.map((n) => (members.includes(n) ? '<td class="seen">✓</td>' : '<td class="miss">✗</td>')).join('')}
+                <td class="num ${members.length < 2 ? 'miss' : ''}">${members.length}</td></tr>`
+            })
+            .join('')
+
+        const eventsBy = Object.fromEntries(d.stats.events.map((e) => [e.session, e]))
+        $('stats').innerHTML =
+          '<tr><th>session</th><th>expected</th><th>seen</th><th>missed</th><th>own posts</th><th>media errors</th><th>redelivered</th><th>divergent</th><th>webhooks</th><th>forced 500s</th><th>bad hmac</th></tr>' +
+          d.stats.sessions
+            .map((s) => {
+              const e = eventsBy[s.session] ?? {}
+              return `<tr><td>${esc(s.session)}</td><td class="num">${s.expected}</td><td class="num">${s.seen}</td>
+                <td class="num ${s.missed ? 'miss' : ''}">${s.missed}</td><td class="num">${s.from_me}</td>
+                <td class="num">${s.media_errors}</td><td class="num">${s.redelivered}</td><td class="num">${s.divergent}</td>
+                <td class="num">${e.deliveries ?? 0}</td><td class="num">${e.forced_failures ?? 0}</td><td class="num">${e.bad_hmac ?? 0}</td></tr>`
+            })
+            .join('')
+
+        $('coverage').innerHTML =
+          `<tr><th>first seen</th><th>group</th><th>from</th><th>type</th>${names.map((n) => `<th>${esc(n)}</th>`).join('')}<th>key id</th></tr>` +
+          d.coverage
+            .map((c) => {
+              const cells = names
+                .map((n) => {
+                  const s = c.bySession[n]
+                  if (!s) return '<td class="miss">✗</td>'
+                  const bits = [`✓ +${delay(s.delayMs)}`]
+                  if (s.deliveries > 1) bits.push(`×${s.deliveries}`)
+                  if (c.image)
+                    bits.push(
+                      s.sha
+                        ? `<span class="mono">${esc(s.sha)}</span>`
+                        : `<span class="miss">${esc(s.mediaError ?? 'no hash')}</span>`,
+                    )
+                  return `<td class="${s.fromMe ? 'fromme' : 'seen'}" title="sender ${esc(s.sender)}">${s.fromMe ? 'me ' : ''}${bits.join(' ')}</td>`
+                })
+                .join('')
+              return `<tr class="${c.divergent ? 'divergent' : ''}"><td>${time(c.firstAt)}</td>
+                <td title="${esc(c.chat)}">${esc(c.group ?? c.chat)}</td><td>${esc(c.pushName)}</td>
+                <td>${c.image ? '📷' : 'text'}</td>${cells}<td class="mono">${esc(c.key)}</td></tr>`
+            })
+            .join('')
+
+        $('reactions').innerHTML =
+          '<tr><th>at</th><th>session</th><th>group</th><th>on message by</th><th>reactor</th><th>emoji</th><th>target key</th></tr>' +
+          d.reactions
+            .map(
+              (r) => `<tr><td>${time(r.received_at)}</td><td>${esc(r.session)}</td>
+                <td>${esc(r.subject ?? r.chat_id)}</td><td>${esc(r.target_author ?? '?')}</td>
+                <td>${esc(r.reactor)}</td><td>${r.emoji ? esc(r.emoji) : '<span class="sub">removed</span>'}</td>
+                <td class="mono">${esc(r.target_key)}</td></tr>`,
+            )
+            .join('')
+
+        $('timeline').innerHTML =
+          '<tr><th>at</th><th>session</th><th>status</th><th>source</th></tr>' +
+          d.timeline
+            .map(
+              (t) =>
+                `<tr><td>${time(t.at)}</td><td>${esc(t.session)}</td><td><span class="pill s-${esc(t.status)}">${esc(t.status)}</span></td><td>${esc(t.source)}</td></tr>`,
+            )
+            .join('')
+      }
+
+      $('setRate').onclick = () =>
+        fetch(`/control/fail-rate?rate=${$('rate').value}`, { method: 'POST' }).then(refresh)
+      $('sessions').onclick = (e) => {
+        const name = e.target.dataset?.restart
+        if (!name) return
+        e.target.disabled = true
+        fetch(`/control/session/${encodeURIComponent(name)}/restart`, { method: 'POST' }).then(
+          refresh,
+        )
+      }
+      $('syncGroups').onclick = () =>
+        fetch('/control/sync-groups', { method: 'POST' }).then(refresh)
+      refresh()
+      setInterval(
+        () => refresh().catch(() => ($('meta').textContent = 'recorder unreachable')),
+        5000,
+      )
+    </script>
+  </body>
+</html>

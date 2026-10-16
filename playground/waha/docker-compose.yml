@@ -1,0 +1,74 @@
+# WAHA multi-session lab. Runs as its own compose project, separate from
+# docker-compose.local.yml (whose WAHA listens on :3100), so both can run at once.
+#
+#   docker compose -f playground/waha/docker-compose.yml -p waha-lab up -d
+#
+# Two networks so an internet outage can be simulated without also cutting the
+# webhook path: `lab` is internal-only (WAHA <-> recorder), `egress` reaches the
+# internet. `./lab.sh netcut 300` detaches WAHA from `egress` only.
+
+services:
+  waha:
+    image: devlikeapro/waha:${WAHA_TAG:-latest-2026.9.2}
+    container_name: waha-lab
+    ports:
+      - '127.0.0.1:3200:3000'
+    networks: [lab, egress]
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_API_KEY: lab-api-key
+      WAHA_NOWEB_WA_VERSION: auto-web
+      WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
+      WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+      WAHA_PRINT_QR: 'false'
+      # Sessions are created by the recorder, not WHATSAPP_START_SESSION. Whether
+      # they come back by themselves after a restart is one of the experiments.
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
+      WAHA_DASHBOARD_USERNAME: lab
+      WAHA_DASHBOARD_PASSWORD: lab
+      WHATSAPP_SWAGGER_USERNAME: lab
+      WHATSAPP_SWAGGER_PASSWORD: lab
+      WAHA_CLIENT_DEVICE_NAME: OMB Lab
+    # Same cap as production, so OOM behaviour with N sessions is representative.
+    # Override with WAHA_MEM=1g to find the real ceiling.
+    mem_limit: ${WAHA_MEM:-640m}
+    restart: unless-stopped
+    volumes:
+      - waha-lab-sessions:/app/.sessions
+
+  recorder:
+    image: node:24-alpine
+    container_name: waha-lab-recorder
+    working_dir: /app
+    command: ['node', '--disable-warning=ExperimentalWarning', 'src/server.ts']
+    ports:
+      - '127.0.0.1:3201:3201'
+    networks: [lab, egress]
+    environment:
+      PORT: '3201'
+      WAHA_URL: http://waha:3000
+      WAHA_API_KEY: lab-api-key
+      WEBHOOK_BASE: http://recorder:3201
+      WEBHOOK_HMAC_KEY: lab-hmac-key
+      # Created on recorder start if missing; pair them from http://localhost:3201
+      LAB_SESSIONS: ${LAB_SESSIONS:-personal,prod}
+      # Only groups this session is in are recorded (the bot's groups). DMs, status
+      # updates and other groups of personal numbers are dropped unrecorded.
+      LAB_PRIMARY: ${LAB_PRIMARY:-prod}
+      DB_PATH: /data/lab.db
+      # Media is downloaded only to hash it. Set to true to keep the files under
+      # data/media. Off by default because the prod number sees real groups.
+      KEEP_MEDIA: ${KEEP_MEDIA:-false}
+    depends_on: [waha]
+    restart: unless-stopped
+    volumes:
+      - ./recorder:/app:ro
+      - ./data:/data
+
+networks:
+  lab:
+    internal: true
+  egress: {}
+
+volumes:
+  waha-lab-sessions:
