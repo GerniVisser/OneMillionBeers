@@ -13,6 +13,43 @@ let firstMessage = true
 // without this, both deliveries race through and insert two DB rows.
 const processingMsgIds = new Set<string>()
 
+// Message ids revoked ("delete for everyone") recently, with their expiry time.
+// WhatsApp can deliver the revoke before the message itself (seen in the WAHA
+// lab: a sticker deleted within a second arrived 13 s after its revoke). The
+// revoke then finds no beer log to delete, so the message must be dropped when
+// it arrives, or undone if it was still being processed when the revoke came in.
+const REVOKED_TTL_MS = 10 * 60 * 1000
+const revokedMsgIds = new Map<string, number>()
+
+function rememberRevoked(msgId: string): void {
+  const now = Date.now()
+  for (const [id, expiresAt] of revokedMsgIds) {
+    if (expiresAt <= now) revokedMsgIds.delete(id)
+  }
+  revokedMsgIds.set(msgId, now + REVOKED_TTL_MS)
+}
+
+function wasRevoked(msgId: string): boolean {
+  const expiresAt = revokedMsgIds.get(msgId)
+  return expiresAt !== undefined && expiresAt > Date.now()
+}
+
+// Stickers arrive as image/webp media but are never beer photos. Photos are always
+// imageMessage (image/jpeg); stickers are stickerMessage, possibly wrapped once in
+// an ephemeral or view-once envelope.
+function isSticker(mimetype: string, data: Record<string, unknown> | undefined): boolean {
+  if (mimetype === 'image/webp') return true
+  const message = data?.message as Record<string, unknown> | undefined
+  if (!message) return false
+  if (message.stickerMessage) return true
+  return Object.values(message).some(
+    (wrapper) =>
+      !!(
+        (wrapper as Record<string, unknown> | null)?.message as Record<string, unknown> | undefined
+      )?.stickerMessage,
+  )
+}
+
 export async function handleWebhookEvent(body: unknown, logger: Logger): Promise<void> {
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
@@ -55,9 +92,27 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const mimetype = media?.mimetype as string | undefined
   if (!hasMedia || !mimetype?.startsWith('image/')) return
 
+  const data = payload._data as Record<string, unknown> | undefined
+  if (isSticker(mimetype, data)) {
+    logger.debug({ chatId }, 'Sticker — not a beer photo, discarding')
+    return
+  }
+
   const msgId = payload.id as string
   if (!msgId) {
     logger.warn({ chatId }, 'Message has no ID — discarding')
+    return
+  }
+
+  // WAHA NOWEB: payload.id is the full composite key
+  // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
+  // message hash, which matches revokedMessageId in message.revoked events.
+  // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
+  const dataKey = data?.key as Record<string, unknown> | undefined
+  const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
+
+  if (wasRevoked(sourceMessageId)) {
+    logger.info({ chatId, sourceMessageId }, 'Message was revoked before it arrived — discarding')
     return
   }
 
@@ -75,9 +130,6 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     // _data.key.participantAlt which always carries the real phone JID.
     const participantRaw = payload.participant as string | undefined
     const isLid = participantRaw?.endsWith('@lid')
-    const data = payload._data as Record<string, unknown> | undefined
-
-    const dataKey = data?.key as Record<string, unknown> | undefined
     const participantAlt = dataKey?.participantAlt as string | undefined
 
     const senderJid = (
@@ -136,12 +188,6 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
-    // WAHA NOWEB: payload.id is the full composite key
-    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
-    // message hash, which matches revokedMessageId in message.revoked events.
-    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
-    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
-
     const photoHash = createHash('sha256').update(buffer).digest('hex')
     const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
 
@@ -167,6 +213,14 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
     } catch (err) {
       logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
+      return
+    }
+
+    // The revoke came in while this message was being downloaded or forwarded,
+    // so its delete ran before the beer log existed. Undo it now.
+    if (wasRevoked(sourceMessageId)) {
+      logger.info({ sourceMessageId }, 'Message was revoked while processing — deleting beer log')
+      await deleteBeerLogForMessage(sourceMessageId, logger)
     }
   } finally {
     processingMsgIds.delete(msgId)
@@ -199,8 +253,12 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     return
   }
 
+  rememberRevoked(msgId)
   logger.info({ msgId }, 'Message revoked — checking for beer log')
+  await deleteBeerLogForMessage(msgId, logger)
+}
 
+async function deleteBeerLogForMessage(msgId: string, logger: Logger): Promise<void> {
   let photoUrl: string | null
   try {
     photoUrl = await forwardDeleteBeerLog(msgId)

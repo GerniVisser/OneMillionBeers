@@ -255,6 +255,113 @@ describe('webhook', () => {
     expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
   })
 
+  describe('stickers', () => {
+    // Stickers arrive with media like photos but are image/webp stickerMessages
+    // (seen in the WAHA lab); real photos are imageMessage with image/jpeg.
+    it('ignores a sticker (image/webp)', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      const body = makeImagePayload({
+        media: { mimetype: 'image/webp', url: 'http://waha:3000/api/files/sticker.webp' },
+        _data: { key: { id: 'MSGID123' }, message: { stickerMessage: {} } },
+      })
+      await handleWebhookEvent(body, logger)
+      expect(mockUploadPhoto).not.toHaveBeenCalled()
+      expect(mockForwardBeerLog).not.toHaveBeenCalled()
+    })
+
+    it('ignores a sticker wrapped in an ephemeral envelope whatever its mimetype', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      const body = makeImagePayload({
+        media: { mimetype: 'image/png', url: 'http://waha:3000/api/files/sticker.png' },
+        _data: { message: { ephemeralMessage: { message: { stickerMessage: {} } } } },
+      })
+      await handleWebhookEvent(body, logger)
+      expect(mockUploadPhoto).not.toHaveBeenCalled()
+    })
+
+    it('still processes a photo (imageMessage, image/jpeg)', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      const body = makeImagePayload({
+        _data: { key: { id: 'MSGID123' }, message: { imageMessage: {} } },
+      })
+      await handleWebhookEvent(body, logger)
+      expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('revoke arriving before or during the message', () => {
+    // WhatsApp can deliver "delete for everyone" before the message itself (seen in
+    // the WAHA lab). The revoke then deletes nothing, so the message must not
+    // become a beer log when it arrives.
+    const photoUrl = 'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg'
+    const revoke = {
+      event: 'message.revoked',
+      payload: { revokedMessageId: 'HASH123', before: null },
+    }
+    const nowebImage = () =>
+      makeImagePayload({
+        id: 'false_120363XXXX@g.us_HASH123_1234567890@lid',
+        _data: { key: { id: 'HASH123' }, message: { imageMessage: {} } },
+      })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('discards a message whose revoke already arrived', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(revoke, logger)
+      await handleWebhookEvent(nowebImage(), logger)
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledOnce() // from the revoke itself
+      expect(mockUploadPhoto).not.toHaveBeenCalled()
+      expect(mockForwardBeerLog).not.toHaveBeenCalled()
+    })
+
+    it('deletes the beer log when the revoke arrives while the message is being processed', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      // The revoke lands while the beer log is being forwarded, so its own delete
+      // finds nothing; the message handler must then undo the beer log.
+      mockForwardBeerLog.mockImplementation(async () => {
+        await handleWebhookEvent(revoke, logger)
+      })
+      mockForwardDeleteBeerLog.mockResolvedValueOnce(null).mockResolvedValueOnce(photoUrl)
+
+      await handleWebhookEvent(nowebImage(), logger)
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledTimes(2)
+      expect(mockForwardDeleteBeerLog).toHaveBeenLastCalledWith('HASH123')
+      expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+    })
+
+    it('processes the message again once the revoke is older than 10 minutes', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(revoke, logger)
+      vi.setSystemTime(Date.now() + 10 * 60 * 1000 + 1)
+      await handleWebhookEvent(nowebImage(), logger)
+
+      expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+    })
+
+    it('does not affect other messages', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(revoke, logger)
+      await handleWebhookEvent(
+        makeImagePayload({ _data: { key: { id: 'OTHERHASH' }, message: { imageMessage: {} } } }),
+        logger,
+      )
+      expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('message.revoked', () => {
     // WAHA NOWEB: before is null; revokedMessageId is the bare message hash
     // (same value as payload.id in the original message event)
