@@ -208,6 +208,21 @@ aws ssm put-parameter --name /omb/INTERNAL_API_TOKEN --type SecureString \
 
 Rotating it means updating the parameter and redeploying; backend and collector come up together in the same `docker compose up -d`, so the mismatch window is only as long as the container restart.
 
+### Admin page credentials
+
+The WhatsApp admin page (`/admin`) logs in with a username and password. Only a scrypt hash of the password is stored. Generate it, plus a session secret and an optional read-only API token, on your own machine:
+
+```bash
+pnpm --filter @omb/collector-whatsapp admin:hash-password
+```
+
+It prompts for the password without echoing it and prints the four `aws ssm put-parameter` commands for `/omb/ADMIN_USERNAME`, `/omb/ADMIN_PASSWORD_HASH`, `/omb/ADMIN_SESSION_SECRET` and `/omb/ADMIN_API_TOKEN`. Run them with a leading space so they stay out of shell history. Then redeploy (or re-run the deploy's `up` for `collector-whatsapp`).
+
+- **Order does not matter.** Without the parameters the collector starts normally with the admin page disabled (`/admin` returns 404), so ingestion never depends on them. Setting only some of the three required ones makes the collector exit at startup, though.
+- **Changing the password or rotating `ADMIN_SESSION_SECRET` logs out every device.** Sessions last 30 days otherwise.
+- **Lockout:** 5 failed logins from one IP lock that IP for 15 minutes; 20 failures overall lock all new logins for 15 minutes. nginx also limits login requests to 10 a minute per IP. A device that is already logged in is unaffected.
+- **`ADMIN_API_TOKEN`** (sent as `Authorization: Bearer …`) can only read the overview. It can never run actions or fetch a QR or pairing code.
+
 `STORAGE_KEY` and `STORAGE_SECRET` are intentionally empty in production. The collector's S3 client omits explicit credentials when these are empty, falling back to the AWS SDK credential chain (EC2 instance profile → IMDS).
 
 ---

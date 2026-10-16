@@ -54,8 +54,8 @@ services:
     #   docker compose --env-file .env --env-file .env.sha pull waha
     #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
     # The session lives in the waha-sessions volume, so recreating the container
-    # keeps the pairing. If the status page shows SCAN_QR_CODE afterwards, re-pair
-    # at /whatsapp/status?token=...
+    # keeps the pairing. If a session shows SCAN_QR_CODE afterwards, re-link it
+    # from the admin page at /admin.
     #
     # WhatsApp periodically invalidates the WhatsApp Web version baked into the
     # NOWEB engine, which breaks login with a registration loop
@@ -110,7 +110,11 @@ services:
       WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
       COLLECTOR_PORT: '8080'
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
-      STATUS_TOKEN: ${STATUS_TOKEN}
+      # Admin page (/admin). Optional as a set: unset leaves the page disabled.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
       ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
       ALERT_EMAIL: ${ALERT_EMAIL}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL}
