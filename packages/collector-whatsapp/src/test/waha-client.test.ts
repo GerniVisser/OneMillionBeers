@@ -213,4 +213,105 @@ describe('waha-client', () => {
     const { listAllGroups } = await import('../waha-client.js')
     expect(await listAllGroups()).toEqual([])
   })
+
+  describe('admin page calls', () => {
+    it('listSessions asks for stopped sessions too and normalises `me`', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [
+          { name: 'default', status: 'WORKING', me: { id: '27733514583@c.us' } },
+          { name: 'backup', status: 'STOPPED' },
+        ],
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const { listSessions } = await import('../waha-client.js')
+      expect(await listSessions()).toEqual([
+        { name: 'default', status: 'WORKING', me: { id: '27733514583@c.us' } },
+        { name: 'backup', status: 'STOPPED', me: null },
+      ])
+      expect(mockFetch.mock.calls[0][0]).toBe('http://waha:3000/api/sessions?all=true')
+    })
+
+    it('sessionAction POSTs the action and URL-encodes the session name', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true })
+      vi.stubGlobal('fetch', mockFetch)
+      const { sessionAction } = await import('../waha-client.js')
+      await sessionAction('a/b', 'logout')
+      const [url, init] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://waha:3000/api/sessions/a%2Fb/logout')
+      expect(init.method).toBe('POST')
+      expect(init.headers['x-api-key']).toBe('test-api-key')
+    })
+
+    it('sessionAction throws on non-2xx', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }))
+      const { sessionAction } = await import('../waha-client.js')
+      await expect(sessionAction('default', 'start')).rejects.toThrow('422')
+    })
+
+    it('requestPairingCode sends the phone number and returns the code', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ code: 'ABCD-EFGH' }) })
+      vi.stubGlobal('fetch', mockFetch)
+      const { requestPairingCode } = await import('../waha-client.js')
+      expect(await requestPairingCode('default', '27733514583')).toBe('ABCD-EFGH')
+      const [url, init] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://waha:3000/api/default/auth/request-code')
+      expect(JSON.parse(init.body)).toEqual({ phoneNumber: '27733514583' })
+    })
+
+    it('requestPairingCode surfaces WAHA errors', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue({ ok: false, status: 422, text: async () => 'not in SCAN_QR_CODE' }),
+      )
+      const { requestPairingCode } = await import('../waha-client.js')
+      await expect(requestPairingCode('default', '27733514583')).rejects.toThrow(
+        'not in SCAN_QR_CODE',
+      )
+    })
+
+    it('getServerInfo combines version and status', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => ({
+          ok: true,
+          json: async () =>
+            url.endsWith('/version')
+              ? { version: '2026.9.2', engine: 'NOWEB' }
+              : { startTimestamp: 1000, uptime: 5000 },
+        })),
+      )
+      const { getServerInfo } = await import('../waha-client.js')
+      expect(await getServerInfo()).toEqual({
+        version: '2026.9.2',
+        engine: 'NOWEB',
+        startedAt: 1000,
+        uptimeMs: 5000,
+      })
+    })
+
+    it('restartServer asks WAHA for a graceful stop', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({ ok: true })
+      vi.stubGlobal('fetch', mockFetch)
+      const { restartServer } = await import('../waha-client.js')
+      await restartServer()
+      const [url, init] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://waha:3000/api/server/stop')
+      expect(JSON.parse(init.body)).toEqual({ force: false })
+    })
+
+    it('getQrCodePng fetches the given session', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) })
+      vi.stubGlobal('fetch', mockFetch)
+      const { getQrCodePng } = await import('../waha-client.js')
+      await getQrCodePng('backup')
+      expect(mockFetch.mock.calls[0][0]).toBe('http://waha:3000/api/backup/auth/qr?format=image')
+    })
+  })
 })

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
 import { handleSessionStatusChange } from './session-monitor.js'
+import { recordBeer, recordStatus, recordWebhook } from './activity.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -17,9 +18,13 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
 
+  const session = sessionOf(body as Record<string, unknown>)
+  recordWebhook(session, event)
+
   if (event === 'session.status') {
     const status = ((body as Record<string, unknown>).payload as Record<string, unknown>)?.status
     if (typeof status === 'string') {
+      recordStatus(session, status, 'webhook')
       await handleSessionStatusChange(status, logger)
     }
     return
@@ -36,6 +41,11 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   }
 
   // Unknown event — ignore silently
+}
+
+// WAHA names the session in every event; fall back for older payloads.
+function sessionOf(body: Record<string, unknown>): string {
+  return typeof body.session === 'string' ? body.session : config.WAHA_SESSION
 }
 
 async function handleMessage(body: Record<string, unknown>, logger: Logger): Promise<void> {
@@ -165,6 +175,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         photoHash,
       })
       logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
+      recordBeer(sessionOf(body))
     } catch (err) {
       logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
     }

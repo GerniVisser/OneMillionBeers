@@ -2,6 +2,22 @@ import { config } from './config.js'
 
 export type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED'
 
+export interface WahaSession {
+  name: string
+  status: SessionStatus
+  // The paired account; null while unpaired or stopped.
+  me: { id: string; pushName?: string } | null
+}
+
+export interface WahaServerInfo {
+  version: string
+  engine: string
+  startedAt: number
+  uptimeMs: number
+}
+
+export type SessionAction = 'start' | 'stop' | 'restart' | 'logout'
+
 // Events the collector handles — kept in sync with webhook.ts handler
 const WEBHOOK_EVENTS = [
   'message',
@@ -19,8 +35,12 @@ function webhookConfig() {
   return { webhooks: [{ url: config.WAHA_WEBHOOK_URL, events: WEBHOOK_EVENTS }] }
 }
 
-export async function getSessionStatus(): Promise<SessionStatus> {
-  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
+// Session names come from the admin page; encode them so a name can never
+// reach a different WAHA path.
+const sessionPath = (session: string) => encodeURIComponent(session)
+
+export async function getSessionStatus(session = config.WAHA_SESSION): Promise<SessionStatus> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${sessionPath(session)}`, {
     headers: wahaHeaders(),
     signal: AbortSignal.timeout(10_000),
   })
@@ -34,13 +54,85 @@ export async function getSessionStatus(): Promise<SessionStatus> {
  * FAILED session caused by a transient WhatsApp-side disconnect; does not help
  * when WhatsApp has de-authorized the linked device (that needs a QR re-scan).
  */
-export async function restartSession(): Promise<void> {
-  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}/restart`, {
+export async function restartSession(session = config.WAHA_SESSION): Promise<void> {
+  await sessionAction(session, 'restart')
+}
+
+/**
+ * Lifecycle actions from the admin page. `logout` unlinks the device and
+ * discards its credentials; WAHA then restarts the session ready to pair.
+ */
+export async function sessionAction(session: string, action: SessionAction): Promise<void> {
+  const res = await fetch(
+    `${config.WAHA_BASE_URL}/api/sessions/${sessionPath(session)}/${action}`,
+    { method: 'POST', headers: wahaHeaders(), signal: AbortSignal.timeout(30_000) },
+  )
+  if (!res.ok) throw new Error(`WAHA ${action} session returned ${res.status}`)
+}
+
+/** Every session WAHA knows about, including stopped ones. */
+export async function listSessions(): Promise<WahaSession[]> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions?all=true`, {
+    headers: wahaHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`WAHA listSessions returned ${res.status}`)
+  const data = (await res.json()) as Array<{ name: string; status: SessionStatus; me?: unknown }>
+  return data.map((s) => ({
+    name: s.name,
+    status: s.status,
+    me: (s.me as WahaSession['me']) ?? null,
+  }))
+}
+
+export async function getServerInfo(): Promise<WahaServerInfo> {
+  const opts = { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) }
+  const [versionRes, statusRes] = await Promise.all([
+    fetch(`${config.WAHA_BASE_URL}/api/server/version`, opts),
+    fetch(`${config.WAHA_BASE_URL}/api/server/status`, opts),
+  ])
+  if (!versionRes.ok) throw new Error(`WAHA server version returned ${versionRes.status}`)
+  if (!statusRes.ok) throw new Error(`WAHA server status returned ${statusRes.status}`)
+  const version = (await versionRes.json()) as { version: string; engine: string }
+  const status = (await statusRes.json()) as { startTimestamp: number; uptime: number }
+  return {
+    version: version.version,
+    engine: version.engine,
+    startedAt: status.startTimestamp,
+    uptimeMs: status.uptime,
+  }
+}
+
+/**
+ * Stops the WAHA process gracefully. Docker's restart policy brings the
+ * container straight back, and sessions resume from their stored credentials.
+ */
+export async function restartServer(): Promise<void> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/server/stop`, {
     method: 'POST',
     headers: wahaHeaders(),
+    body: JSON.stringify({ force: false }),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`WAHA server stop returned ${res.status}`)
+}
+
+/**
+ * Links the session by phone number instead of QR: WhatsApp shows a prompt and
+ * the returned code is typed in under Linked devices → Link with phone number.
+ * Only valid while the session is in SCAN_QR_CODE.
+ */
+export async function requestPairingCode(session: string, phoneNumber: string): Promise<string> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/${sessionPath(session)}/auth/request-code`, {
+    method: 'POST',
+    headers: wahaHeaders(),
+    body: JSON.stringify({ phoneNumber }),
     signal: AbortSignal.timeout(30_000),
   })
-  if (!res.ok) throw new Error(`WAHA restartSession returned ${res.status}`)
+  if (!res.ok) throw new Error(`WAHA request-code returned ${res.status}: ${await res.text()}`)
+  const data = (await res.json()) as { code?: string }
+  if (!data.code) throw new Error('WAHA request-code returned no code')
+  return data.code
 }
 
 export async function startSession(): Promise<void> {
@@ -75,9 +167,9 @@ export async function ensureWebhookConfigured(): Promise<boolean> {
   return true
 }
 
-export async function getQrCodePng(): Promise<Buffer> {
+export async function getQrCodePng(session = config.WAHA_SESSION): Promise<Buffer> {
   const res = await fetch(
-    `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/auth/qr?format=image`,
+    `${config.WAHA_BASE_URL}/api/${sessionPath(session)}/auth/qr?format=image`,
     { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
   )
   if (!res.ok) throw new Error(`WAHA getQrCodePng returned ${res.status}`)
