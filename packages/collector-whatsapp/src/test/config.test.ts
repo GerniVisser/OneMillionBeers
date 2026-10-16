@@ -11,7 +11,6 @@ const REQUIRED_ENV = {
   WAHA_API_KEY: 'test-api-key',
   WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
   PUBLIC_BASE_URL: 'http://localhost:8080',
-  STATUS_TOKEN: 'test-token',
 }
 
 describe('config', () => {
@@ -31,21 +30,10 @@ describe('config', () => {
     const { config } = await import('../config.js')
     expect(config.WAHA_BASE_URL).toBe('http://waha:3000')
     expect(config.WAHA_API_KEY).toBe('test-api-key')
-    expect(config.STATUS_TOKEN).toBe('test-token')
   })
 
   it('calls process.exit(1) when WAHA_BASE_URL is missing', async () => {
     vi.stubEnv('WAHA_BASE_URL', '')
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called')
-    })
-    await expect(import('../config.js')).rejects.toThrow('process.exit called')
-    expect(exitSpy).toHaveBeenCalledWith(1)
-    exitSpy.mockRestore()
-  })
-
-  it('calls process.exit(1) when STATUS_TOKEN is missing', async () => {
-    vi.stubEnv('STATUS_TOKEN', '')
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called')
     })
@@ -86,5 +74,70 @@ describe('config', () => {
     const { config } = await import('../config.js')
     expect(config.ENABLE_ALERTS).toBe(true)
     expect(config.ALERT_EMAIL).toBeUndefined()
+  })
+
+  describe('admin page settings', () => {
+    const ADMIN = {
+      ADMIN_USERNAME: 'gerni',
+      ADMIN_PASSWORD_HASH:
+        'scrypt:32768:8:1:c2FsdHNhbHRzYWx0c2FsdA:a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2V5a2U',
+      ADMIN_SESSION_SECRET: 'x'.repeat(32),
+    }
+
+    function expectExit() {
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called')
+      })
+      return {
+        async check() {
+          await expect(import('../config.js')).rejects.toThrow('process.exit called')
+          expect(exitSpy).toHaveBeenCalledWith(1)
+          exitSpy.mockRestore()
+        },
+      }
+    }
+
+    it('leaves the admin page disabled when none are set', async () => {
+      const { config } = await import('../config.js')
+      expect(config.ADMIN_USERNAME).toBeUndefined()
+      expect(config.ADMIN_PASSWORD_HASH).toBeUndefined()
+    })
+
+    it('treats empty strings (unset compose variables) as absent', async () => {
+      for (const k of [...Object.keys(ADMIN), 'ADMIN_API_TOKEN']) vi.stubEnv(k, '')
+      const { config } = await import('../config.js')
+      expect(config.ADMIN_USERNAME).toBeUndefined()
+      expect(config.ADMIN_API_TOKEN).toBeUndefined()
+    })
+
+    it('accepts all three together, with an optional API token', async () => {
+      for (const [k, v] of Object.entries(ADMIN)) vi.stubEnv(k, v)
+      vi.stubEnv('ADMIN_API_TOKEN', 't'.repeat(32))
+      const { config } = await import('../config.js')
+      expect(config.ADMIN_USERNAME).toBe('gerni')
+      expect(config.ADMIN_API_TOKEN).toBe('t'.repeat(32))
+    })
+
+    it('exits when only some of the three are set', async () => {
+      vi.stubEnv('ADMIN_USERNAME', 'gerni')
+      await expectExit().check()
+    })
+
+    it('exits when the password hash is not a scrypt hash', async () => {
+      for (const [k, v] of Object.entries(ADMIN)) vi.stubEnv(k, v)
+      vi.stubEnv('ADMIN_PASSWORD_HASH', 'plaintext-password')
+      await expectExit().check()
+    })
+
+    it('exits when the session secret is shorter than 32 characters', async () => {
+      for (const [k, v] of Object.entries(ADMIN)) vi.stubEnv(k, v)
+      vi.stubEnv('ADMIN_SESSION_SECRET', 'short')
+      await expectExit().check()
+    })
+
+    it('exits when the API token is shorter than 32 characters', async () => {
+      vi.stubEnv('ADMIN_API_TOKEN', 'short')
+      await expectExit().check()
+    })
   })
 })

@@ -223,7 +223,7 @@ resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
 
 resource "aws_cloudwatch_metric_alarm" "whatsapp_session" {
   alarm_name          = "omb-whatsapp-session-unhealthy"
-  alarm_description   = "WhatsApp session has been FAILED or SCAN_QR_CODE for two consecutive polls. Re-pair at /whatsapp/status."
+  alarm_description   = "WhatsApp session has been FAILED or SCAN_QR_CODE for two consecutive polls. Re-link it from the admin page at /admin."
   namespace           = "OMB"
   metric_name         = "WhatsAppSessionUnhealthy"
   statistic           = "Sum"

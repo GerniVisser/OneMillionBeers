@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>OMB WhatsApp Admin</title>
+    <!-- No favicon request: it would fall through to the frontend. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/admin/app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>OMB WhatsApp</h1>
+      <div id="user" class="user" hidden>
+        <span id="username"></span>
+        <button type="button" id="logout" class="link">Log out</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="login-view" class="card narrow" hidden>
+        <h2>Log in</h2>
+        <form id="login-form">
+          <label>
+            Username
+            <input id="login-username" name="username" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button type="submit" class="primary">Log in</button>
+          <p id="login-error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section id="app-view" hidden>
+        <p id="banner" class="banner" role="status" hidden></p>
+        <div id="waha" class="card"></div>
+        <h2 class="section">Numbers</h2>
+        <div id="sessions"></div>
+        <h2 class="section">Admin activity</h2>
+        <div class="card scroll"><table id="audit"></table></div>
+        <p class="muted small" id="updated"></p>
+      </section>
+    </main>
+
+    <script src="/admin/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,126 @@
+# The real application against the lab's WAHA: collector-whatsapp (production
+# image, including the admin page), the gateway (nginx.dev.conf), the backend,
+# Postgres with migrations, and MinIO for photos. Profile "app", so the plain lab
+# does not start it:
+#
+#   ./lab.sh app up        → admin page at http://localhost:3202/admin
+#
+# The collector ingests through its own WAHA session, `omb`, so it never touches
+# the lab's `personal` and `prod` sessions (it overwrites the webhook config of
+# its own session on start). Link `omb` from the admin page to ingest real beers
+# into this local database; leave it unlinked to only exercise the admin page.
+#
+# Admin login: admin / local-admin-password (hash from .env.local.example).
+
+x-app: &app
+  profiles: [app]
+  restart: unless-stopped
+  networks: [lab]
+
+services:
+  postgres:
+    <<: *app
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: omb
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d omb']
+      interval: 2s
+      retries: 30
+    volumes:
+      - lab-app-postgres:/var/lib/postgresql/data
+
+  migrate:
+    <<: *app
+    restart: 'no'
+    build: ../../db
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/omb
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  minio:
+    <<: *app
+    image: minio/minio
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    # Photo URLs point here, so the browser can load them.
+    ports:
+      - '127.0.0.1:9100:9000'
+    networks: [lab, egress]
+    volumes:
+      - lab-app-minio:/data
+
+  minio-init:
+    <<: *app
+    restart: 'no'
+    image: minio/mc
+    depends_on: [minio]
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/omb-photos;
+      mc anonymous set public local/omb-photos"
+
+  backend:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: packages/backend/Dockerfile
+      target: prod
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/omb
+      INTERNAL_API_TOKEN: lab-internal-token-not-for-production-use
+      NODE_ENV: production
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  collector-whatsapp:
+    <<: *app
+    build:
+      context: ../..
+      dockerfile: packages/collector-whatsapp/Dockerfile
+      target: prod
+    environment:
+      BACKEND_URL: http://backend:3000
+      INTERNAL_API_TOKEN: lab-internal-token-not-for-production-use
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_URL: http://localhost:9100
+      STORAGE_BUCKET: omb-photos
+      STORAGE_KEY: minioadmin
+      STORAGE_SECRET: minioadmin
+      STORAGE_REGION: auto
+      LOG_LEVEL: info
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: lab-api-key
+      WAHA_SESSION: omb
+      WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
+      COLLECTOR_PORT: '8080'
+      # Must match the origin the page is opened on: the admin API refuses
+      # state-changing requests from any other Origin.
+      PUBLIC_BASE_URL: http://localhost:3202
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD_HASH: scrypt:32768:8:1:N4Cx9cwwma4YpI6UWId9JQ:h6xV7IksmcL6K-9HnS0exRuuCzPLW6jMopP5ZNkj7rc
+      ADMIN_SESSION_SECRET: local-admin-session-secret-not-for-production
+      ADMIN_API_TOKEN: lab-read-only-token-for-diagnostics-0000
+    depends_on: [waha, backend]
+
+  gateway:
+    <<: *app
+    image: nginx:alpine
+    ports:
+      - '127.0.0.1:3202:80'
+    networks: [lab, egress]
+    volumes:
+      - ../../packages/gateway/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [collector-whatsapp]
+
+volumes:
+  lab-app-postgres:
+  lab-app-minio:

@@ -105,6 +105,21 @@ describe('webhook', () => {
     expect(beerLog.photoHash).toMatch(/^[0-9a-f]{64}$/) // SHA-256 hex
   })
 
+  it("records webhook, status and beer activity under the event's session", async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    const { getActivity } = await import('../activity.js')
+    await handleWebhookEvent({ ...makeImagePayload(), session: 'backup' }, logger)
+    await handleWebhookEvent(
+      { event: 'session.status', session: 'backup', payload: { status: 'FAILED' } },
+      logger,
+    )
+    const a = getActivity('backup')
+    expect(a.beersSinceStart).toBe(1)
+    expect(a.lastEvent).toBe('session.status')
+    expect(a.statusHistory[0]).toMatchObject({ status: 'FAILED', source: 'webhook' })
+  })
+
   it('dispatches session.status event to handleSessionStatusChange', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
