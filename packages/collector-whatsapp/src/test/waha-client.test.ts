@@ -219,15 +219,25 @@ describe('waha-client', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => [
-          { name: 'default', status: 'WORKING', me: { id: '27733514583@c.us' } },
-          { name: 'backup', status: 'STOPPED' },
+          {
+            name: 'default',
+            status: 'WORKING',
+            me: { id: '27733514583@c.us' },
+            config: { webhooks: [{ url: 'http://collector:8080/webhook' }] },
+          },
+          { name: 'backup', status: 'STOPPED', config: null },
         ],
       })
       vi.stubGlobal('fetch', mockFetch)
       const { listSessions } = await import('../waha-client.js')
       expect(await listSessions()).toEqual([
-        { name: 'default', status: 'WORKING', me: { id: '27733514583@c.us' } },
-        { name: 'backup', status: 'STOPPED', me: null },
+        {
+          name: 'default',
+          status: 'WORKING',
+          me: { id: '27733514583@c.us' },
+          webhookUrls: ['http://collector:8080/webhook'],
+        },
+        { name: 'backup', status: 'STOPPED', me: null, webhookUrls: [] },
       ])
       expect(mockFetch.mock.calls[0][0]).toBe('http://waha:3000/api/sessions?all=true')
     })

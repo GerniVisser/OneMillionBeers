@@ -62,6 +62,7 @@ describe('admin routes', () => {
     vi.resetModules()
     Object.assign(testConfig, {
       WAHA_SESSION: 'default',
+      WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
       PUBLIC_BASE_URL: ORIGIN,
       ADMIN_USERNAME: 'gerni',
       ADMIN_PASSWORD_HASH: passwordHash,
@@ -79,8 +80,13 @@ describe('admin routes', () => {
       m.mockReset()
     }
     mockListSessions.mockResolvedValue([
-      { name: 'default', status: 'WORKING', me: { id: '27733514583@c.us', pushName: 'OMB' } },
-      { name: 'backup', status: 'FAILED', me: null },
+      {
+        name: 'default',
+        status: 'WORKING',
+        me: { id: '27733514583@c.us', pushName: 'OMB' },
+        webhookUrls: ['http://collector:8080/webhook'],
+      },
+      { name: 'backup', status: 'FAILED', me: null, webhookUrls: ['http://recorder:3201/webhook'] },
     ])
     mockGetServerInfo.mockResolvedValue({
       version: '2026.9.2',
@@ -267,6 +273,18 @@ describe('admin routes', () => {
       const body = (await server.inject({ url: '/admin/api/overview', headers: { cookie } })).json()
       expect(body.waha).toEqual({ reachable: false, error: 'connect ECONNREFUSED' })
       expect(body.sessions).toMatchObject([{ name: 'default', status: 'UNKNOWN' }])
+    })
+  })
+
+  it('reports whether each session webhook reaches this collector', async () => {
+    const server = await build()
+    const cookie = await login(server)
+    const body = (await server.inject({ url: '/admin/api/overview', headers: { cookie } })).json()
+    const byName = Object.fromEntries(body.sessions.map((s: { name: string }) => [s.name, s]))
+    expect(byName.default).toMatchObject({ deliversHere: true })
+    expect(byName.backup).toMatchObject({
+      deliversHere: false,
+      webhookUrls: ['http://recorder:3201/webhook'],
     })
   })
 

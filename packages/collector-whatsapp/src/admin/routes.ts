@@ -266,6 +266,11 @@ export function registerAdminRoutes(server: FastifyInstance, logger: Logger): vo
           status: live?.status ?? 'UNKNOWN',
           me: live?.me ?? null,
           ingests: name === config.WAHA_SESSION,
+          // Whether WAHA sends this session's events to this collector at all.
+          // For the ingesting session, false means beers are silently not
+          // arriving (the collector only re-applies its webhook at startup).
+          webhookUrls: live?.webhookUrls ?? [],
+          deliversHere: live ? live.webhookUrls.includes(config.WAHA_WEBHOOK_URL) : null,
           activity: getActivity(name),
         }
       }),

@@ -190,15 +190,24 @@
             ? 'was +' + phoneOf(a.lastKnownMe)
             : 'not linked',
       ) +
+      fact('Webhooks go to', webhookTarget(s)) +
       fact(
-        'Last webhook',
-        a.lastWebhookAt ? ago(a.lastWebhookAt, now) + ' · ' + a.lastEvent : '—',
+        'Last webhook here',
+        s.deliversHere === false
+          ? 'n/a (not sent here)'
+          : a.lastWebhookAt
+            ? ago(a.lastWebhookAt, now) + ' · ' + a.lastEvent
+            : '—',
       ) +
       (s.ingests
         ? fact('Last beer', ago(a.lastBeerAt, now)) +
           fact('Beers since collector start', a.beersSinceStart)
         : '') +
       '</dl>' +
+      (s.ingests && s.deliversHere === false
+        ? '<p class="banner bad">This session\'s webhooks do not reach the collector, so no beers are ' +
+          'being ingested. Restart the collector to re-apply its webhook config.</p>'
+        : '') +
       '<div class="actions">' +
       '<button type="button" data-action="restart"' +
       dis +
@@ -216,6 +225,20 @@
         : '') +
       '</article>'
     )
+  }
+
+  // "this collector", or the host(s) WAHA sends this session's events to instead.
+  function webhookTarget(s) {
+    if (s.deliversHere) return 'this collector'
+    if (!s.webhookUrls.length) return s.deliversHere === null ? '—' : 'nowhere (no webhook)'
+    const hosts = s.webhookUrls.map((u) => {
+      try {
+        return new URL(u).host
+      } catch {
+        return u
+      }
+    })
+    return hosts.join(', ') + ' (not this collector)'
   }
 
   const pill = (status) => '<span class="pill s-' + esc(status) + '">' + esc(status) + '</span>'

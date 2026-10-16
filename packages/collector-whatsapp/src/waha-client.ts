@@ -7,6 +7,8 @@ export interface WahaSession {
   status: SessionStatus
   // The paired account; null while unpaired or stopped.
   me: { id: string; pushName?: string } | null
+  // Where WAHA sends this session's events.
+  webhookUrls: string[]
 }
 
 export interface WahaServerInfo {
@@ -77,11 +79,17 @@ export async function listSessions(): Promise<WahaSession[]> {
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`WAHA listSessions returned ${res.status}`)
-  const data = (await res.json()) as Array<{ name: string; status: SessionStatus; me?: unknown }>
+  const data = (await res.json()) as Array<{
+    name: string
+    status: SessionStatus
+    me?: unknown
+    config?: { webhooks?: Array<{ url?: string }> } | null
+  }>
   return data.map((s) => ({
     name: s.name,
     status: s.status,
     me: (s.me as WahaSession['me']) ?? null,
+    webhookUrls: (s.config?.webhooks ?? []).flatMap((w) => (w.url ? [w.url] : [])),
   }))
 }
 
