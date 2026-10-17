@@ -85,12 +85,8 @@ jobs:
           aws s3 cp docker-compose.yml s3://onemillionbeers-deploy-prod/docker-compose.yml
           aws s3 cp scripts/prod-db-migrate.sh s3://onemillionbeers-deploy-prod/scripts/prod-db-migrate.sh
 
-      # The .env written below single-quotes every value. docker compose
-      # interpolates unquoted .env values, so a secret containing $ — a bcrypt
-      # hash, say — would be silently mangled, and one containing # or trailing
-      # whitespace would be truncated. Single-quoted values are taken literally.
-      # A value containing a single quote cannot be represented in a .env at
-      # all, so the deploy fails loudly rather than writing a broken file.
+      # .env values are single-quoted (chr(39)) so compose takes $, # and trailing
+      # spaces literally. A value containing a single quote fails the deploy.
       - name: Deploy to EC2
         uses: MercuryTechnologies/aws-ssm-send-command-action@v0.1.0
         with:
