@@ -28,7 +28,7 @@ export async function stopDb(): Promise<void> {
 }
 
 export async function clearTables(p: pg.Pool): Promise<void> {
-  await p.query('TRUNCATE beer_logs, users, groups RESTART IDENTITY CASCADE')
+  await p.query('TRUNCATE beer_logs, beer_log_revocations, users, groups RESTART IDENTITY CASCADE')
 }
 
 async function runMigrations(p: pg.Pool): Promise<void> {
