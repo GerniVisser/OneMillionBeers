@@ -9,24 +9,11 @@ import {
   type SessionAction,
 } from './waha-client.js'
 
-/**
- * Operator page for the WhatsApp numbers: health at a glance, and enough
- * control to re-link one without an SSH session.
- *
- * It has no authentication of its own. The gateway requires HTTP basic auth on
- * /admin and rate-limits it, and the collector is not otherwise reachable from
- * outside the Docker network. Everything here therefore assumes the caller is
- * already an operator — do not add a route under /admin that would be unsafe
- * under that assumption, and do not expose the collector any other way.
- *
- * WAHA itself and its API key are never exposed; every call is proxied.
- */
+// No authentication here: the gateway's basic auth on /admin is the only gate.
+// Never expose the collector any other way.
 const ACTIONS: SessionAction[] = ['start', 'stop', 'restart', 'logout']
 
-/**
- * A session name reaches WAHA inside a URL path, so an unvalidated one would
- * let a caller address arbitrary WAHA endpoints. Only configured names pass.
- */
+// The name goes into a WAHA URL path, so only configured names are allowed.
 function knownSession(name: string): boolean {
   return config.WAHA_SESSIONS.includes(name)
 }
@@ -37,8 +24,6 @@ export function registerAdminRoutes(server: FastifyInstance, logger: Logger): vo
   server.get('/admin/api/overview', async (_req, reply) => {
     try {
       const all = await listSessions()
-      // Report the configured numbers in order, including any WAHA has never
-      // heard of — "missing" is a real state worth seeing.
       const sessions = config.WAHA_SESSIONS.map(
         (name) =>
           all.find((s) => s.name === name) ?? {
@@ -99,7 +84,7 @@ export function registerAdminRoutes(server: FastifyInstance, logger: Logger): vo
       logger.warn({ session: name, reason: result.message }, 'Pairing code request refused')
       return reply.status(502).send({ error: result.message })
     }
-    // The code itself is a credential for linking a device — never logged.
+    // The code links a device, so it is never logged.
     logger.warn({ session: name }, 'Admin requested a WhatsApp pairing code')
     return reply.send({ code: result.code })
   })
@@ -208,8 +193,7 @@ function card(s) {
 
   if (linkable) {
     const link = el.querySelector('.link')
-    // A QR cannot be scanned on the phone being linked, which is usually the
-    // one in your hand when the alert arrives. The code can.
+    // A QR can't be scanned on the phone being linked; a pairing code can.
     link.append($('<img alt="QR code" src="/admin/api/sessions/' + encodeURIComponent(s.name) + '/qr?t=' + Date.now() + '">'))
     const row = $('<div class="row"><input inputmode="numeric" placeholder="27821234567"><button>Get code</button></div>').firstElementChild
     const out = document.createElement('p')

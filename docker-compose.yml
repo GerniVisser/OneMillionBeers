@@ -9,12 +9,7 @@ services:
       - '80:80'
       - '443:443'
     environment:
-      # Rendered into /etc/nginx/conf.d/admin.htpasswd by the stock nginx
-      # entrypoint's envsubst pass over /etc/nginx/templates. Unset or empty
-      # leaves an unusable password file, so every login is rejected and
-      # /admin fails closed. Generate with:
-      #   htpasswd -nbB admin "$(openssl rand -base64 24)"
-      # then put the whole line in SSM as /omb/ADMIN_HTPASSWD.
+      # Rendered to the /admin password file at start; unset rejects every login.
       ADMIN_HTPASSWD: ${ADMIN_HTPASSWD:-}
     volumes:
       - certbot-www:/var/www/certbot:ro

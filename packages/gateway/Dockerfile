@@ -1,6 +1,4 @@
-# templates/ is rendered by the stock nginx entrypoint (envsubst) into
-# /etc/nginx/conf.d/ at container start, which is how ADMIN_HTPASSWD becomes
-# the password file for /admin without baking a secret into the image.
+# templates/ is rendered by the nginx entrypoint at start, so no secret is baked in.
 FROM nginx:alpine AS dev
 COPY nginx.dev.conf /etc/nginx/nginx.conf
 COPY templates/ /etc/nginx/templates/

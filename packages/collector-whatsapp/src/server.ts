@@ -19,7 +19,7 @@ export function buildServer(logger: Logger) {
     return reply.send({ status: 'ok' })
   })
 
-  // Operator page. Authentication is the gateway's job — see admin.ts.
+  // No auth here: the gateway protects /admin.
   registerAdminRoutes(server, logger)
 
   return server

@@ -203,12 +203,10 @@ export async function listAllGroups(
 export interface SessionSummary {
   name: string
   status: SessionStatus
-  /** The linked phone number, once paired. */
   phone: string | null
   pushName: string | null
 }
 
-/** Every session WAHA knows about, including stopped ones. */
 export async function listSessions(): Promise<SessionSummary[]> {
   const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions?all=true`, {
     headers: wahaHeaders(),
@@ -230,11 +228,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
 
 export type SessionAction = 'start' | 'stop' | 'restart' | 'logout'
 
-/**
- * logout unlinks the device, which drops the session to SCAN_QR_CODE so it can
- * be paired with a different number. The others are lifecycle only and keep
- * the pairing.
- */
+// logout unlinks the device; the others keep the pairing.
 export async function sessionAction(session: string, action: SessionAction): Promise<void> {
   const res = await fetch(
     `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}/${action}`,
@@ -243,14 +237,8 @@ export async function sessionAction(session: string, action: SessionAction): Pro
   if (!res.ok) throw new Error(`WAHA ${action} returned ${res.status}`)
 }
 
-/**
- * Asks WhatsApp for an 8-character pairing code, entered on the phone under
- * Linked devices -> Link with phone number. The alternative to a QR, and the
- * only option when the admin page is open on the phone being linked.
- *
- * WAHA only allows this in SCAN_QR_CODE status and rejects it otherwise with a
- * message worth showing the operator, so the body is returned on failure.
- */
+// The alternative to a QR, entered on the phone being linked. On refusal WAHA's
+// message is returned, since it says why (it only works in SCAN_QR_CODE).
 export async function requestPairingCode(
   session: string,
   phoneNumber: string,

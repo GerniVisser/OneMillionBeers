@@ -106,8 +106,6 @@ describe('admin', () => {
     })
 
     it('refuses a session that is not configured', async () => {
-      // The name is interpolated into a WAHA URL path, so an unvalidated one
-      // would let a caller address arbitrary WAHA endpoints.
       const server = await buildAdmin()
       const res = await server.inject({
         method: 'POST',
@@ -170,7 +168,6 @@ describe('admin', () => {
     )
 
     it("surfaces WAHA's reason when it refuses", async () => {
-      // e.g. "Can request code only in SCAN_QR_CODE status" — worth showing.
       mockRequestPairingCode.mockResolvedValue({
         ok: false,
         message: 'Can request code only in SCAN_QR_CODE status',
