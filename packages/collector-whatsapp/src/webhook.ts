@@ -25,12 +25,12 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   }
 
   if (event === 'message') {
-    await handleMessage(body as Record<string, unknown>, logger)
+    await handleMessage(body as Record<string, unknown>, logger.child({ session }))
     return
   }
 
   if (event === 'message.revoked') {
-    await handleRevokedMessage(body as Record<string, unknown>, logger)
+    await handleRevokedMessage(body as Record<string, unknown>, logger.child({ session }))
     return
   }
 
@@ -84,7 +84,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     return
   }
 
-  logger.warn({ chatId }, 'Processing photo from WhatsApp group')
+  logger.debug({ chatId }, 'Processing photo from WhatsApp group')
 
   // WhatsApp's newer LID protocol uses a device-linked identifier (ends in @lid)
   // as the primary participant field instead of a phone number. Fall back to
