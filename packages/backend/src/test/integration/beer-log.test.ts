@@ -490,3 +490,80 @@ describe('pseudo_name generation', () => {
     expect(rows[0].pseudo_name).not.toBe(rows[1].pseudo_name)
   })
 })
+
+// V17 moved the dedup key from a global UNIQUE(source_message_id) to
+// UNIQUE(group_id, source_message_id) and added the revocation tombstone table.
+// These exercise the schema directly: the routes that use it come next.
+describe('schema: group-scoped dedup key and revocation tombstones', () => {
+  async function makeGroup(sourceGroupId: string): Promise<string> {
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO groups (source_group_id, name, slug) VALUES ($1, $2, $3) RETURNING id`,
+      [sourceGroupId, sourceGroupId, sourceGroupId],
+    )
+    return rows[0]!.id
+  }
+
+  async function makeUser(): Promise<string> {
+    const { rows } = await pool.query<{ id: string }>(
+      `INSERT INTO users (identity_hash, slug) VALUES ($1, 'u') RETURNING id`,
+      ['a'.repeat(64)],
+    )
+    return rows[0]!.id
+  }
+
+  const insertLog = (userId: string, groupId: string, sourceMessageId: string | null) =>
+    pool.query(
+      `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id)
+       VALUES ($1, $2, 'https://example.com/b.jpg', now(), $3)`,
+      [userId, groupId, sourceMessageId],
+    )
+
+  it('rejects the same message id twice in one group', async () => {
+    const [userId, groupId] = [await makeUser(), await makeGroup('wa:a@g.us')]
+    await insertLog(userId, groupId, 'MSG1')
+    await expect(insertLog(userId, groupId, 'MSG1')).rejects.toMatchObject({ code: '23505' })
+  })
+
+  it('allows the same message id in two different groups', async () => {
+    // A bare WhatsApp message hash is not globally unique. Under the old index a
+    // collision let one group's revoke delete the other group's row and photo.
+    const userId = await makeUser()
+    await insertLog(userId, await makeGroup('wa:a@g.us'), 'MSG1')
+    await insertLog(userId, await makeGroup('wa:b@g.us'), 'MSG1')
+    const { rows } = await pool.query('SELECT * FROM beer_logs')
+    expect(rows).toHaveLength(2)
+  })
+
+  it('allows multiple legacy rows with a NULL source_message_id', async () => {
+    const [userId, groupId] = [await makeUser(), await makeGroup('wa:a@g.us')]
+    await insertLog(userId, groupId, null)
+    await insertLog(userId, groupId, null)
+    const { rows } = await pool.query('SELECT * FROM beer_logs')
+    expect(rows).toHaveLength(2)
+  })
+
+  it('records a tombstone for a message no beer log has ever referenced', async () => {
+    // The revoke can arrive before the message, so the tombstone must not depend
+    // on a beer_logs row, or on the group being known.
+    await pool.query(
+      `INSERT INTO beer_log_revocations (source_group_id, source_message_id) VALUES ($1, $2)`,
+      ['wa:never-seen@g.us', 'MSG1'],
+    )
+    const { rows } = await pool.query('SELECT * FROM beer_log_revocations')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.revoked_at).toBeInstanceOf(Date)
+  })
+
+  it('keys tombstones by group so the same message id can be revoked in each', async () => {
+    const insertTomb = (group: string) =>
+      pool.query(
+        `INSERT INTO beer_log_revocations (source_group_id, source_message_id) VALUES ($1, 'MSG1')`,
+        [group],
+      )
+    await insertTomb('wa:a@g.us')
+    await insertTomb('wa:b@g.us')
+    await expect(insertTomb('wa:a@g.us')).rejects.toMatchObject({ code: '23505' })
+    const { rows } = await pool.query('SELECT * FROM beer_log_revocations')
+    expect(rows).toHaveLength(2)
+  })
+})
