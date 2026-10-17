@@ -41,8 +41,8 @@ services:
       PORT: '3100'
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: local-api-key
-      WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
       WAHA_PRINT_QR: 'true'
