@@ -149,7 +149,7 @@ describe('webhook', () => {
       .mockRejectedValueOnce(new Error('backend error'))
       .mockResolvedValueOnce('created')
     const { handleWebhookEvent } = await import('../webhook.js')
-    await Promise.all([
+    await Promise.allSettled([
       handleWebhookEvent(
         makeImagePayload({ id: 'false_120363XXXX@g.us_MSGID123_27821111111@lid' }),
         logger,
@@ -249,19 +249,26 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
-  it('does not call forwardBeerLog when uploadPhoto throws', async () => {
+  it('asks for redelivery when the photo cannot be uploaded', async () => {
     mockImageFetch()
     mockUploadPhoto.mockRejectedValue(new Error('S3 error'))
-    const { handleWebhookEvent } = await import('../webhook.js')
-    await handleWebhookEvent(makeImagePayload(), logger)
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
     expect(mockForwardBeerLog).not.toHaveBeenCalled()
   })
 
-  it('does not rethrow when forwardBeerLog throws', async () => {
+  it('asks for redelivery when the backend cannot store the beer', async () => {
     mockImageFetch()
     mockForwardBeerLog.mockRejectedValue(new Error('backend error'))
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
+  })
+
+  it('does not ask for redelivery when the media cannot be downloaded', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const { handleWebhookEvent } = await import('../webhook.js')
     await expect(handleWebhookEvent(makeImagePayload(), logger)).resolves.toBeUndefined()
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
   it.each(['default', 'backup'])('syncs a group the moment %s joins it', async (session) => {
@@ -436,10 +443,12 @@ describe('webhook', () => {
       expect(mockDeletePhoto).not.toHaveBeenCalled()
     })
 
-    it('does not throw when forwardDeleteBeerLog rejects', async () => {
+    it('asks for redelivery when the backend cannot record the revoke', async () => {
       mockForwardDeleteBeerLog.mockRejectedValue(new Error('network error'))
-      const { handleWebhookEvent } = await import('../webhook.js')
-      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).resolves.toBeUndefined()
+      const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).rejects.toBeInstanceOf(
+        RetryLater,
+      )
       expect(mockDeletePhoto).not.toHaveBeenCalled()
     })
 
