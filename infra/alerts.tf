@@ -205,9 +205,8 @@ resource "aws_cloudwatch_metric_alarm" "beers_lost" {
   ok_actions          = local.alarm_actions
 }
 
-# The collector polls WAHA every 30 minutes and logs this on FAILED or
-# SCAN_QR_CODE. A FAILED session is auto-restarted, so one occurrence can heal
-# itself; two consecutive polls means it has not.
+# Logged for any number that is FAILED or SCAN_QR_CODE. A FAILED session is
+# auto-restarted, so one occurrence can heal itself; 15 minutes means it has not.
 resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
   name           = "omb-whatsapp-session-unhealthy"
   log_group_name = aws_cloudwatch_log_group.collector_whatsapp.name
@@ -223,12 +222,12 @@ resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
 
 resource "aws_cloudwatch_metric_alarm" "whatsapp_session" {
   alarm_name          = "omb-whatsapp-session-unhealthy"
-  alarm_description   = "WhatsApp session has been FAILED or SCAN_QR_CODE for two consecutive polls. Re-pair at /whatsapp/status."
+  alarm_description   = "A WhatsApp number has been FAILED or SCAN_QR_CODE for 15 minutes. The other numbers keep ingesting; re-link it at /admin. The email names which one."
   namespace           = "OMB"
   metric_name         = "WhatsAppSessionUnhealthy"
   statistic           = "Sum"
-  period              = 1800
-  evaluation_periods  = 2
+  period              = 300
+  evaluation_periods  = 3
   threshold           = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching"
@@ -370,6 +369,41 @@ resource "aws_cloudwatch_metric_alarm" "rds_memory" {
   threshold           = 50 * 1024 * 1024
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "missing"
+  alarm_actions       = local.alarm_actions
+  ok_actions          = local.alarm_actions
+}
+
+# ---------------------------------------------------------------------------
+# WAHA — failures it logs that the collector cannot see.
+# ---------------------------------------------------------------------------
+
+# The login loop WhatsApp causes when it invalidates NOWEB's built-in web version.
+# Plain text, unlike the filters above: WAHA's logs are not JSON.
+resource "aws_cloudwatch_log_metric_filter" "waha_connection_failure" {
+  name           = "omb-waha-connection-failure"
+  log_group_name = aws_cloudwatch_log_group.waha.name
+  pattern        = "Connection Failure"
+
+  metric_transformation {
+    name          = "WahaConnectionFailure"
+    namespace     = "OMB"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "waha_connection_failure" {
+  alarm_name        = "omb-waha-connection-failure"
+  alarm_description = "WAHA is failing to connect to WhatsApp. If this persists it is usually a stale WhatsApp Web version; check the /omb/waha log group before restarting repeatedly."
+  namespace         = "OMB"
+  metric_name       = "WahaConnectionFailure"
+  statistic         = "Sum"
+  # A single reconnect is normal; the loop produces several.
+  period              = 900
+  evaluation_periods  = 1
+  threshold           = 3
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
   alarm_actions       = local.alarm_actions
   ok_actions          = local.alarm_actions
 }
