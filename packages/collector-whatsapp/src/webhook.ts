@@ -53,7 +53,15 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const hasMedia = payload.hasMedia
   const media = payload.media as Record<string, unknown> | undefined
   const mimetype = media?.mimetype as string | undefined
-  if (!hasMedia || !mimetype?.startsWith('image/')) return
+  if (!hasMedia || !mimetype) return
+
+  // Beer photos are always image/jpeg — WhatsApp re-encodes every photo message.
+  // Accepting any image/* meant stickers (image/webp) were logged as beers, and
+  // stored mislabelled, because the S3 key and ContentType are both hardcoded JPEG.
+  if (mimetype !== 'image/jpeg') {
+    logger.debug({ chatId, mimetype }, 'Media is not a JPEG photo — discarding')
+    return
+  }
 
   const msgId = payload.id as string
   if (!msgId) {
@@ -126,8 +134,8 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         return
       }
       const contentType = res.headers.get('content-type') ?? ''
-      if (!contentType.startsWith('image/')) {
-        logger.warn({ chatId, contentType }, 'Media response is not an image — discarding')
+      if (!contentType.startsWith('image/jpeg')) {
+        logger.warn({ chatId, contentType }, 'Media response is not a JPEG — discarding')
         return
       }
       buffer = Buffer.from(await res.arrayBuffer())
