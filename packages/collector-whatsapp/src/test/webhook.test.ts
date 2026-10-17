@@ -7,6 +7,7 @@ const mockForwardBeerLog = vi.fn()
 const mockForwardDeleteBeerLog = vi.fn()
 const mockHandleSessionStatusChange = vi.fn()
 const mockGetGroupName = vi.fn()
+const mockSyncGroup = vi.fn()
 
 vi.mock('@omb/collector-core', () => ({
   uploadPhoto: mockUploadPhoto,
@@ -19,9 +20,11 @@ vi.mock('../session-monitor.js', () => ({
   handleSessionStatusChange: mockHandleSessionStatusChange,
 }))
 vi.mock('../waha-client.js', () => ({ getGroupName: mockGetGroupName }))
+vi.mock('../group-sync.js', () => ({ syncGroup: mockSyncGroup }))
 vi.mock('../config.js', () => ({
   config: {
     WAHA_BASE_URL: 'http://waha:3000',
+    WAHA_SESSIONS: ['default'],
     WAHA_API_KEY: 'test-key',
     STORAGE_PUBLIC_URL: 'https://s3.example.com',
     STORAGE_BUCKET: 'omb-bucket',
@@ -75,6 +78,8 @@ describe('webhook', () => {
     mockForwardDeleteBeerLog.mockReset()
     mockHandleSessionStatusChange.mockReset()
     mockGetGroupName.mockReset()
+    mockSyncGroup.mockReset()
+    mockSyncGroup.mockResolvedValue(undefined)
     mockGetGroupName.mockResolvedValue('Beer Crew')
     mockUploadPhoto.mockResolvedValue(
       'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
@@ -229,6 +234,19 @@ describe('webhook', () => {
     mockForwardBeerLog.mockRejectedValue(new Error('backend error'))
     const { handleWebhookEvent } = await import('../webhook.js')
     await expect(handleWebhookEvent(makeImagePayload(), logger)).resolves.toBeUndefined()
+  })
+
+  it.each(['default', 'backup'])('syncs a group the moment %s joins it', async (session) => {
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent(
+      {
+        event: 'group.v2.join',
+        session,
+        payload: { group: { id: '120363XXXX@g.us', subject: 'Beer Crew' } },
+      },
+      logger,
+    )
+    expect(mockSyncGroup).toHaveBeenCalledWith(session, '120363XXXX@g.us', 'Beer Crew', logger)
   })
 
   it('ignores unknown event types without throwing', async () => {

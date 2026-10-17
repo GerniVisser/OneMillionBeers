@@ -37,22 +37,6 @@ describe('waha-client', () => {
     await expect(getSessionStatus('default')).rejects.toThrow('500')
   })
 
-  it('startSession POSTs to /api/sessions/start with correct body and api-key header', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({ ok: true })
-    vi.stubGlobal('fetch', mockFetch)
-    const { startSession } = await import('../waha-client.js')
-    await startSession('default')
-    expect(mockFetch).toHaveBeenCalledOnce()
-    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('http://waha:3000/api/sessions/start')
-    expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>)['x-api-key']).toBe('test-api-key')
-    const body = JSON.parse(init.body as string)
-    expect(body.name).toBe('default')
-    expect(body.config.webhooks[0].url).toBe('http://collector:8080/webhook')
-    expect(body.config.webhooks[0].events).toContain('message')
-  })
-
   it('getQrCodePng returns a Buffer from the response', async () => {
     const fakeData = new Uint8Array([1, 2, 3]).buffer
     vi.stubGlobal(
@@ -135,49 +119,135 @@ describe('waha-client', () => {
     expect(name).toBe('120363402479181080@g.us')
   })
 
-  it('ensureWebhookConfigured always PUTs the canonical config and returns true', async () => {
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ config: { webhooks: [] } }) }) // GET session
-      .mockResolvedValueOnce({ ok: true }) // PUT config
-    vi.stubGlobal('fetch', mockFetch)
-    const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured('default')
-    expect(result).toBe(true)
-    const [putUrl, putInit] = mockFetch.mock.calls[1] as [string, RequestInit]
-    expect(putUrl).toBe('http://waha:3000/api/sessions/default')
-    expect(putInit.method).toBe('PUT')
-    const body = JSON.parse(putInit.body as string)
-    expect(body.config.webhooks[0].events).toContain('message')
-    expect(body.config.webhooks[0].events).not.toContain('message.any')
-  })
+  describe('reconcileSession', () => {
+    const liveConfig = {
+      webhooks: [
+        {
+          url: 'http://collector:8080/webhook',
+          events: [
+            'message',
+            'message.revoked',
+            'session.status',
+            'group.v2.join',
+            'group.v2.update',
+          ],
+          retries: { policy: 'constant', delaySeconds: 2, attempts: 5 },
+        },
+      ],
+      noweb: { markOnline: false },
+    }
 
-  it('ensureWebhookConfigured overwrites stale config that includes message.any', async () => {
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce({
+    it('creates a session that does not exist, started, with the config', async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 404 })
+        .mockResolvedValueOnce({ ok: true })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+
+      expect(await reconcileSession('backup')).toEqual({ action: 'created' })
+      const [url, init] = mockFetch.mock.calls[1] as [string, RequestInit]
+      expect(url).toBe('http://waha:3000/api/sessions')
+      expect(init.method).toBe('POST')
+      const body = JSON.parse(init.body as string)
+      expect(body).toMatchObject({ name: 'backup', start: true })
+      expect(body.config.webhooks[0].events).toContain('message')
+      expect(body.config.webhooks[0].events).not.toContain('message.any')
+      expect(body.config.noweb.markOnline).toBe(false)
+    })
+
+    it('leaves an already-correct session alone', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          config: {
-            webhooks: [
-              { url: 'http://collector:8080/webhook', events: ['message', 'message.any'] },
-            ],
-          },
-        }),
+        json: async () => ({ status: 'WORKING', config: liveConfig }),
       })
-      .mockResolvedValueOnce({ ok: true })
-    vi.stubGlobal('fetch', mockFetch)
-    const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured('default')
-    expect(result).toBe(true)
-    expect(mockFetch).toHaveBeenCalledTimes(2) // GET + PUT — did not skip
-  })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
 
-  it('ensureWebhookConfigured returns false when session fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
-    const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured('default')
-    expect(result).toBe(false)
+      expect(await reconcileSession('default')).toEqual({ action: 'unchanged', status: 'WORKING' })
+      expect(mockFetch).toHaveBeenCalledOnce() // GET only — no PUT
+    })
+
+    it('ignores event order when comparing', async () => {
+      const shuffled = {
+        ...liveConfig,
+        webhooks: [
+          { ...liveConfig.webhooks[0], events: [...liveConfig.webhooks[0]!.events].reverse() },
+        ],
+      }
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'WORKING', config: shuffled }),
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+
+      expect((await reconcileSession('default')).action).toBe('unchanged')
+    })
+
+    it('PUTs when the live config has drifted', async () => {
+      const stale = { webhooks: [{ url: 'http://old:8080/webhook', events: ['message.any'] }] }
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'WORKING', config: stale }),
+        })
+        .mockResolvedValueOnce({ ok: true })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+
+      expect(await reconcileSession('default')).toEqual({ action: 'updated', status: 'WORKING' })
+      const [putUrl, putInit] = mockFetch.mock.calls[1] as [string, RequestInit]
+      expect(putUrl).toBe('http://waha:3000/api/sessions/default')
+      expect(putInit.method).toBe('PUT')
+    })
+
+    it('PUTs when markOnline is left at the WAHA default', async () => {
+      const noMarkOnline = { webhooks: liveConfig.webhooks }
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ status: 'WORKING', config: noMarkOnline }),
+        })
+        .mockResolvedValueOnce({ ok: true })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+
+      expect((await reconcileSession('default')).action).toBe('updated')
+    })
+
+    it('reports the live status so a change made while the collector was down is seen', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'SCAN_QR_CODE', config: liveConfig }),
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+
+      expect(await reconcileSession('default')).toEqual({
+        action: 'unchanged',
+        status: 'SCAN_QR_CODE',
+      })
+    })
+
+    it('throws when WAHA is unreachable, so the caller can keep the other sessions', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+      const { reconcileSession } = await import('../waha-client.js')
+      await expect(reconcileSession('default')).rejects.toThrow('500')
+    })
+
+    it('URL-encodes the session name', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'WORKING', config: liveConfig }),
+      })
+      vi.stubGlobal('fetch', mockFetch)
+      const { reconcileSession } = await import('../waha-client.js')
+      await reconcileSession('a/b')
+      expect(mockFetch.mock.calls[0]![0]).toBe('http://waha:3000/api/sessions/a%2Fb')
+    })
   })
 
   it('listAllGroups returns groups from an array response', async () => {

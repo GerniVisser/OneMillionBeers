@@ -3,6 +3,7 @@ import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
 import { type BeerLogOutcome } from '@omb/shared'
 import { handleSessionStatusChange } from './session-monitor.js'
+import { syncGroup } from './group-sync.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -35,6 +36,17 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
 
   if (event === 'message.revoked') {
     await handleRevokedMessage(body as Record<string, unknown>, logger)
+    return
+  }
+
+  if (event === 'group.v2.join') {
+    // Sync now rather than at the next poll.
+    const group = ((body as Record<string, unknown>).payload as Record<string, unknown> | undefined)
+      ?.group as Record<string, unknown> | undefined
+    const id = group?.id as string | undefined
+    if (!id) return
+    logger.info({ session, id }, 'Joined a WhatsApp group — syncing it now')
+    await syncGroup(session, id, (group?.subject as string | undefined) ?? id, logger)
     return
   }
 

@@ -1,8 +1,8 @@
 import { pino } from 'pino'
 import { config } from './config.js'
-import { startSession, ensureWebhookConfigured } from './waha-client.js'
+import { reconcileSession } from './waha-client.js'
 import { buildServer } from './server.js'
-import { startPolling } from './session-monitor.js'
+import { startPolling, handleSessionStatusChange } from './session-monitor.js'
 import { startGroupPolling } from './group-sync.js'
 
 async function main(): Promise<void> {
@@ -16,28 +16,25 @@ async function main(): Promise<void> {
   await server.listen({ port: config.COLLECTOR_PORT, host: '0.0.0.0' })
   logger.info({ port: config.COLLECTOR_PORT }, 'Webhook server listening')
 
-  for (const session of config.WAHA_SESSIONS) {
-    // Ensure WAHA session is started (idempotent). Includes webhook config in the
-    // start body — required since WAHA 2026.x no longer reads WAHA_WEBHOOK_URL env var.
-    try {
-      await startSession(session)
-      logger.info({ session }, 'WAHA session started')
-    } catch (err) {
-      // Non-fatal — WAHA may already be running the session via WHATSAPP_START_SESSION env var
-      logger.warn({ err, session }, 'Could not explicitly start WAHA session — continuing anyway')
-    }
-
-    // If session was already running (startSession returned 422), it may have no webhook
-    // config (WAHA 2026.x broke env-var-based webhook config). Configure it now via PUT,
-    // which restarts the session briefly. The server is already up so the WORKING event lands.
-    try {
-      if (await ensureWebhookConfigured(session)) {
-        logger.info({ session }, 'Applied WAHA webhook config — session restarting')
+  // Per session and non-fatal: one unreachable number must not stop the others.
+  await Promise.all(
+    config.WAHA_SESSIONS.map(async (session) => {
+      try {
+        const result = await reconcileSession(session)
+        if (result.action === 'created') {
+          logger.info({ session }, 'WAHA session created')
+          return
+        }
+        if (result.action === 'updated') {
+          logger.info({ session }, 'Applied WAHA session config — session restarting')
+        }
+        // A change made while we were down sent no webhook, so check it now.
+        await handleSessionStatusChange(session, result.status, logger)
+      } catch (err) {
+        logger.warn({ err, session }, 'Could not reconcile WAHA session — continuing anyway')
       }
-    } catch (err) {
-      logger.warn({ err, session }, 'Could not configure WAHA webhook')
-    }
-  }
+    }),
+  )
 
   const stopPolling = startPolling(logger)
   const stopGroupPolling = startGroupPolling(logger)
