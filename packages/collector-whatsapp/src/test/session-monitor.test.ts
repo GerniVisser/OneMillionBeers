@@ -166,8 +166,6 @@ describe('session-monitor', () => {
     })
   })
 
-  // Two numbers run for redundancy and fail independently. The whole point is
-  // that one needing a human does not degrade the other.
   describe('per-session isolation', () => {
     it('gives each session its own restart budget', async () => {
       testConfig.WAHA_SESSIONS = ['default', 'backup']
@@ -196,7 +194,7 @@ describe('session-monitor', () => {
       expect(mockSendReauthAlert.mock.calls.map((c) => c[0])).toEqual(['default', 'backup'])
     })
 
-    it('one session recovering does not silence another that is still broken', async () => {
+    it("one session recovering does not reset another's alert de-dupe", async () => {
       testConfig.WAHA_SESSIONS = ['default', 'backup']
       mockSendReauthAlert.mockResolvedValue(undefined)
       const { handleSessionStatusChange } = await import('../session-monitor.js')
@@ -205,13 +203,10 @@ describe('session-monitor', () => {
       await handleSessionStatusChange('default', 'WORKING', logger)
       await handleSessionStatusChange('backup', 'SCAN_QR_CODE', logger)
 
-      // Still de-duped for backup — WORKING on default must not reset it.
       expect(mockSendReauthAlert).toHaveBeenCalledOnce()
     })
 
     it('emails once while an unpaired session flips between SCAN_QR_CODE and FAILED', async () => {
-      // An unpaired number oscillates between the two. De-duping on the exact
-      // status would email on every flip.
       mockSendReauthAlert.mockResolvedValue(undefined)
       const { handleSessionStatusChange } = await import('../session-monitor.js')
 

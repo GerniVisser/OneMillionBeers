@@ -16,7 +16,6 @@ export async function sendReauthAlert(
 ): Promise<void> {
   if (!config.ENABLE_ALERTS) return
 
-  // With more than one number, an alert that does not say which one is useless.
   const textBody = `WhatsApp number "${session}" is ${status} and requires re-authentication.
 
 Re-link it at: ${adminUrl}

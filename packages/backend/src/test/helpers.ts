@@ -47,10 +47,7 @@ async function runMigrations(p: pg.Pool): Promise<void> {
 
 let messageSeq = 0
 
-/**
- * A fresh WhatsApp message id. Ingestion is idempotent on
- * (group, source_message_id), so every seeded beer needs its own.
- */
+/** Ingestion dedups on message id, so every seeded beer needs a fresh one. */
 export function nextMessageId(): string {
   return `MSG${(++messageSeq).toString().padStart(6, '0')}`
 }
