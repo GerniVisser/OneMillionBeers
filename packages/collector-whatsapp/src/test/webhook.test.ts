@@ -164,6 +164,31 @@ describe('webhook', () => {
     expect(mockForwardBeerLog.mock.calls[1]![0].sourceMessageId).toBe('MSGID123')
   })
 
+  it('names the number that delivered a message in its logs', async () => {
+    mockImageFetch()
+    mockForwardDeleteBeerLog.mockResolvedValue(null)
+    const lines: Array<Record<string, unknown>> = []
+    const capture = pino(
+      { level: 'info' },
+      { write: (line: string) => lines.push(JSON.parse(line)) },
+    )
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent({ ...makeImagePayload(), session: 'backup' }, capture)
+    await handleWebhookEvent(
+      {
+        event: 'message.revoked',
+        session: 'backup',
+        payload: { revokedMessageId: 'MSGID123', after: { from: '120363XXXX@g.us' } },
+      },
+      capture,
+    )
+
+    const forwarded = lines.find((l) => l.msg === 'Beer log forwarded')
+    const revoked = lines.find((l) => l.msg === 'Message revoked — checking for beer log')
+    expect(forwarded?.session).toBe('backup')
+    expect(revoked?.session).toBe('backup')
+  })
+
   it('dispatches session.status event to handleSessionStatusChange', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
