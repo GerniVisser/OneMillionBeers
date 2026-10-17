@@ -131,6 +131,33 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
+  // WhatsApp re-encodes every photo message to JPEG, so anything else is not a
+  // beer photo. Stickers arrive as image/webp and used to be logged as beers.
+  it('ignores a sticker (image/webp)', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    const body = makeImagePayload()
+    ;(body.payload as Record<string, unknown>).media = {
+      mimetype: 'image/webp',
+      url: 'http://waha:3000/api/files/sticker.webp',
+    }
+    await handleWebhookEvent(body, logger)
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+    expect(mockForwardBeerLog).not.toHaveBeenCalled()
+  })
+
+  it('ignores a non-JPEG image', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    const body = makeImagePayload()
+    ;(body.payload as Record<string, unknown>).media = {
+      mimetype: 'image/png',
+      url: 'http://waha:3000/api/files/screenshot.png',
+    }
+    await handleWebhookEvent(body, logger)
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+  })
+
   it('ignores private chat messages (chatId ends in @s.whatsapp.net)', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     const body = makeImagePayload({ chatId: '1234567890@s.whatsapp.net' })
@@ -211,7 +238,7 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
-  it('discards when response Content-Type is not image/', async () => {
+  it('discards when response Content-Type is not image/jpeg', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
