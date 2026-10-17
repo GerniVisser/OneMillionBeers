@@ -106,8 +106,6 @@ describe('forwardBeerLog', () => {
   })
 
   it('rejects a 2xx response that carries no outcome', async () => {
-    // The collector decides whether to clean up its S3 object from the outcome,
-    // so a backend that does not report one is a contract break, not a success.
     fetchSpy.mockResolvedValue(new Response('{"ok":true}', { status: 201 }))
 
     const { forwardBeerLog } = await import('../forwarder.js')
@@ -147,8 +145,6 @@ describe('forwardDeleteBeerLog', () => {
   })
 
   it('returns null when the revoke matched no beer log', async () => {
-    // Normal: the revoke can arrive before the message it revokes. The backend
-    // still records the revocation, so this is a 200 with no photoUrl.
     fetchSpy.mockResolvedValue(new Response('{"ok":true}', { status: 200 }))
 
     const { forwardDeleteBeerLog } = await import('../forwarder.js')
