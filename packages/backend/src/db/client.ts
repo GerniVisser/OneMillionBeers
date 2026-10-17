@@ -40,17 +40,8 @@ export function createPool(connectionString: string): pg.Pool {
   return new Pool({ connectionString })
 }
 
-/** Anything you can .query() — pg.Pool and pg.PoolClient both satisfy it. */
 export type Queryable = Pick<pg.Pool, 'query'>
 
-/**
- * Runs fn on a single connection inside a transaction, rolling back on throw.
- *
- * Used only where two statements have to see each other's effects: ingesting a
- * beer and revoking one both read and write the same message's state, and must
- * not interleave. Everything else in this codebase is a single autocommit
- * statement and should stay that way.
- */
 export async function withTransaction<T>(
   pool: pg.Pool,
   fn: (client: pg.PoolClient) => Promise<T>,

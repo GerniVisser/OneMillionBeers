@@ -360,15 +360,8 @@ export async function searchUsers(
 
 // ─── Beer Logs ────────────────────────────────────────────────────────────────
 
-/**
- * Serialises ingest against revoke for one message.
- *
- * Both paths read the message's state and then write it. Under READ COMMITTED
- * they can read past each other — the insert sees no tombstone while the delete
- * sees no row — and both commit, leaving a revoked beer in place forever. The
- * lock is only ever contended by two operations on the same message, so it
- * costs nothing in the normal case. It is released when the transaction ends.
- */
+// Without this, an ingest and a revoke of the same message can each miss the
+// other's write under READ COMMITTED, leaving a revoked beer in place.
 async function lockMessage(
   client: Queryable,
   sourceGroupId: string,
@@ -380,13 +373,6 @@ async function lockMessage(
   ])
 }
 
-/**
- * Inserts a beer log unless this message was already logged or already revoked.
- *
- * Idempotent on (group, source_message_id), with no time window — which is what
- * makes it safe for several bots in one group whose deliveries can be
- * milliseconds or days apart.
- */
 export async function insertBeerLog(
   pool: pg.Pool,
   p: {
@@ -419,26 +405,16 @@ export async function insertBeerLog(
       )
       return rowCount ? 'created' : 'duplicate'
     } catch (err) {
-      // Until V18 lands there is still a global UNIQUE(photo_hash), so two
-      // different messages carrying byte-identical photos collide on it. That
-      // is a duplicate photo, not a failure: report it the way the old
-      // ON CONFLICT (photo_hash) DO NOTHING did rather than 500ing and losing
-      // the beer. Dead code once the index is gone.
+      // Until V18 drops it, UNIQUE(photo_hash) rejects a byte-identical photo
+      // from another message. Treat that as a duplicate, as before.
       if ((err as { code?: string }).code === '23505') return 'duplicate'
       throw err
     }
   })
 }
 
-/**
- * Records that a message was deleted for everyone, and removes its beer log if
- * one exists.
- *
- * The tombstone is written whether or not there was a row, because WhatsApp can
- * deliver the revoke before the message — and with several bots the message can
- * arrive days after the revoke. Idempotent: call it repeatedly and the result
- * is one tombstone and at most one delete.
- */
+// The tombstone is written even when there is no row: the revoke can arrive
+// before the message.
 export async function revokeBeerLog(
   pool: pg.Pool,
   sourceGroupId: string,

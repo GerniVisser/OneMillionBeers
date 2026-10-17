@@ -15,7 +15,6 @@ export function internalAuthHeader(): Record<string, string> {
   return { Authorization: `Bearer ${config.INTERNAL_API_TOKEN}` }
 }
 
-/** Returns what the backend did with it, so the caller can clean up S3. */
 export async function forwardBeerLog(payload: BeerLogRequest): Promise<BeerLogOutcome> {
   // Belt-and-suspenders: validate outbound payload before sending
   BeerLogRequestSchema.parse(payload)
@@ -37,12 +36,7 @@ export async function forwardBeerLog(payload: BeerLogRequest): Promise<BeerLogOu
   return BeerLogResponseSchema.parse(await response.json()).outcome
 }
 
-/**
- * Records the revocation and deletes the beer log if there is one.
- *
- * Returns the photo URL to delete from storage, or null when there was no beer
- * log — which is normal: the revoke can arrive before the message it revokes.
- */
+/** Returns the photo URL to delete, or null if no beer log matched. */
 export async function forwardDeleteBeerLog(
   sourceMessageId: string,
   sourceGroupId: string,
