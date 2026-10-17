@@ -486,9 +486,6 @@ describe('pseudo_name generation', () => {
   })
 })
 
-// V17 moved the dedup key from a global UNIQUE(source_message_id) to
-// UNIQUE(group_id, source_message_id) and added the revocation tombstone table.
-// These exercise the schema directly: the routes that use it come next.
 describe('schema: group-scoped dedup key and revocation tombstones', () => {
   async function makeGroup(sourceGroupId: string): Promise<string> {
     const { rows } = await pool.query<{ id: string }>(
@@ -520,8 +517,6 @@ describe('schema: group-scoped dedup key and revocation tombstones', () => {
   })
 
   it('allows the same message id in two different groups', async () => {
-    // A bare WhatsApp message hash is not globally unique. Under the old index a
-    // collision let one group's revoke delete the other group's row and photo.
     const userId = await makeUser()
     await insertLog(userId, await makeGroup('wa:a@g.us'), 'MSG1')
     await insertLog(userId, await makeGroup('wa:b@g.us'), 'MSG1')
@@ -538,8 +533,6 @@ describe('schema: group-scoped dedup key and revocation tombstones', () => {
   })
 
   it('records a tombstone for a message no beer log has ever referenced', async () => {
-    // The revoke can arrive before the message, so the tombstone must not depend
-    // on a beer_logs row, or on the group being known.
     await pool.query(
       `INSERT INTO beer_log_revocations (source_group_id, source_message_id) VALUES ($1, $2)`,
       ['wa:never-seen@g.us', 'MSG1'],
