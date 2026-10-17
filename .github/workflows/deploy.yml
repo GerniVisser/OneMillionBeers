@@ -85,6 +85,12 @@ jobs:
           aws s3 cp docker-compose.yml s3://onemillionbeers-deploy-prod/docker-compose.yml
           aws s3 cp scripts/prod-db-migrate.sh s3://onemillionbeers-deploy-prod/scripts/prod-db-migrate.sh
 
+      # The .env written below single-quotes every value. docker compose
+      # interpolates unquoted .env values, so a secret containing $ — a bcrypt
+      # hash, say — would be silently mangled, and one containing # or trailing
+      # whitespace would be truncated. Single-quoted values are taken literally.
+      # A value containing a single quote cannot be represented in a .env at
+      # all, so the deploy fails loudly rather than writing a broken file.
       - name: Deploy to EC2
         uses: MercuryTechnologies/aws-ssm-send-command-action@v0.1.0
         with:
@@ -98,7 +104,7 @@ jobs:
                 "aws s3 cp s3://onemillionbeers-deploy-prod/scripts/prod-db-migrate.sh /opt/onemillionbeers/prod-db-migrate.sh",
                 "chmod +x /opt/onemillionbeers/prod-db-migrate.sh",
                 "cd /opt/onemillionbeers",
-                "aws ssm get-parameters-by-path --path '/omb/' --with-decryption --region us-east-1 --output json | python3 -c \"import json,sys; [print(p['Name'].rsplit('/',1)[-1]+'='+p['Value']) for p in json.load(sys.stdin)['Parameters']]\" > .env",
+                "aws ssm get-parameters-by-path --path '/omb/' --with-decryption --region us-east-1 --output json | python3 -c \"import json,sys; line=lambda n,v: sys.exit('refusing to write /omb/%s: value contains a single quote, which .env cannot represent' % n) if chr(39) in v else '%s=%s%s%s' % (n,chr(39),v,chr(39)); print(chr(10).join(line(p['Name'].rsplit('/',1)[-1], p['Value']) for p in json.load(sys.stdin)['Parameters']))\" > .env",
                 "chmod 600 .env",
                 "printf 'GIT_SHA=%s\\nGITHUB_REPOSITORY=%s\\n' '${{ env.GIT_SHA }}' '${{ env.REPO_LC }}' > .env.sha",
                 "docker compose --env-file .env --env-file .env.sha pull backend collector-whatsapp frontend nginx",
