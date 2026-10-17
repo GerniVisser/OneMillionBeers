@@ -40,14 +40,13 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   }
 
   if (event === 'group.v2.join') {
-    // Sync now rather than at the next poll. Primary only: all numbers share groups.
-    if (session !== config.WAHA_SESSIONS[0]) return
+    // Sync now rather than at the next poll.
     const group = ((body as Record<string, unknown>).payload as Record<string, unknown> | undefined)
       ?.group as Record<string, unknown> | undefined
     const id = group?.id as string | undefined
     if (!id) return
     logger.info({ session, id }, 'Joined a WhatsApp group — syncing it now')
-    await syncGroup(id, (group?.subject as string | undefined) ?? id, logger)
+    await syncGroup(session, id, (group?.subject as string | undefined) ?? id, logger)
     return
   }
 

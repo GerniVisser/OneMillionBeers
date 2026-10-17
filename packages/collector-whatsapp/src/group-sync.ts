@@ -37,12 +37,8 @@ async function pushGroupSync(
   }
 }
 
-// Every number is in the same groups, so only the primary syncs them.
-function primarySession(): string {
-  return config.WAHA_SESSIONS[0]!
-}
-
 export async function syncGroup(
+  session: string,
   rawGroupId: string,
   subject: string,
   logger: Logger,
@@ -51,7 +47,7 @@ export async function syncGroup(
 
   let avatarUrl: string | null = null
   try {
-    const pictureUrl = await getGroupPictureUrl(primarySession(), rawGroupId)
+    const pictureUrl = await getGroupPictureUrl(session, rawGroupId)
     if (pictureUrl) {
       const buffer = await downloadBuffer(pictureUrl)
       if (buffer) {
@@ -64,7 +60,7 @@ export async function syncGroup(
 
   let inviteCode: string | null = null
   try {
-    inviteCode = await getGroupInviteCode(primarySession(), rawGroupId)
+    inviteCode = await getGroupInviteCode(session, rawGroupId)
   } catch (err) {
     logger.warn({ err, rawGroupId }, 'Failed to fetch invite code — proceeding without it')
   }
@@ -77,12 +73,15 @@ export async function syncGroup(
   }
 }
 
+// Every number syncs the groups it sees, so group details keep updating while any one is up.
 export async function syncAllGroups(logger: Logger): Promise<void> {
   logger.info('Starting group sync')
-  const groups = await listAllGroups(primarySession())
-  logger.info({ count: groups.length }, 'Groups to sync')
-  for (const { id, subject } of groups) {
-    await syncGroup(id, subject, logger)
+  for (const session of config.WAHA_SESSIONS) {
+    const groups = await listAllGroups(session)
+    logger.info({ session, count: groups.length }, 'Groups to sync')
+    for (const { id, subject } of groups) {
+      await syncGroup(session, id, subject, logger)
+    }
   }
   logger.info('Group sync complete')
 }

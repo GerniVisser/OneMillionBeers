@@ -209,30 +209,17 @@ describe('webhook', () => {
     await expect(handleWebhookEvent(makeImagePayload(), logger)).resolves.toBeUndefined()
   })
 
-  it('syncs a group the moment the primary number joins it', async () => {
+  it.each(['default', 'backup'])('syncs a group the moment %s joins it', async (session) => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
       {
         event: 'group.v2.join',
-        session: 'default',
+        session,
         payload: { group: { id: '120363XXXX@g.us', subject: 'Beer Crew' } },
       },
       logger,
     )
-    expect(mockSyncGroup).toHaveBeenCalledWith('120363XXXX@g.us', 'Beer Crew', logger)
-  })
-
-  it('ignores a group join by a secondary number', async () => {
-    const { handleWebhookEvent } = await import('../webhook.js')
-    await handleWebhookEvent(
-      {
-        event: 'group.v2.join',
-        session: 'backup',
-        payload: { group: { id: '120363XXXX@g.us', subject: 'Beer Crew' } },
-      },
-      logger,
-    )
-    expect(mockSyncGroup).not.toHaveBeenCalled()
+    expect(mockSyncGroup).toHaveBeenCalledWith(session, '120363XXXX@g.us', 'Beer Crew', logger)
   })
 
   it('ignores unknown event types without throwing', async () => {

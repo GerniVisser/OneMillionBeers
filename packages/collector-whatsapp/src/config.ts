@@ -4,7 +4,7 @@ import { CoreConfigSchema } from '@omb/collector-core'
 const WhatsAppConfigSchema = CoreConfigSchema.extend({
   WAHA_BASE_URL: z.string().url(),
   WAHA_API_KEY: z.string().min(1),
-  // One per WhatsApp number. The first is the primary and owns group sync.
+  // One per WhatsApp number.
   WAHA_SESSIONS: z
     .string()
     .min(1)
