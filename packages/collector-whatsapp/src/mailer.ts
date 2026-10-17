@@ -12,21 +12,26 @@ function getSes(): SESClient {
 export async function sendReauthAlert(
   session: string,
   status: string,
-  statusPageUrl: string,
+  adminUrl: string,
 ): Promise<void> {
   if (!config.ENABLE_ALERTS) return
 
   const textBody = `WhatsApp number "${session}" is ${status} and requires re-authentication.
 
-Scan the QR code at: ${statusPageUrl}
+Re-link it at: ${adminUrl}
 
-The page refreshes automatically every 15 seconds to keep the QR code current.
-Open the link on your computer and scan with your phone.`
+The page asks for the admin password. Scan the QR from another device, or ask
+for a pairing code and enter it on the phone itself under
+Settings -> Linked devices -> Link with phone number.
+
+The other numbers keep ingesting while this one is down.`
 
   const htmlBody = `<p>WhatsApp number <strong>${session}</strong> is ${status} and requires re-authentication.</p>
-<p>Scan the QR code at: <a href="${statusPageUrl}">${statusPageUrl}</a></p>
-<p>The page refreshes automatically every 15 seconds to keep the QR code current.
-Open the link on your computer and scan with your phone.</p>`
+<p>Re-link it at: <a href="${adminUrl}">${adminUrl}</a></p>
+<p>The page asks for the admin password. Scan the QR from another device, or ask
+for a pairing code and enter it on the phone itself under
+Settings &rarr; Linked devices &rarr; Link with phone number.</p>
+<p>The other numbers keep ingesting while this one is down.</p>`
 
   await getSes().send(
     new SendEmailCommand({
