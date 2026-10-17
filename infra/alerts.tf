@@ -205,14 +205,8 @@ resource "aws_cloudwatch_metric_alarm" "beers_lost" {
   ok_actions          = local.alarm_actions
 }
 
-# The collector logs this for any number that is FAILED or SCAN_QR_CODE, on
-# every status webhook and on every poll. A FAILED session is auto-restarted,
-# so a single occurrence can heal itself; three consecutive 5-minute periods
-# means it has not.
-#
-# The pattern is a literal match on the log message, which the collector's
-# session-monitor.ts carries a comment about. Changing either without the
-# other silently disables this alarm.
+# Logged for any number that is FAILED or SCAN_QR_CODE. A FAILED session is
+# auto-restarted, so one occurrence can heal itself; 15 minutes means it has not.
 resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
   name           = "omb-whatsapp-session-unhealthy"
   log_group_name = aws_cloudwatch_log_group.collector_whatsapp.name
@@ -227,14 +221,11 @@ resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "whatsapp_session" {
-  alarm_name        = "omb-whatsapp-session-unhealthy"
-  alarm_description = "A WhatsApp number has been FAILED or SCAN_QR_CODE for 15 minutes. The other numbers keep ingesting; re-link it at /admin. The email names which one."
-  namespace         = "OMB"
-  metric_name       = "WhatsAppSessionUnhealthy"
-  statistic         = "Sum"
-  # 1800 x 2 was written for a 30-minute poll and meant up to an hour of
-  # silence. The poll is now 5 minutes and status webhooks arrive in seconds,
-  # so 300 x 3 is 15 minutes of continuous unhealthiness before emailing.
+  alarm_name          = "omb-whatsapp-session-unhealthy"
+  alarm_description   = "A WhatsApp number has been FAILED or SCAN_QR_CODE for 15 minutes. The other numbers keep ingesting; re-link it at /admin. The email names which one."
+  namespace           = "OMB"
+  metric_name         = "WhatsAppSessionUnhealthy"
+  statistic           = "Sum"
   period              = 300
   evaluation_periods  = 3
   threshold           = 1
@@ -383,18 +374,11 @@ resource "aws_cloudwatch_metric_alarm" "rds_memory" {
 }
 
 # ---------------------------------------------------------------------------
-# WAHA itself. Nothing read this log group before, so the only signal that WAHA
-# was broken came indirectly from the collector's own polling.
+# WAHA — failures it logs that the collector cannot see.
 # ---------------------------------------------------------------------------
 
-# WhatsApp periodically invalidates the WhatsApp Web version baked into the
-# NOWEB engine. The session then fails to log in with a registration loop that
-# no amount of restarting fixes — it took production down for ~46h on
-# 2026-07-28. WAHA_NOWEB_WA_VERSION=auto-web is the mitigation; this is the
-# detector if it ever stops working.
-#
-# A plain text pattern, not a JSON one: WAHA's logs are not JSON with a $.msg
-# field, so a { $.msg = ... } filter would match nothing and fail silently.
+# The login loop WhatsApp causes when it invalidates NOWEB's built-in web version.
+# Plain text, unlike the filters above: WAHA's logs are not JSON.
 resource "aws_cloudwatch_log_metric_filter" "waha_connection_failure" {
   name           = "omb-waha-connection-failure"
   log_group_name = aws_cloudwatch_log_group.waha.name
@@ -414,8 +398,7 @@ resource "aws_cloudwatch_metric_alarm" "waha_connection_failure" {
   namespace         = "OMB"
   metric_name       = "WahaConnectionFailure"
   statistic         = "Sum"
-  # A single reconnect is normal and recovers in seconds. Three in 15 minutes
-  # is the shape of the registration loop.
+  # A single reconnect is normal; the loop produces several.
   period              = 900
   evaluation_periods  = 1
   threshold           = 3
