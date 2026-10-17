@@ -131,8 +131,6 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
-  // WhatsApp re-encodes every photo message to JPEG, so anything else is not a
-  // beer photo. Stickers arrive as image/webp and used to be logged as beers.
   it('ignores a sticker (image/webp)', async () => {
     mockImageFetch()
     const { handleWebhookEvent } = await import('../webhook.js')
