@@ -16,10 +16,7 @@ async function main(): Promise<void> {
   await server.listen({ port: config.COLLECTOR_PORT, host: '0.0.0.0' })
   logger.info({ port: config.COLLECTOR_PORT }, 'Webhook server listening')
 
-  // Create any session that does not exist yet and apply our webhook config to
-  // the ones that do, but only when it has actually drifted. Failure is
-  // non-fatal and per session: one number WAHA cannot reach must not stop the
-  // others from ingesting.
+  // Per session and non-fatal: one unreachable number must not stop the others.
   await Promise.all(
     config.WAHA_SESSIONS.map(async (session) => {
       try {
@@ -31,9 +28,7 @@ async function main(): Promise<void> {
         if (result.action === 'updated') {
           logger.info({ session }, 'Applied WAHA session config — session restarting')
         }
-        // The status we just read may have changed while the collector was
-        // down, and no webhook would have been delivered for it. Feeding it
-        // through the monitor closes that gap at boot.
+        // A change made while we were down sent no webhook, so check it now.
         await handleSessionStatusChange(session, result.status, logger)
       } catch (err) {
         logger.warn({ err, session }, 'Could not reconcile WAHA session — continuing anyway')

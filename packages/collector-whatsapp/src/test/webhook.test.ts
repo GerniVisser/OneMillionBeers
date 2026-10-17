@@ -210,7 +210,6 @@ describe('webhook', () => {
   })
 
   it('syncs a group the moment the primary number joins it', async () => {
-    // Otherwise the group stays nameless until the next poll, up to 30 min away.
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
       {
@@ -224,7 +223,6 @@ describe('webhook', () => {
   })
 
   it('ignores a group join by a secondary number', async () => {
-    // Every number joins the same groups, so the others would repeat the work.
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
       {

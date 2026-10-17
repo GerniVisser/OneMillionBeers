@@ -40,9 +40,7 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   }
 
   if (event === 'group.v2.join') {
-    // Sync the new group now rather than leaving it nameless until the next
-    // poll, up to 30 minutes away. Primary only: every number joins the same
-    // groups, so the others would just repeat the work.
+    // Sync now rather than at the next poll. Primary only: all numbers share groups.
     if (session !== config.WAHA_SESSIONS[0]) return
     const group = ((body as Record<string, unknown>).payload as Record<string, unknown> | undefined)
       ?.group as Record<string, unknown> | undefined

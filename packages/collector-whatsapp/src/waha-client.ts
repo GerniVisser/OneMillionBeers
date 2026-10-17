@@ -15,33 +15,22 @@ function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }
 }
 
-/**
- * The session config this collector owns. WAHA keeps other fields of its own,
- * which reconcileSession deliberately leaves alone.
- *
- * No `hmac`: /webhook is reachable only on the Docker network and nginx has no
- * route to it, so there is nothing to forge. Signing a request without
- * verifying the signature would be decoration that reads as security. Revisit
- * the day /webhook is exposed publicly or WAHA moves off this host.
- */
+// No hmac: /webhook is only reachable on the Docker network. Revisit if that changes.
 function sessionConfig() {
   return {
     webhooks: [
       {
         url: config.WAHA_WEBHOOK_URL,
         events: WEBHOOK_EVENTS,
-        // Survives a collector restart: WAHA holds the event and retries for
-        // about 10 s rather than dropping it on the first refused connection.
+        // Covers a collector restart (~10 s) instead of dropping the event.
         retries: { policy: 'constant', delaySeconds: 2, attempts: 5 },
       },
     ],
-    // Default true marks the number online, and WhatsApp then holds back
-    // notifications on the phone itself. These sessions only listen.
+    // The default marks the number online, which mutes notifications on the phone.
     noweb: { markOnline: false },
   }
 }
 
-/** The parts of a live session config we compare against sessionConfig(). */
 function ownedFields(cfg: unknown): string {
   const c = cfg as
     | {
@@ -90,19 +79,8 @@ export type ReconcileResult =
   | { action: 'updated'; status: SessionStatus }
   | { action: 'unchanged'; status: SessionStatus }
 
-/**
- * Brings one WAHA session in line with sessionConfig(), and reports its status.
- *
- * Missing -> create it, started, with the config in the create body. Present ->
- * compare only the fields we own and PUT only when they differ, because a PUT
- * restarts the session. The previous code PUT unconditionally on every boot, so
- * every deploy, every OOM kill and every crash-loop iteration restarted the
- * session; with several numbers that multiplies, and a collector crash loop
- * becomes a WAHA session-restart loop.
- *
- * Never touches pairing, status or engine. Recovering a FAILED session stays
- * the session monitor's job.
- */
+// Creates the session if missing; otherwise PUTs only on drift, because a PUT
+// restarts the session. Never touches pairing or status.
 export async function reconcileSession(session: string): Promise<ReconcileResult> {
   const url = `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`
   const res = await fetch(url, { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) })

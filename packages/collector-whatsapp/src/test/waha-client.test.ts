@@ -120,7 +120,6 @@ describe('waha-client', () => {
   })
 
   describe('reconcileSession', () => {
-    // The canonical config this collector owns, as the live session would report it.
     const liveConfig = {
       webhooks: [
         {
@@ -158,8 +157,6 @@ describe('waha-client', () => {
     })
 
     it('leaves an already-correct session alone', async () => {
-      // A PUT restarts the session, so an unconditional one made every deploy
-      // and every crash-loop iteration restart every number.
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ status: 'WORKING', config: liveConfig }),
@@ -207,7 +204,6 @@ describe('waha-client', () => {
     })
 
     it('PUTs when markOnline is left at the WAHA default', async () => {
-      // markOnline: true suppresses notifications on the phone itself.
       const noMarkOnline = { webhooks: liveConfig.webhooks }
       const mockFetch = vi
         .fn()
