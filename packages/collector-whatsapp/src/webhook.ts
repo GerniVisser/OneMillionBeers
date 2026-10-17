@@ -10,6 +10,10 @@ const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
 
 let firstMessage = true
 
+// Our own storage (S3 or the backend) failed: the route answers 503 and WAHA
+// delivers the event again. Safe because ingestion is idempotent.
+export class RetryLater extends Error {}
+
 export async function handleWebhookEvent(body: unknown, logger: Logger): Promise<void> {
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
@@ -159,7 +163,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     photoUrl = await uploadPhoto(key, buffer)
   } catch (err) {
     logger.error({ err, key }, 'Failed to upload photo — discarding')
-    return
+    throw new RetryLater()
   }
 
   let outcome: BeerLogOutcome
@@ -177,7 +181,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     logger.info({ sourceGroupId, senderId, key, outcome }, 'Beer log forwarded')
   } catch (err) {
     logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
-    return
+    throw new RetryLater()
   }
 
   // Never delete on 'duplicate': the key is shared with the copy that won.
@@ -235,7 +239,7 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     photoUrl = await forwardDeleteBeerLog(msgId, 'wa:' + groupJid)
   } catch (err) {
     logger.error({ err, msgId }, 'Failed to delete beer log for revoked message')
-    return
+    throw new RetryLater()
   }
 
   if (!photoUrl) {

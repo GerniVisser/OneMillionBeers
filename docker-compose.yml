@@ -74,6 +74,9 @@ services:
       # Only images reach the collector; skip downloading video/audio/documents.
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+      # The collector fetches the media on every webhook attempt, and retries span
+      # ~17 min (waha-client.ts). The default lifetime is 180 s.
+      WHATSAPP_FILES_LIFETIME: '1800'
     # /ping needs no API key. Liveness only, on purpose: an unpaired number must
     # not mark WAHA unhealthy while the others are working.
     healthcheck:

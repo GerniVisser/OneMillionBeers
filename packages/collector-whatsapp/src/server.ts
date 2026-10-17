@@ -1,19 +1,22 @@
 import Fastify from 'fastify'
 import { type Logger } from 'pino'
 import { config } from './config.js'
-import { handleWebhookEvent } from './webhook.js'
+import { handleWebhookEvent, RetryLater } from './webhook.js'
 import { getSessionStatus, getQrCodePng } from './waha-client.js'
 
 export function buildServer(logger: Logger) {
   const server = Fastify({ logger: false })
 
+  // Answered only once the event is stored: any non-2xx makes WAHA deliver it
+  // again, on the `retries` schedule in waha-client.ts.
   server.post('/webhook', async (req, reply) => {
-    // Respond immediately — WAHA retries on timeout, which causes duplicate processing.
-    // handleWebhookEvent never throws (errors are caught and logged internally).
-    reply.send({ ok: true })
-    handleWebhookEvent(req.body, logger).catch((err) => {
-      logger.error({ err }, 'Unhandled error in webhook handler')
-    })
+    try {
+      await handleWebhookEvent(req.body, logger)
+      return reply.send({ ok: true })
+    } catch (err) {
+      if (!(err instanceof RetryLater)) logger.error({ err }, 'Unhandled error in webhook handler')
+      return reply.status(503).send({ ok: false })
+    }
   })
 
   server.get('/status', async (req, reply) => {
