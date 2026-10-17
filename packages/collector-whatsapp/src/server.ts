@@ -17,17 +17,24 @@ export function buildServer(logger: Logger) {
   })
 
   server.get('/status', async (req, reply) => {
-    const { token } = req.query as { token?: string }
+    const { token, session = config.WAHA_SESSIONS[0]! } = req.query as {
+      token?: string
+      session?: string
+    }
     if (token !== config.STATUS_TOKEN) {
       return reply.status(401).send({ error: 'Unauthorized' })
     }
+    // The name goes into a WAHA URL path, so only configured names are allowed.
+    if (!config.WAHA_SESSIONS.includes(session)) {
+      return reply.status(404).send({ error: 'Unknown session' })
+    }
 
-    const status = await getSessionStatus()
+    const status = await getSessionStatus(session)
 
     if (status === 'SCAN_QR_CODE') {
       let qrHtml: string
       try {
-        const qrBuf = await getQrCodePng()
+        const qrBuf = await getQrCodePng(session)
         const qrBase64 = qrBuf.toString('base64')
         qrHtml = `<!DOCTYPE html>
 <html>

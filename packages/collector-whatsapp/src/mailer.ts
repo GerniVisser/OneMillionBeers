@@ -9,17 +9,21 @@ function getSes(): SESClient {
   return ses
 }
 
-export async function sendReauthAlert(statusPageUrl: string): Promise<void> {
+export async function sendReauthAlert(
+  session: string,
+  status: string,
+  statusPageUrl: string,
+): Promise<void> {
   if (!config.ENABLE_ALERTS) return
 
-  const textBody = `The WhatsApp session has dropped and requires re-authentication.
+  const textBody = `WhatsApp number "${session}" is ${status} and requires re-authentication.
 
 Scan the QR code at: ${statusPageUrl}
 
 The page refreshes automatically every 15 seconds to keep the QR code current.
 Open the link on your computer and scan with your phone.`
 
-  const htmlBody = `<p>The WhatsApp session has dropped and requires re-authentication.</p>
+  const htmlBody = `<p>WhatsApp number <strong>${session}</strong> is ${status} and requires re-authentication.</p>
 <p>Scan the QR code at: <a href="${statusPageUrl}">${statusPageUrl}</a></p>
 <p>The page refreshes automatically every 15 seconds to keep the QR code current.
 Open the link on your computer and scan with your phone.</p>`
@@ -29,7 +33,7 @@ Open the link on your computer and scan with your phone.</p>`
       Destination: { ToAddresses: [config.ALERT_EMAIL!] },
       Source: config.SES_FROM_EMAIL!,
       Message: {
-        Subject: { Data: '[OMB] WhatsApp re-authentication required' },
+        Subject: { Data: `[OMB] WhatsApp re-authentication required: ${session}` },
         Body: {
           Text: { Data: textBody },
           Html: { Data: htmlBody },

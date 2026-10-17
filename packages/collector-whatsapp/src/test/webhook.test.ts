@@ -159,10 +159,10 @@ describe('webhook', () => {
   it('dispatches session.status event to handleSessionStatusChange', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
-      { event: 'session.status', payload: { status: 'SCAN_QR_CODE' } },
+      { event: 'session.status', session: 'backup', payload: { status: 'SCAN_QR_CODE' } },
       logger,
     )
-    expect(mockHandleSessionStatusChange).toHaveBeenCalledWith('SCAN_QR_CODE', logger)
+    expect(mockHandleSessionStatusChange).toHaveBeenCalledWith('backup', 'SCAN_QR_CODE', logger)
   })
 
   it('ignores message with hasMedia=false', async () => {

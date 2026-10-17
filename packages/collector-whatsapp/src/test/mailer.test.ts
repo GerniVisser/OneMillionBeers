@@ -35,7 +35,7 @@ describe('mailer', () => {
   it('returns immediately when ENABLE_ALERTS=false', async () => {
     testConfig.ENABLE_ALERTS = false
     const { sendReauthAlert } = await import('../mailer.js')
-    await sendReauthAlert('https://example.com/status?token=abc')
+    await sendReauthAlert('default', 'SCAN_QR_CODE', 'https://example.com/status?token=abc')
     expect(mockSend).not.toHaveBeenCalled()
   })
 
@@ -43,7 +43,7 @@ describe('mailer', () => {
     testConfig.ENABLE_ALERTS = true
     mockSend.mockResolvedValue({})
     const { sendReauthAlert } = await import('../mailer.js')
-    await sendReauthAlert('https://example.com/status?token=abc')
+    await sendReauthAlert('default', 'SCAN_QR_CODE', 'https://example.com/status?token=abc')
 
     expect(mockSend).toHaveBeenCalledOnce()
     const cmdInput = mockSendEmailCommand.mock.calls[0]![0] as {
@@ -56,7 +56,7 @@ describe('mailer', () => {
     }
     expect(cmdInput.Destination.ToAddresses).toContain('to@example.com')
     expect(cmdInput.Source).toBe('from@example.com')
-    expect(cmdInput.Message.Subject.Data).toBe('[OMB] WhatsApp re-authentication required')
+    expect(cmdInput.Message.Subject.Data).toBe('[OMB] WhatsApp re-authentication required: default')
     expect(cmdInput.Message.Body.Text.Data).toContain('https://example.com/status?token=abc')
     expect(cmdInput.Message.Body.Html.Data).toContain(
       '<a href="https://example.com/status?token=abc"',
@@ -67,8 +67,8 @@ describe('mailer', () => {
     testConfig.ENABLE_ALERTS = true
     mockSend.mockRejectedValue(new Error('SES error'))
     const { sendReauthAlert } = await import('../mailer.js')
-    await expect(sendReauthAlert('https://example.com/status?token=abc')).rejects.toThrow(
-      'SES error',
-    )
+    await expect(
+      sendReauthAlert('default', 'SCAN_QR_CODE', 'https://example.com/status?token=abc'),
+    ).rejects.toThrow('SES error')
   })
 })

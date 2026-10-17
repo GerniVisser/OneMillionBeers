@@ -18,10 +18,12 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
 
+  const session = ((body as Record<string, unknown>)?.session as string | undefined) ?? 'unknown'
+
   if (event === 'session.status') {
     const status = ((body as Record<string, unknown>).payload as Record<string, unknown>)?.status
     if (typeof status === 'string') {
-      await handleSessionStatusChange(status, logger)
+      await handleSessionStatusChange(session, status, logger)
     }
     return
   }
