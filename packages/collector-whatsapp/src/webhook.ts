@@ -18,8 +18,6 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
 
-  // Every WAHA event names the session it came from. With one number it is
-  // always the same value; with several it is how we tell them apart.
   const session = ((body as Record<string, unknown>)?.session as string | undefined) ?? 'unknown'
 
   if (event === 'session.status') {

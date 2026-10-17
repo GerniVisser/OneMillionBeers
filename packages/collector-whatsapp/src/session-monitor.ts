@@ -3,16 +3,9 @@ import { config } from './config.js'
 import { sendReauthAlert } from './mailer.js'
 import { getSessionStatus, restartSession } from './waha-client.js'
 
-// Per session, because the numbers fail independently: one that needs
-// re-pairing must not consume another's restart budget or silence its alerts.
 interface SessionState {
-  // Whether we have already alerted about this session being unhealthy, and
-  // when, so a persistent failure re-alerts periodically instead of going quiet
-  // after the first email.
   alerted: boolean
   alertedAt: number
-  // Consecutive auto-restart attempts, so a session WhatsApp refuses to
-  // re-authenticate (stale credentials) stops being restarted in a tight loop.
   restartAttempts: number
   lastRestartAt: number
 }
@@ -74,12 +67,7 @@ async function tryAutoRestart(session: string, logger: Logger): Promise<boolean>
   }
 }
 
-/**
- * De-duped on "unhealthy", not on the exact status. An unpaired session
- * oscillates SCAN_QR_CODE -> FAILED -> SCAN_QR_CODE, which on a per-status
- * de-dupe emails on every flip. The warn lines stay per-status, so the
- * CloudWatch metric still counts each one.
- */
+// De-duped across statuses: an unpaired session keeps flipping SCAN_QR_CODE <-> FAILED.
 async function maybeAlert(session: string, status: string, logger: Logger): Promise<void> {
   const state = stateFor(session)
   const now = Date.now()
@@ -121,8 +109,7 @@ export async function handleSessionStatusChange(
   }
 
   if (status === 'FAILED') {
-    // 'WhatsApp session requires attention' is matched literally by
-    // infra/alerts.tf (omb-whatsapp-session-unhealthy). Add fields, not words.
+    // Matched literally by infra/alerts.tf: changing the text silences the alarm.
     logger.warn({ session, status }, 'WhatsApp session requires attention')
     // Try to self-heal first; alert regardless, so a silent restart loop is visible.
     await tryAutoRestart(session, logger)
@@ -132,7 +119,7 @@ export async function handleSessionStatusChange(
 
   if (status === 'SCAN_QR_CODE') {
     // Credentials are gone — restarting cannot help, only a QR scan can.
-    // Matched literally by infra/alerts.tf; see above.
+    // Matched literally by infra/alerts.tf.
     logger.warn({ session, status }, 'WhatsApp session requires attention')
     await maybeAlert(session, status, logger)
     return
