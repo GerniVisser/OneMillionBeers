@@ -63,12 +63,8 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const data = payload._data as Record<string, unknown> | undefined
   const dataKey = data?.key as Record<string, unknown> | undefined
 
-  // WAHA NOWEB: payload.id is the full composite key
-  // (false_{group}@g.us_{hash}_{participant}@lid) whose participant part can
-  // differ between the numbers that received it, while _data.key.id is the bare
-  // message hash — identical across all of them (385/385 in the lab) and the
-  // same value message.revoked carries. It is the natural key everywhere: the
-  // backend's unique index, the S3 object name and the guard below.
+  // NOWEB's payload.id embeds the receiving participant, so it can differ between
+  // our numbers. _data.key.id is the bare hash: the same for all, and what revokes carry.
   const sourceMessageId = (dataKey?.id as string | undefined) ?? (payload.id as string | undefined)
   if (!sourceMessageId) {
     logger.warn({ chatId }, 'Message has no ID — discarding')
@@ -148,10 +144,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     }
 
     const photoHash = createHash('sha256').update(buffer).digest('hex')
-    // Keyed on the message, not on who received it, so every bot in the group
-    // derives the same name and writes one object instead of one each. Their
-    // bytes are identical (385/385 in the lab), so a concurrent overwrite is
-    // the same object.
+    // Every number that receives the message derives this key, so they write one object.
     const safeMessageId = sourceMessageId.replace(/[^A-Za-z0-9._-]/g, '-')
     const key = `photos/${chatId.replace('@g.us', '')}/${safeMessageId}.jpg`
 
@@ -181,10 +174,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
-    // The message was deleted for everyone before this copy reached the
-    // backend, so nothing will ever reference the object we just uploaded.
-    // A duplicate is left alone: the key is shared with the bot that won, and
-    // deleting it would take that beer's photo with it.
+    // Never delete on 'duplicate': the key is shared with the copy that won.
     if (outcome === 'revoked') {
       try {
         await deletePhoto(key)
@@ -224,9 +214,7 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     return
   }
 
-  // A bare message id is only unique within its chat, so the backend needs the
-  // group too. payload.after is the revocation message itself, posted in the
-  // same chat as the message it revokes.
+  // payload.after is the revoke itself, posted in the same chat as its target.
   const after = payload.after as Record<string, unknown> | undefined
   const afterKey = (after?._data as Record<string, unknown> | undefined)?.key as
     | Record<string, unknown>
