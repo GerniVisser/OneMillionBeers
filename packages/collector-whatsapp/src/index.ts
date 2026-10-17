@@ -19,7 +19,7 @@ async function main(): Promise<void> {
   // Ensure WAHA session is started (idempotent). Includes webhook config in the
   // start body — required since WAHA 2026.x no longer reads WAHA_WEBHOOK_URL env var.
   try {
-    await startSession()
+    await startSession(config.WAHA_SESSIONS[0]!)
     logger.info('WAHA session started')
   } catch (err) {
     // Non-fatal — WAHA may already be running the session via WHATSAPP_START_SESSION env var
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   // which restarts the session briefly. The server is already up so the WORKING event lands.
   let webhookConfigured = false
   try {
-    webhookConfigured = await ensureWebhookConfigured()
+    webhookConfigured = await ensureWebhookConfigured(config.WAHA_SESSIONS[0]!)
     if (webhookConfigured) {
       logger.info('Applied WAHA webhook config — session restarting')
     }

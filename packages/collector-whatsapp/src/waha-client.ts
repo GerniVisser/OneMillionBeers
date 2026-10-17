@@ -19,8 +19,8 @@ function webhookConfig() {
   return { webhooks: [{ url: config.WAHA_WEBHOOK_URL, events: WEBHOOK_EVENTS }] }
 }
 
-export async function getSessionStatus(): Promise<SessionStatus> {
-  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
+export async function getSessionStatus(session: string): Promise<SessionStatus> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`, {
     headers: wahaHeaders(),
     signal: AbortSignal.timeout(10_000),
   })
@@ -34,20 +34,23 @@ export async function getSessionStatus(): Promise<SessionStatus> {
  * FAILED session caused by a transient WhatsApp-side disconnect; does not help
  * when WhatsApp has de-authorized the linked device (that needs a QR re-scan).
  */
-export async function restartSession(): Promise<void> {
-  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}/restart`, {
-    method: 'POST',
-    headers: wahaHeaders(),
-    signal: AbortSignal.timeout(30_000),
-  })
+export async function restartSession(session: string): Promise<void> {
+  const res = await fetch(
+    `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}/restart`,
+    {
+      method: 'POST',
+      headers: wahaHeaders(),
+      signal: AbortSignal.timeout(30_000),
+    },
+  )
   if (!res.ok) throw new Error(`WAHA restartSession returned ${res.status}`)
 }
 
-export async function startSession(): Promise<void> {
+export async function startSession(session: string): Promise<void> {
   const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/start`, {
     method: 'POST',
     headers: wahaHeaders(),
-    body: JSON.stringify({ name: config.WAHA_SESSION, config: webhookConfig() }),
+    body: JSON.stringify({ name: session, config: webhookConfig() }),
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`WAHA startSession returned ${res.status}`)
@@ -59,14 +62,17 @@ export async function startSession(): Promise<void> {
  * (e.g. a previous deploy that registered extra events like message.any).
  * Returns true if the config was applied (session will restart briefly).
  */
-export async function ensureWebhookConfigured(): Promise<boolean> {
-  const sessionRes = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
-    headers: wahaHeaders(),
-    signal: AbortSignal.timeout(10_000),
-  })
+export async function ensureWebhookConfigured(session: string): Promise<boolean> {
+  const sessionRes = await fetch(
+    `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`,
+    {
+      headers: wahaHeaders(),
+      signal: AbortSignal.timeout(10_000),
+    },
+  )
   if (!sessionRes.ok) return false
 
-  await fetch(`${config.WAHA_BASE_URL}/api/sessions/${config.WAHA_SESSION}`, {
+  await fetch(`${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`, {
     method: 'PUT',
     headers: wahaHeaders(),
     body: JSON.stringify({ config: webhookConfig() }),
@@ -75,9 +81,9 @@ export async function ensureWebhookConfigured(): Promise<boolean> {
   return true
 }
 
-export async function getQrCodePng(): Promise<Buffer> {
+export async function getQrCodePng(session: string): Promise<Buffer> {
   const res = await fetch(
-    `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/auth/qr?format=image`,
+    `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/auth/qr?format=image`,
     { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
   )
   if (!res.ok) throw new Error(`WAHA getQrCodePng returned ${res.status}`)
@@ -93,10 +99,10 @@ function isGarbageSubject(value: string): boolean {
   return /^\d{10,}/.test(value) || /["{}\[\]]/.test(value)
 }
 
-export async function getGroupName(groupId: string): Promise<string> {
+export async function getGroupName(session: string, groupId: string): Promise<string> {
   try {
     const res = await fetch(
-      `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups/${groupId}`,
+      `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/groups/${groupId}`,
       { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
     )
     if (!res.ok) return groupId
@@ -109,10 +115,10 @@ export async function getGroupName(groupId: string): Promise<string> {
   }
 }
 
-export async function getGroupPictureUrl(groupId: string): Promise<string | null> {
+export async function getGroupPictureUrl(session: string, groupId: string): Promise<string | null> {
   try {
     const res = await fetch(
-      `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups/${groupId}/picture`,
+      `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/groups/${groupId}/picture`,
       { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
     )
     if (!res.ok) return null
@@ -123,10 +129,10 @@ export async function getGroupPictureUrl(groupId: string): Promise<string | null
   }
 }
 
-export async function getGroupInviteCode(groupId: string): Promise<string | null> {
+export async function getGroupInviteCode(session: string, groupId: string): Promise<string | null> {
   try {
     const res = await fetch(
-      `${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups/${groupId}/invite-code`,
+      `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/groups/${groupId}/invite-code`,
       { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
     )
     if (!res.ok) return null
@@ -137,9 +143,11 @@ export async function getGroupInviteCode(groupId: string): Promise<string | null
   }
 }
 
-export async function listAllGroups(): Promise<Array<{ id: string; subject: string }>> {
+export async function listAllGroups(
+  session: string,
+): Promise<Array<{ id: string; subject: string }>> {
   try {
-    const res = await fetch(`${config.WAHA_BASE_URL}/api/${config.WAHA_SESSION}/groups`, {
+    const res = await fetch(`${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/groups`, {
       headers: wahaHeaders(),
       signal: AbortSignal.timeout(15_000),
     })

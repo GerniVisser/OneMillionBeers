@@ -108,6 +108,11 @@ services:
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY}
       WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
+      # One name per WhatsApp number, first is the primary. Adding a second
+      # number is an SSM change (/omb/WAHA_SESSIONS) plus a deploy to
+      # regenerate .env — no code change. The default keeps today's behaviour
+      # if the parameter does not exist yet.
+      WAHA_SESSIONS: ${WAHA_SESSIONS:-default}
       COLLECTOR_PORT: '8080'
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       STATUS_TOKEN: ${STATUS_TOKEN}

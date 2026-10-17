@@ -37,6 +37,15 @@ async function pushGroupSync(
   }
 }
 
+/**
+ * Group sync runs for the primary session only. Every number is in the same
+ * groups, so syncing from each one would multiply a WAHA call that NOWEB backs
+ * with groupFetchAllParticipating — already rate-limit prone — for no new data.
+ */
+function primarySession(): string {
+  return config.WAHA_SESSIONS[0]!
+}
+
 export async function syncGroup(
   rawGroupId: string,
   subject: string,
@@ -46,7 +55,7 @@ export async function syncGroup(
 
   let avatarUrl: string | null = null
   try {
-    const pictureUrl = await getGroupPictureUrl(rawGroupId)
+    const pictureUrl = await getGroupPictureUrl(primarySession(), rawGroupId)
     if (pictureUrl) {
       const buffer = await downloadBuffer(pictureUrl)
       if (buffer) {
@@ -59,7 +68,7 @@ export async function syncGroup(
 
   let inviteCode: string | null = null
   try {
-    inviteCode = await getGroupInviteCode(rawGroupId)
+    inviteCode = await getGroupInviteCode(primarySession(), rawGroupId)
   } catch (err) {
     logger.warn({ err, rawGroupId }, 'Failed to fetch invite code — proceeding without it')
   }
@@ -74,7 +83,7 @@ export async function syncGroup(
 
 export async function syncAllGroups(logger: Logger): Promise<void> {
   logger.info('Starting group sync')
-  const groups = await listAllGroups()
+  const groups = await listAllGroups(primarySession())
   logger.info({ count: groups.length }, 'Groups to sync')
   for (const { id, subject } of groups) {
     await syncGroup(id, subject, logger)
@@ -87,7 +96,7 @@ export function startGroupPolling(logger: Logger): () => void {
 
   const timer = setInterval(() => {
     syncAllGroups(logger).catch((err) => logger.error({ err }, 'Periodic group sync failed'))
-  }, config.WAHA_POLL_INTERVAL_MS)
+  }, config.WAHA_GROUP_SYNC_INTERVAL_MS)
 
   return () => clearInterval(timer)
 }

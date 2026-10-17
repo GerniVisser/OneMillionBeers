@@ -54,9 +54,9 @@ describe('config', () => {
     exitSpy.mockRestore()
   })
 
-  it('defaults WAHA_SESSION to "default"', async () => {
+  it('defaults WAHA_SESSIONS to a single "default" session', async () => {
     const { config } = await import('../config.js')
-    expect(config.WAHA_SESSION).toBe('default')
+    expect(config.WAHA_SESSIONS).toEqual(['default'])
   })
 
   it('defaults COLLECTOR_PORT to 8080', async () => {
@@ -64,9 +64,22 @@ describe('config', () => {
     expect(config.COLLECTOR_PORT).toBe(8080)
   })
 
-  it('defaults WAHA_POLL_INTERVAL_MS to 1800000', async () => {
+  it('defaults WAHA_POLL_INTERVAL_MS to five minutes', async () => {
     const { config } = await import('../config.js')
-    expect(config.WAHA_POLL_INTERVAL_MS).toBe(1_800_000)
+    expect(config.WAHA_POLL_INTERVAL_MS).toBe(300_000)
+  })
+
+  it('defaults WAHA_GROUP_SYNC_INTERVAL_MS to thirty minutes', async () => {
+    // Deliberately slower than the status poll: NOWEB backs the group listing
+    // with groupFetchAllParticipating, which rate-limits when called often.
+    const { config } = await import('../config.js')
+    expect(config.WAHA_GROUP_SYNC_INTERVAL_MS).toBe(1_800_000)
+  })
+
+  it('parses WAHA_SESSIONS as a comma list, trimmed and deduped', async () => {
+    vi.stubEnv('WAHA_SESSIONS', ' default , backup ,default, ')
+    const { config } = await import('../config.js')
+    expect(config.WAHA_SESSIONS).toEqual(['default', 'backup'])
   })
 
   it('defaults ENABLE_ALERTS to false', async () => {

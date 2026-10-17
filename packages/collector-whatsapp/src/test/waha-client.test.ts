@@ -4,7 +4,7 @@ vi.mock('../config.js', () => ({
   config: {
     WAHA_BASE_URL: 'http://waha:3000',
     WAHA_API_KEY: 'test-api-key',
-    WAHA_SESSION: 'default',
+    WAHA_SESSIONS: ['default'],
     WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
   },
 }))
@@ -27,21 +27,21 @@ describe('waha-client', () => {
       }),
     )
     const { getSessionStatus } = await import('../waha-client.js')
-    const status = await getSessionStatus()
+    const status = await getSessionStatus('default')
     expect(status).toBe('WORKING')
   })
 
   it('getSessionStatus throws on non-2xx', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
     const { getSessionStatus } = await import('../waha-client.js')
-    await expect(getSessionStatus()).rejects.toThrow('500')
+    await expect(getSessionStatus('default')).rejects.toThrow('500')
   })
 
   it('startSession POSTs to /api/sessions/start with correct body and api-key header', async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true })
     vi.stubGlobal('fetch', mockFetch)
     const { startSession } = await import('../waha-client.js')
-    await startSession()
+    await startSession('default')
     expect(mockFetch).toHaveBeenCalledOnce()
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('http://waha:3000/api/sessions/start')
@@ -63,7 +63,7 @@ describe('waha-client', () => {
       }),
     )
     const { getQrCodePng } = await import('../waha-client.js')
-    const buf = await getQrCodePng()
+    const buf = await getQrCodePng('default')
     expect(Buffer.isBuffer(buf)).toBe(true)
     expect(buf[0]).toBe(1)
   })
@@ -71,7 +71,7 @@ describe('waha-client', () => {
   it('getQrCodePng throws on non-2xx', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const { getQrCodePng } = await import('../waha-client.js')
-    await expect(getQrCodePng()).rejects.toThrow('404')
+    await expect(getQrCodePng('default')).rejects.toThrow('404')
   })
 
   it('getGroupName returns the group name on success', async () => {
@@ -83,14 +83,14 @@ describe('waha-client', () => {
       }),
     )
     const { getGroupName } = await import('../waha-client.js')
-    const name = await getGroupName('120363@g.us')
+    const name = await getGroupName('default', '120363@g.us')
     expect(name).toBe('Beer Crew')
   })
 
   it('getGroupName returns groupId as fallback when fetch throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')))
     const { getGroupName } = await import('../waha-client.js')
-    const name = await getGroupName('120363@g.us')
+    const name = await getGroupName('default', '120363@g.us')
     expect(name).toBe('120363@g.us')
   })
 
@@ -105,7 +105,7 @@ describe('waha-client', () => {
       }),
     )
     const { getGroupName } = await import('../waha-client.js')
-    const name = await getGroupName('120363402479181080@g.us')
+    const name = await getGroupName('default', '120363402479181080@g.us')
     expect(name).toBe('120363402479181080@g.us')
   })
 
@@ -118,7 +118,7 @@ describe('waha-client', () => {
       }),
     )
     const { getGroupName } = await import('../waha-client.js')
-    const name = await getGroupName('120363402479181080@g.us')
+    const name = await getGroupName('default', '120363402479181080@g.us')
     expect(name).toBe('120363402479181080@g.us')
   })
 
@@ -131,7 +131,7 @@ describe('waha-client', () => {
       }),
     )
     const { getGroupName } = await import('../waha-client.js')
-    const name = await getGroupName('120363402479181080@g.us')
+    const name = await getGroupName('default', '120363402479181080@g.us')
     expect(name).toBe('120363402479181080@g.us')
   })
 
@@ -142,7 +142,7 @@ describe('waha-client', () => {
       .mockResolvedValueOnce({ ok: true }) // PUT config
     vi.stubGlobal('fetch', mockFetch)
     const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured()
+    const result = await ensureWebhookConfigured('default')
     expect(result).toBe(true)
     const [putUrl, putInit] = mockFetch.mock.calls[1] as [string, RequestInit]
     expect(putUrl).toBe('http://waha:3000/api/sessions/default')
@@ -168,7 +168,7 @@ describe('waha-client', () => {
       .mockResolvedValueOnce({ ok: true })
     vi.stubGlobal('fetch', mockFetch)
     const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured()
+    const result = await ensureWebhookConfigured('default')
     expect(result).toBe(true)
     expect(mockFetch).toHaveBeenCalledTimes(2) // GET + PUT — did not skip
   })
@@ -176,7 +176,7 @@ describe('waha-client', () => {
   it('ensureWebhookConfigured returns false when session fetch fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const { ensureWebhookConfigured } = await import('../waha-client.js')
-    const result = await ensureWebhookConfigured()
+    const result = await ensureWebhookConfigured('default')
     expect(result).toBe(false)
   })
 
@@ -189,7 +189,7 @@ describe('waha-client', () => {
       }),
     )
     const { listAllGroups } = await import('../waha-client.js')
-    const groups = await listAllGroups()
+    const groups = await listAllGroups('default')
     expect(groups).toHaveLength(1)
     expect(groups[0]).toEqual({ id: '123@g.us', subject: 'Beer Crew' })
   })
@@ -203,7 +203,7 @@ describe('waha-client', () => {
       }),
     )
     const { listAllGroups } = await import('../waha-client.js')
-    const groups = await listAllGroups()
+    const groups = await listAllGroups('default')
     expect(groups).toHaveLength(1)
     expect(groups[0].subject).toBe('Beer Crew')
   })
@@ -211,6 +211,6 @@ describe('waha-client', () => {
   it('listAllGroups returns empty array on non-2xx', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
     const { listAllGroups } = await import('../waha-client.js')
-    expect(await listAllGroups()).toEqual([])
+    expect(await listAllGroups('default')).toEqual([])
   })
 })

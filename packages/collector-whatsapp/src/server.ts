@@ -22,12 +22,12 @@ export function buildServer(logger: Logger) {
       return reply.status(401).send({ error: 'Unauthorized' })
     }
 
-    const status = await getSessionStatus()
+    const status = await getSessionStatus(config.WAHA_SESSIONS[0]!)
 
     if (status === 'SCAN_QR_CODE') {
       let qrHtml: string
       try {
-        const qrBuf = await getQrCodePng()
+        const qrBuf = await getQrCodePng(config.WAHA_SESSIONS[0]!)
         const qrBase64 = qrBuf.toString('base64')
         qrHtml = `<!DOCTYPE html>
 <html>
