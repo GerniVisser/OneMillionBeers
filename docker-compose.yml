@@ -49,13 +49,25 @@ services:
         tag: backend/{{.ID}}
 
   waha:
-    # Pinned deliberately so the running version is reproducible. Upgrade as a
-    # planned action (WAHA is NOT in the deploy.yml pull/up list):
-    #   docker compose --env-file .env --env-file .env.sha pull waha
-    #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
-    # The session lives in the waha-sessions volume, so recreating the container
-    # keeps the pairing. If the status page shows SCAN_QR_CODE afterwards, re-pair
-    # at /whatsapp/status?token=...
+    # NEVER RENAME THIS SERVICE. It is in the `up -d` list in deploy.yml but not
+    # in the `pull` list, and the deploy runs with --remove-orphans: a rename
+    # deletes the running container while the replacement is not started. If a
+    # rename is ever unavoidable, add the new service AND its up-list entry in
+    # one commit, deploy, confirm both containers exist, then remove the old one.
+    #
+    # Changes to this block DO apply on deploy (`up -d` is a no-op unless the
+    # resolved config changed), but the image is NOT pulled automatically, so a
+    # mutable tag can never roll the version forward mid-deploy. Changing the
+    # pinned tag below is a deliberate upgrade: snapshot the session volume
+    # first, and verify afterwards that every session is WORKING again.
+    #
+    #   docker run --rm -v onemillionbeers_waha-sessions:/s \
+    #     -v /opt/onemillionbeers/backup:/b alpine \
+    #     tar czf /b/waha-sessions-$(date +%F).tgz -C /s .
+    #
+    # The pairing lives in the waha-sessions volume, so recreating the container
+    # keeps it. `docker compose down -v` destroys it; nothing in the deploy runs
+    # `down` and nothing should.
     #
     # WhatsApp periodically invalidates the WhatsApp Web version baked into the
     # NOWEB engine, which breaks login with a registration loop
@@ -71,11 +83,25 @@ services:
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: ${WAHA_API_KEY}
-      WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
+      # Bring every session back after a container restart or an OOM kill,
+      # rather than only the one named in WHATSAPP_START_SESSION. The collector
+      # creates and configures the sessions it needs on boot.
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       # Only images reach the collector; skip downloading video/audio/documents.
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+    # Liveness only. /ping is the one unauthenticated endpoint, so the check
+    # needs no API key and no shell expansion. Deliberately NOT session health:
+    # a check that failed on an unpaired number would mark the container
+    # unhealthy while the other numbers are ingesting perfectly well. Session
+    # health is the collector's job — see session-monitor.ts.
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:3000/ping']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     # Capped because an unbounded WAHA leaked until the kernel OOM-killer took the
     # whole t3.small down on 2026-10-06. Restarting it costs nothing; losing the
     # host costs the site.
