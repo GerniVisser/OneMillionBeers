@@ -61,7 +61,7 @@ services:
     # WAHA_NOWEB_WA_VERSION=auto-web fetches the current version on start (falls
     # back to the built-in one if the fetch fails or is older) so a stale image no
     # longer strands the session. Do not change it after the QR has been scanned.
-    image: devlikeapro/waha:latest-2026.8.2
+    image: devlikeapro/waha:latest-2026.9.2
     expose:
       - '3000'
     restart: unless-stopped
