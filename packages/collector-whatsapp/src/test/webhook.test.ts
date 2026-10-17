@@ -63,9 +63,6 @@ function makeImagePayload(overrides?: Record<string, unknown>) {
         url: 'http://waha:3000/api/files/fake',
       },
       chatId: '120363XXXX@g.us',
-      // NOWEB sends both: the composite id, whose participant part can differ
-      // between the numbers that received it, and the bare message hash, which
-      // does not.
       _data: { key: { id: 'MSGID123' } },
       ...overrides,
     },
@@ -115,9 +112,6 @@ describe('webhook', () => {
   })
 
   it('names the S3 object after the message, not after who received it', async () => {
-    // Every bot in the group derives the same key, so they write one object
-    // between them instead of one each. The composite payload.id embeds the
-    // receiving participant and would give each bot a different name.
     mockImageFetch()
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(
@@ -132,8 +126,6 @@ describe('webhook', () => {
   })
 
   it('deletes the object it just uploaded when the backend reports the message was revoked', async () => {
-    // The revoke landed before this copy reached the backend, so nothing will
-    // ever reference the object.
     mockImageFetch()
     mockForwardBeerLog.mockResolvedValue('revoked')
     const { handleWebhookEvent } = await import('../webhook.js')
@@ -143,8 +135,6 @@ describe('webhook', () => {
   })
 
   it('leaves the object alone when the backend reports a duplicate', async () => {
-    // The key is shared with the bot that won the race, so deleting it here
-    // would take that beer's photo with it.
     mockImageFetch()
     mockForwardBeerLog.mockResolvedValue('duplicate')
     const { handleWebhookEvent } = await import('../webhook.js')
@@ -154,10 +144,6 @@ describe('webhook', () => {
   })
 
   it('collapses two bots delivering the same message at the same moment', async () => {
-    // Same message, two receiving numbers: the composite ids differ, the bare
-    // message hash does not. Keying the in-flight guard on the hash stops the
-    // second download and upload before they start. The DB is still the
-    // backstop for deliveries that do not overlap.
     mockImageFetch()
     const { handleWebhookEvent } = await import('../webhook.js')
     await Promise.all([
@@ -420,8 +406,6 @@ describe('webhook', () => {
     })
 
     it('ignores a revoke with no resolvable group', async () => {
-      // A bare message id is only unique within its chat, so without the group
-      // the delete could match another group's beer log.
       const { handleWebhookEvent } = await import('../webhook.js')
       await handleWebhookEvent(
         { event: 'message.revoked', payload: { revokedMessageId: 'MSGID123', after: {} } },

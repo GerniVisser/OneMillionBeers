@@ -70,8 +70,6 @@ describe('config', () => {
   })
 
   it('defaults WAHA_GROUP_SYNC_INTERVAL_MS to thirty minutes', async () => {
-    // Deliberately slower than the status poll: NOWEB backs the group listing
-    // with groupFetchAllParticipating, which rate-limits when called often.
     const { config } = await import('../config.js')
     expect(config.WAHA_GROUP_SYNC_INTERVAL_MS).toBe(1_800_000)
   })

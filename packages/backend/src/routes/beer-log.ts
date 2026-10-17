@@ -55,8 +55,6 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
       photoHash,
     })
 
-    // Only a new beer changes the count or the head of the feed. A duplicate
-    // delivery from a second bot must not push an SSE update to every client.
     if (outcome === 'created') {
       const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
       broadcast({
@@ -74,8 +72,6 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
     { config: { rateLimit: false } },
     async (request, reply) => {
       const { sourceMessageId } = request.params as { sourceMessageId: string }
-      // A bare WhatsApp message id is only unique within its chat, so the group
-      // is part of the key. Without it a revoke could delete another group's row.
       const { sourceGroupId } = request.query as { sourceGroupId?: string }
       if (!sourceGroupId) {
         return reply.status(400).send({ ok: false, error: 'sourceGroupId is required' })
@@ -87,9 +83,7 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
         broadcast({ type: 'remove', id: deleted.id, count })
       }
 
-      // Always ok: the revocation is now recorded whether or not a row existed,
-      // so a message that arrives after its revoke is refused. Repeating the
-      // call is a no-op rather than a 404.
+      // 200 even when no row matched: the revocation itself was recorded.
       return reply
         .status(200)
         .send({ ok: true, ...(deleted ? { photoUrl: deleted.photoUrl } : {}) })

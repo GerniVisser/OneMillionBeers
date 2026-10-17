@@ -37,11 +37,7 @@ async function pushGroupSync(
   }
 }
 
-/**
- * Group sync runs for the primary session only. Every number is in the same
- * groups, so syncing from each one would multiply a WAHA call that NOWEB backs
- * with groupFetchAllParticipating — already rate-limit prone — for no new data.
- */
+// Every number is in the same groups, so only the primary syncs them.
 function primarySession(): string {
   return config.WAHA_SESSIONS[0]!
 }

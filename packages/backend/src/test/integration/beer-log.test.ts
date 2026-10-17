@@ -31,7 +31,6 @@ const validPayload = {
   sourceMessageId: 'MSGID001',
 }
 
-/** A distinct message in the same group — i.e. a genuinely different beer. */
 const anotherMessage = (sourceMessageId: string) => ({ ...validPayload, sourceMessageId })
 
 const post = (payload: Record<string, unknown>) =>
@@ -227,8 +226,6 @@ describe('POST /v1/internal/beer-log', () => {
   })
 
   it('rejects a request without a sourceMessageId', async () => {
-    // (group, sourceMessageId) is the key that makes ingestion idempotent, so a
-    // request that omits it could be inserted twice.
     const withoutId: Record<string, unknown> = { ...validPayload }
     delete withoutId.sourceMessageId
     const res = await post(withoutId)
@@ -259,9 +256,6 @@ describe('POST /v1/internal/beer-log', () => {
 })
 
 describe('POST /v1/internal/beer-log — idempotency', () => {
-  // Several WhatsApp numbers run in each group for redundancy, so the same
-  // message arrives several times: usually milliseconds apart, but after an
-  // outage WhatsApp replays a backlog and a number can be days behind.
   it('reports created then duplicate for the same message from two bots', async () => {
     const first = await post(validPayload)
     const second = await post({ ...validPayload, photoUrl: 'https://example.com/bot-two.jpg' })
@@ -272,8 +266,6 @@ describe('POST /v1/internal/beer-log — idempotency', () => {
   })
 
   it('keeps the first bot photo URL when a second bot reports the same message', async () => {
-    // Both bots derive the same S3 key, so the surviving row must point at an
-    // object that exists — and the loser must not overwrite the winner's URL.
     await post(validPayload)
     await post({ ...validPayload, photoUrl: 'https://example.com/bot-two.jpg' })
     const { rows } = await pool.query('SELECT photo_url FROM beer_logs')
@@ -281,8 +273,6 @@ describe('POST /v1/internal/beer-log — idempotency', () => {
   })
 
   it('creates exactly one row when two bots post concurrently', async () => {
-    // Two pooled connections racing on the unique index, as happens when both
-    // numbers deliver within the measured 16 ms.
     const [a, b] = await Promise.all([
       post(validPayload),
       post({ ...validPayload, photoUrl: 'https://example.com/bot-two.jpg' }),
@@ -303,8 +293,6 @@ describe('POST /v1/internal/beer-log — idempotency', () => {
   })
 
   it('treats a redelivery whose photo hashes differently as a duplicate, not an error', async () => {
-    // The old insert conflicted on photo_hash alone, so this raised an uncaught
-    // 23505: the backend 500'd, the beer was lost and its S3 object orphaned.
     await post({ ...validPayload, photoHash: HASH_A })
     const res = await post({ ...validPayload, photoHash: HASH_B })
     expect(res.statusCode).toBe(201)
@@ -363,8 +351,6 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
   })
 
   it('refuses a message that arrives after its own revoke', async () => {
-    // WhatsApp delivers the revoke first often enough that the lab caught it
-    // twice in a day, the message following up to 13 s later.
     await revoke(validPayload.sourceMessageId)
     const res = await post(validPayload)
     expect(res.json()).toEqual({ ok: true, outcome: 'revoked' })
@@ -372,8 +358,6 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
   })
 
   it('still refuses a late copy from a second bot after a revoke', async () => {
-    // The second number can be days behind after an outage, long after the
-    // first copy was revoked and deleted. An in-memory guard cannot catch this.
     await post(validPayload)
     await revoke(validPayload.sourceMessageId)
     const late = await post({ ...validPayload, photoUrl: 'https://example.com/bot-two.jpg' })
@@ -486,9 +470,6 @@ describe('pseudo_name generation', () => {
   })
 })
 
-// V17 moved the dedup key from a global UNIQUE(source_message_id) to
-// UNIQUE(group_id, source_message_id) and added the revocation tombstone table.
-// These exercise the schema directly: the routes that use it come next.
 describe('schema: group-scoped dedup key and revocation tombstones', () => {
   async function makeGroup(sourceGroupId: string): Promise<string> {
     const { rows } = await pool.query<{ id: string }>(
@@ -520,8 +501,6 @@ describe('schema: group-scoped dedup key and revocation tombstones', () => {
   })
 
   it('allows the same message id in two different groups', async () => {
-    // A bare WhatsApp message hash is not globally unique. Under the old index a
-    // collision let one group's revoke delete the other group's row and photo.
     const userId = await makeUser()
     await insertLog(userId, await makeGroup('wa:a@g.us'), 'MSG1')
     await insertLog(userId, await makeGroup('wa:b@g.us'), 'MSG1')
@@ -538,8 +517,6 @@ describe('schema: group-scoped dedup key and revocation tombstones', () => {
   })
 
   it('records a tombstone for a message no beer log has ever referenced', async () => {
-    // The revoke can arrive before the message, so the tombstone must not depend
-    // on a beer_logs row, or on the group being known.
     await pool.query(
       `INSERT INTO beer_log_revocations (source_group_id, source_message_id) VALUES ($1, $2)`,
       ['wa:never-seen@g.us', 'MSG1'],
