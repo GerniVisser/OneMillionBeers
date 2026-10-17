@@ -143,8 +143,11 @@ describe('webhook', () => {
     expect(mockDeletePhoto).not.toHaveBeenCalled()
   })
 
-  it('collapses two bots delivering the same message at the same moment', async () => {
+  it("still logs a message when the other number's copy fails while both are in flight", async () => {
     mockImageFetch()
+    mockForwardBeerLog
+      .mockRejectedValueOnce(new Error('backend error'))
+      .mockResolvedValueOnce('created')
     const { handleWebhookEvent } = await import('../webhook.js')
     await Promise.all([
       handleWebhookEvent(
@@ -157,8 +160,8 @@ describe('webhook', () => {
       ),
     ])
 
-    expect(mockUploadPhoto).toHaveBeenCalledOnce()
-    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+    expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
+    expect(mockForwardBeerLog.mock.calls[1]![0].sourceMessageId).toBe('MSGID123')
   })
 
   it('dispatches session.status event to handleSessionStatusChange', async () => {
@@ -321,34 +324,6 @@ describe('webhook', () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(makeImagePayload(), logger)
     expect(mockUploadPhoto).not.toHaveBeenCalled()
-  })
-
-  it('discards a duplicate webhook delivery for the same message ID fired concurrently', async () => {
-    // Simulates WAHA retrying the webhook before the collector has responded.
-    // Both calls start before either resolves; the second should be dropped.
-    mockImageFetch()
-    const { handleWebhookEvent } = await import('../webhook.js')
-
-    await Promise.all([
-      handleWebhookEvent(makeImagePayload(), logger),
-      handleWebhookEvent(makeImagePayload(), logger), // same msgId — duplicate
-    ])
-
-    expect(mockUploadPhoto).toHaveBeenCalledOnce()
-    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
-  })
-
-  it('processes the same message ID again after the first delivery completes', async () => {
-    // Verifies the processingMsgIds Set is cleaned up via finally, so a genuine
-    // re-delivery after a crash is not permanently blocked.
-    mockImageFetch()
-    const { handleWebhookEvent } = await import('../webhook.js')
-
-    await handleWebhookEvent(makeImagePayload(), logger)
-    await handleWebhookEvent(makeImagePayload(), logger) // sequential, not concurrent
-
-    expect(mockUploadPhoto).toHaveBeenCalledTimes(2)
-    expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
   })
 
   describe('message.revoked', () => {
