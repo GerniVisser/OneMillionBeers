@@ -44,3 +44,13 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     await p.query(sql)
   }
 }
+
+let messageSeq = 0
+
+/**
+ * A fresh WhatsApp message id. Ingestion is idempotent on
+ * (group, source_message_id), so every seeded beer needs its own.
+ */
+export function nextMessageId(): string {
+  return `MSG${(++messageSeq).toString().padStart(6, '0')}`
+}

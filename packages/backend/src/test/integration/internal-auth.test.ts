@@ -2,7 +2,14 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type pg from 'pg'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../../app.js'
-import { startDb, stopDb, clearTables, internalHeaders, INTERNAL_TEST_TOKEN } from '../helpers.js'
+import {
+  startDb,
+  stopDb,
+  clearTables,
+  internalHeaders,
+  INTERNAL_TEST_TOKEN,
+  nextMessageId,
+} from '../helpers.js'
 
 let pool: pg.Pool
 let app: FastifyInstance
@@ -28,6 +35,7 @@ const validPayload = {
   senderId: 'wa:27831234567',
   timestamp: '2026-06-01T12:00:00.000Z',
   photoUrl: 'https://example.com/beer.jpg',
+  sourceMessageId: nextMessageId(),
 }
 
 async function beerLogCount(): Promise<number> {

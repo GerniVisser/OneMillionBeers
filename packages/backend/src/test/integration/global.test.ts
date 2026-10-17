@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type pg from 'pg'
 import { buildApp } from '../../app.js'
-import { startDb, stopDb, clearTables, internalHeaders, INTERNAL_TEST_TOKEN } from '../helpers.js'
+import {
+  startDb,
+  stopDb,
+  clearTables,
+  internalHeaders,
+  INTERNAL_TEST_TOKEN,
+  nextMessageId,
+} from '../helpers.js'
 import type { FastifyInstance } from 'fastify'
 import {
   GlobalCountResponseSchema,
@@ -44,6 +51,7 @@ async function seedBeerLogWithCountry(senderId: string, ts = '2024-06-01T12:00:0
       senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
+      sourceMessageId: nextMessageId(),
     },
   })
 }
@@ -59,6 +67,7 @@ async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000
       senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
+      sourceMessageId: nextMessageId(),
     },
   })
 }
@@ -152,6 +161,7 @@ describe('GET /v1/global/stream', () => {
         senderId: '333333333',
         timestamp: '2024-06-01T12:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId: nextMessageId(),
       },
     })
 
@@ -196,6 +206,7 @@ describe('GET /v1/global/stats', () => {
         senderId: '333333333',
         timestamp: '2024-06-01T14:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId: nextMessageId(),
       },
     })
 

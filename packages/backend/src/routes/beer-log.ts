@@ -5,7 +5,7 @@ import {
   findOrCreateGroup,
   upsertUser,
   insertBeerLog,
-  deleteBeerLogBySourceMessageId,
+  revokeBeerLog,
   getGlobalCount,
   getLatestBeer,
 } from '../db/queries.js'
@@ -45,18 +45,19 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
       findOrCreateGroup(pool, sourceGroupId, groupName),
     ])
 
-    const inserted = await insertBeerLog(
-      pool,
-      user.id,
-      group.id,
+    const outcome = await insertBeerLog(pool, {
+      userId: user.id,
+      groupId: group.id,
+      sourceGroupId,
       photoUrl,
-      timestamp,
+      loggedAt: timestamp,
       sourceMessageId,
       photoHash,
-    )
+    })
 
-    // null means the photo_hash already exists — duplicate photo, silently accepted
-    if (inserted) {
+    // Only a new beer changes the count or the head of the feed. A duplicate
+    // delivery from a second bot must not push an SSE update to every client.
+    if (outcome === 'created') {
       const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
       broadcast({
         type: 'count',
@@ -65,7 +66,7 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
       })
     }
 
-    return reply.status(201).send({ ok: true })
+    return reply.status(201).send({ ok: true, outcome })
   })
 
   app.delete(
@@ -73,16 +74,25 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
     { config: { rateLimit: false } },
     async (request, reply) => {
       const { sourceMessageId } = request.params as { sourceMessageId: string }
-
-      const deleted = await deleteBeerLogBySourceMessageId(pool, sourceMessageId)
-      if (!deleted) {
-        return reply.status(404).send({ ok: false })
+      // A bare WhatsApp message id is only unique within its chat, so the group
+      // is part of the key. Without it a revoke could delete another group's row.
+      const { sourceGroupId } = request.query as { sourceGroupId?: string }
+      if (!sourceGroupId) {
+        return reply.status(400).send({ ok: false, error: 'sourceGroupId is required' })
       }
 
-      const count = await getGlobalCount(pool)
-      broadcast({ type: 'remove', id: deleted.id, count })
+      const deleted = await revokeBeerLog(pool, sourceGroupId, sourceMessageId)
+      if (deleted) {
+        const count = await getGlobalCount(pool)
+        broadcast({ type: 'remove', id: deleted.id, count })
+      }
 
-      return reply.status(200).send({ ok: true, photoUrl: deleted.photoUrl })
+      // Always ok: the revocation is now recorded whether or not a row existed,
+      // so a message that arrives after its revoke is refused. Repeating the
+      // call is a no-op rather than a 404.
+      return reply
+        .status(200)
+        .send({ ok: true, ...(deleted ? { photoUrl: deleted.photoUrl } : {}) })
     },
   )
 }

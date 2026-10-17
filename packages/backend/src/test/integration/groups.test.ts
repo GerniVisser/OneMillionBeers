@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import type pg from 'pg'
 import { buildApp } from '../../app.js'
-import { startDb, stopDb, clearTables, internalHeaders, INTERNAL_TEST_TOKEN } from '../helpers.js'
+import {
+  startDb,
+  stopDb,
+  clearTables,
+  internalHeaders,
+  INTERNAL_TEST_TOKEN,
+  nextMessageId,
+} from '../helpers.js'
 import type { FastifyInstance } from 'fastify'
 import {
   GroupProfileResponseSchema,
@@ -45,6 +52,7 @@ async function seedBeerLog(senderId = '123456789', ts = '2024-06-01T12:00:00.000
       senderId,
       timestamp: ts,
       photoUrl: 'https://example.com/beer.jpg',
+      sourceMessageId: nextMessageId(),
     },
   })
 }
@@ -93,6 +101,7 @@ describe('GET /v1/groups', () => {
         senderId: '222',
         timestamp: '2024-06-01T12:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId: nextMessageId(),
       },
     })
 
@@ -117,6 +126,7 @@ describe('GET /v1/groups', () => {
         senderId: 'bbb',
         timestamp: '2024-06-01T12:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId: nextMessageId(),
       },
     })
 
@@ -378,6 +388,7 @@ describe('group flag filtering', () => {
         senderId: 'sender-visible',
         timestamp: '2024-06-01T12:00:00.000Z',
         photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId: nextMessageId(),
       },
     })
   }
