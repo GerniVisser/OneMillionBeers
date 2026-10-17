@@ -39,7 +39,6 @@ const WhatsAppConfigSchema = CoreConfigSchema.extend({
   ALERT_REPEAT_INTERVAL_MS: z.coerce.number().int().positive().default(21_600_000),
   COLLECTOR_PORT: z.coerce.number().int().positive().default(8080),
   PUBLIC_BASE_URL: z.string().url(),
-  STATUS_TOKEN: z.string().min(1),
   // Alert feature — disabled by default (dev). Set ENABLE_ALERTS=true in production.
   // NOTE: not z.coerce.boolean() — that treats any non-empty string as true,
   // so the literal "false" would enable alerts.

@@ -221,3 +221,73 @@ export async function listAllGroups(
     return []
   }
 }
+
+export interface SessionSummary {
+  name: string
+  status: SessionStatus
+  /** The linked phone number, once paired. */
+  phone: string | null
+  pushName: string | null
+}
+
+/** Every session WAHA knows about, including stopped ones. */
+export async function listSessions(): Promise<SessionSummary[]> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions?all=true`, {
+    headers: wahaHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!res.ok) throw new Error(`WAHA listSessions returned ${res.status}`)
+  const data = (await res.json()) as Array<{
+    name: string
+    status: SessionStatus
+    me?: { id?: string; pushName?: string } | null
+  }>
+  return data.map((s) => ({
+    name: s.name,
+    status: s.status,
+    phone: s.me?.id?.replace('@c.us', '') ?? null,
+    pushName: s.me?.pushName ?? null,
+  }))
+}
+
+export type SessionAction = 'start' | 'stop' | 'restart' | 'logout'
+
+/**
+ * logout unlinks the device, which drops the session to SCAN_QR_CODE so it can
+ * be paired with a different number. The others are lifecycle only and keep
+ * the pairing.
+ */
+export async function sessionAction(session: string, action: SessionAction): Promise<void> {
+  const res = await fetch(
+    `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}/${action}`,
+    { method: 'POST', headers: wahaHeaders(), signal: AbortSignal.timeout(30_000) },
+  )
+  if (!res.ok) throw new Error(`WAHA ${action} returned ${res.status}`)
+}
+
+/**
+ * Asks WhatsApp for an 8-character pairing code, entered on the phone under
+ * Linked devices -> Link with phone number. The alternative to a QR, and the
+ * only option when the admin page is open on the phone being linked.
+ *
+ * WAHA only allows this in SCAN_QR_CODE status and rejects it otherwise with a
+ * message worth showing the operator, so the body is returned on failure.
+ */
+export async function requestPairingCode(
+  session: string,
+  phoneNumber: string,
+): Promise<{ ok: true; code: string } | { ok: false; message: string }> {
+  const res = await fetch(
+    `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/auth/request-code`,
+    {
+      method: 'POST',
+      headers: wahaHeaders(),
+      body: JSON.stringify({ phoneNumber }),
+      signal: AbortSignal.timeout(30_000),
+    },
+  )
+  const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string }
+  if (!res.ok) return { ok: false, message: body.message ?? `WAHA returned ${res.status}` }
+  if (!body.code) return { ok: false, message: 'WAHA returned no pairing code' }
+  return { ok: true, code: body.code }
+}

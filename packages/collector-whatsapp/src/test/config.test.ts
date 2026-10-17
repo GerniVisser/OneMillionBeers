@@ -11,7 +11,6 @@ const REQUIRED_ENV = {
   WAHA_API_KEY: 'test-api-key',
   WAHA_WEBHOOK_URL: 'http://collector:8080/webhook',
   PUBLIC_BASE_URL: 'http://localhost:8080',
-  STATUS_TOKEN: 'test-token',
 }
 
 describe('config', () => {
@@ -31,21 +30,10 @@ describe('config', () => {
     const { config } = await import('../config.js')
     expect(config.WAHA_BASE_URL).toBe('http://waha:3000')
     expect(config.WAHA_API_KEY).toBe('test-api-key')
-    expect(config.STATUS_TOKEN).toBe('test-token')
   })
 
   it('calls process.exit(1) when WAHA_BASE_URL is missing', async () => {
     vi.stubEnv('WAHA_BASE_URL', '')
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called')
-    })
-    await expect(import('../config.js')).rejects.toThrow('process.exit called')
-    expect(exitSpy).toHaveBeenCalledWith(1)
-    exitSpy.mockRestore()
-  })
-
-  it('calls process.exit(1) when STATUS_TOKEN is missing', async () => {
-    vi.stubEnv('STATUS_TOKEN', '')
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called')
     })

@@ -8,6 +8,14 @@ services:
     ports:
       - '80:80'
       - '443:443'
+    environment:
+      # Rendered into /etc/nginx/conf.d/admin.htpasswd by the stock nginx
+      # entrypoint's envsubst pass over /etc/nginx/templates. Unset or empty
+      # leaves an unusable password file, so every login is rejected and
+      # /admin fails closed. Generate with:
+      #   htpasswd -nbB admin "$(openssl rand -base64 24)"
+      # then put the whole line in SSM as /omb/ADMIN_HTPASSWD.
+      ADMIN_HTPASSWD: ${ADMIN_HTPASSWD:-}
     volumes:
       - certbot-www:/var/www/certbot:ro
       - certbot-certs:/etc/letsencrypt:ro
@@ -115,7 +123,6 @@ services:
       WAHA_SESSIONS: ${WAHA_SESSIONS:-default}
       COLLECTOR_PORT: '8080'
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
-      STATUS_TOKEN: ${STATUS_TOKEN}
       ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
       ALERT_EMAIL: ${ALERT_EMAIL}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL}

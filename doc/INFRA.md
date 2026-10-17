@@ -208,6 +208,35 @@ aws ssm put-parameter --name /omb/INTERNAL_API_TOKEN --type SecureString \
 
 Rotating it means updating the parameter and redeploying; backend and collector come up together in the same `docker compose up -d`, so the mismatch window is only as long as the container restart.
 
+### The admin page
+
+`/admin` is the operator page for the WhatsApp numbers: status of each one, and
+restart / stop / start / log out / re-link. It is protected by HTTP basic auth
+at the gateway, not by the collector, which has no authentication of its own.
+
+The password file is rendered at container start from `ADMIN_HTPASSWD`, via the
+stock nginx entrypoint's envsubst pass over `/etc/nginx/templates`. Create the
+parameter before the deploy that introduces the page — without it the file is
+unusable and every login is rejected, which is the intended failure mode but
+not a useful one:
+
+```bash
+aws ssm put-parameter --name /omb/ADMIN_HTPASSWD --type SecureString --region us-east-1 \
+  --value "$(docker run --rm httpd:alpine htpasswd -nbB admin "$(openssl rand -base64 24)")"
+```
+
+Record the generated password in a password manager — the parameter only holds
+its bcrypt hash. Rotating it is a `put-parameter --overwrite` plus a deploy.
+
+Restarting the WAHA **container** is deliberately not offered on the page: it
+would need the Docker socket mounted into an internet-facing service.
+Restarting every **session** achieves the same thing operationally. For the
+container itself, over SSM:
+
+```bash
+cd /opt/onemillionbeers && docker compose --env-file .env --env-file .env.sha restart waha
+```
+
 `STORAGE_KEY` and `STORAGE_SECRET` are intentionally empty in production. The collector's S3 client omits explicit credentials when these are empty, falling back to the AWS SDK credential chain (EC2 instance profile → IMDS).
 
 ---
