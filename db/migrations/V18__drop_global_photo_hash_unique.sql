@@ -1,16 +1,3 @@
--- photo_hash was a stand-in natural key, and it over-reaches: the index is
--- global, so the same forwarded photo posted in two different groups is two
--- legitimate beers and one of them was silently discarded. It also fires on a
--- repost of the same image in the same group, which is a real beer too.
---
--- idx_beer_logs_group_message (V17) now carries the anti-inflation role, keyed
--- on the message that actually identifies a post rather than on its bytes.
---
--- The column stays — it is useful for ad-hoc abuse analysis through the
--- analytics role — but nothing queries it, so it gets no replacement index.
---
--- ORDER MATTERS: the pre-V17 backend inserted with ON CONFLICT (photo_hash),
--- which needs this index to exist or every insert fails with 42P10. Flyway runs
--- before containers are restarted, so this migration must only be deployed once
--- the backend that no longer names photo_hash is already live.
+-- Dedup is on (group_id, source_message_id) since V17. Ship only once the backend
+-- no longer uses ON CONFLICT (photo_hash), which fails without this index.
 DROP INDEX idx_beer_logs_photo_hash;

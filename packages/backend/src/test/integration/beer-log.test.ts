@@ -301,7 +301,6 @@ describe('POST /v1/internal/beer-log — idempotency', () => {
   })
 
   it('counts the same photo posted in two different groups', async () => {
-    // The old global UNIQUE(photo_hash) silently discarded the second one.
     await post({ ...validPayload, photoHash: HASH_A })
     await post({ ...validPayload, sourceGroupId: 'group-tg-2', photoHash: HASH_A })
     expect(await countLogs()).toBe(2)
