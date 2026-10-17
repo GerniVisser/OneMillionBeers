@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
+import { type BeerLogOutcome } from '@omb/shared'
 import { handleSessionStatusChange } from './session-monitor.js'
 import { config } from './config.js'
 
@@ -63,17 +64,22 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     return
   }
 
-  const msgId = payload.id as string
-  if (!msgId) {
+  const data = payload._data as Record<string, unknown> | undefined
+  const dataKey = data?.key as Record<string, unknown> | undefined
+
+  // NOWEB's payload.id embeds the receiving participant, so it can differ between
+  // our numbers. _data.key.id is the bare hash: the same for all, and what revokes carry.
+  const sourceMessageId = (dataKey?.id as string | undefined) ?? (payload.id as string | undefined)
+  if (!sourceMessageId) {
     logger.warn({ chatId }, 'Message has no ID — discarding')
     return
   }
 
-  if (processingMsgIds.has(msgId)) {
-    logger.warn({ msgId, chatId }, 'Duplicate webhook delivery for message — discarding')
+  if (processingMsgIds.has(sourceMessageId)) {
+    logger.warn({ sourceMessageId, chatId }, 'Duplicate webhook delivery for message — discarding')
     return
   }
-  processingMsgIds.add(msgId)
+  processingMsgIds.add(sourceMessageId)
 
   try {
     logger.warn({ chatId }, 'Processing photo from WhatsApp group')
@@ -83,9 +89,6 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     // _data.key.participantAlt which always carries the real phone JID.
     const participantRaw = payload.participant as string | undefined
     const isLid = participantRaw?.endsWith('@lid')
-    const data = payload._data as Record<string, unknown> | undefined
-
-    const dataKey = data?.key as Record<string, unknown> | undefined
     const participantAlt = dataKey?.participantAlt as string | undefined
 
     const senderJid = (
@@ -144,14 +147,10 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
-    // WAHA NOWEB: payload.id is the full composite key
-    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
-    // message hash, which matches revokedMessageId in message.revoked events.
-    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
-    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
-
     const photoHash = createHash('sha256').update(buffer).digest('hex')
-    const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
+    // Every number that receives the message derives this key, so they write one object.
+    const safeMessageId = sourceMessageId.replace(/[^A-Za-z0-9._-]/g, '-')
+    const key = `photos/${chatId.replace('@g.us', '')}/${safeMessageId}.jpg`
 
     let photoUrl: string
     try {
@@ -161,8 +160,9 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       return
     }
 
+    let outcome: BeerLogOutcome
     try {
-      await forwardBeerLog({
+      outcome = await forwardBeerLog({
         sourceGroupId,
         groupName,
         senderId,
@@ -172,12 +172,23 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
         sourceMessageId,
         photoHash,
       })
-      logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
+      logger.info({ sourceGroupId, senderId, key, outcome }, 'Beer log forwarded')
     } catch (err) {
       logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
+      return
+    }
+
+    // Never delete on 'duplicate': the key is shared with the copy that won.
+    if (outcome === 'revoked') {
+      try {
+        await deletePhoto(key)
+        logger.info({ sourceMessageId, key }, 'Beer photo deleted from S3')
+      } catch (err) {
+        logger.error({ err, key }, 'Failed to delete photo for a revoked message')
+      }
     }
   } finally {
-    processingMsgIds.delete(msgId)
+    processingMsgIds.delete(sourceMessageId)
   }
 }
 
@@ -207,11 +218,22 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     return
   }
 
+  // payload.after is the revoke itself, posted in the same chat as its target.
+  const after = payload.after as Record<string, unknown> | undefined
+  const afterKey = (after?._data as Record<string, unknown> | undefined)?.key as
+    | Record<string, unknown>
+    | undefined
+  const groupJid = (after?.from ?? afterKey?.remoteJid) as string | undefined
+  if (!groupJid?.endsWith('@g.us')) {
+    logger.warn({ msgId }, 'message.revoked event has no group JID — ignoring')
+    return
+  }
+
   logger.info({ msgId }, 'Message revoked — checking for beer log')
 
   let photoUrl: string | null
   try {
-    photoUrl = await forwardDeleteBeerLog(msgId)
+    photoUrl = await forwardDeleteBeerLog(msgId, 'wa:' + groupJid)
   } catch (err) {
     logger.error({ err, msgId }, 'Failed to delete beer log for revoked message')
     return

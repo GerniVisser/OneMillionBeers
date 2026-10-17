@@ -60,6 +60,7 @@ function makeImagePayload(overrides?: Record<string, unknown>) {
         url: 'http://waha:3000/api/files/fake',
       },
       chatId: '120363XXXX@g.us',
+      _data: { key: { id: 'MSGID123' } },
       ...overrides,
     },
   }
@@ -78,7 +79,7 @@ describe('webhook', () => {
     mockUploadPhoto.mockResolvedValue(
       'https://s3.example.com/omb-bucket/photos/120363XXXX/MSGID123.jpg',
     )
-    mockForwardBeerLog.mockResolvedValue(undefined)
+    mockForwardBeerLog.mockResolvedValue('created')
     mockDeletePhoto.mockResolvedValue(undefined)
     mockForwardDeleteBeerLog.mockResolvedValue(null)
   })
@@ -103,6 +104,56 @@ describe('webhook', () => {
     expect(beerLog.timestamp).toBe(new Date(1742306400 * 1000).toISOString())
     expect(beerLog.sourceMessageId).toBe('MSGID123')
     expect(beerLog.photoHash).toMatch(/^[0-9a-f]{64}$/) // SHA-256 hex
+  })
+
+  it('names the S3 object after the message, not after who received it', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent(
+      makeImagePayload({ id: 'false_120363XXXX@g.us_MSGID123_27821234567@lid' }),
+      logger,
+    )
+
+    const [key] = mockUploadPhoto.mock.calls[0]!
+    expect(key).toBe('photos/120363XXXX/MSGID123.jpg')
+    const [beerLog] = mockForwardBeerLog.mock.calls[0]!
+    expect(beerLog.sourceMessageId).toBe('MSGID123')
+  })
+
+  it('deletes the object it just uploaded when the backend reports the message was revoked', async () => {
+    mockImageFetch()
+    mockForwardBeerLog.mockResolvedValue('revoked')
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent(makeImagePayload(), logger)
+
+    expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+  })
+
+  it('leaves the object alone when the backend reports a duplicate', async () => {
+    mockImageFetch()
+    mockForwardBeerLog.mockResolvedValue('duplicate')
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent(makeImagePayload(), logger)
+
+    expect(mockDeletePhoto).not.toHaveBeenCalled()
+  })
+
+  it('collapses two bots delivering the same message at the same moment', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await Promise.all([
+      handleWebhookEvent(
+        makeImagePayload({ id: 'false_120363XXXX@g.us_MSGID123_27821111111@lid' }),
+        logger,
+      ),
+      handleWebhookEvent(
+        makeImagePayload({ id: 'false_120363XXXX@g.us_MSGID123_27822222222@lid' }),
+        logger,
+      ),
+    ])
+
+    expect(mockUploadPhoto).toHaveBeenCalledOnce()
+    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
   })
 
   it('dispatches session.status event to handleSessionStatusChange', async () => {
@@ -292,7 +343,11 @@ describe('webhook', () => {
         payload: {
           revokedMessageId,
           before: null,
-          after: { id: `false_120363XXXX@g.us_${revokedMessageId}`, type: 'revoked' },
+          after: {
+            id: `false_120363XXXX@g.us_${revokedMessageId}`,
+            type: 'revoked',
+            from: '120363XXXX@g.us',
+          },
         },
       }
     }
@@ -304,7 +359,7 @@ describe('webhook', () => {
       const { handleWebhookEvent } = await import('../webhook.js')
       await handleWebhookEvent(makeRevokedPayload(), logger)
 
-      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123', 'wa:120363XXXX@g.us')
       expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
     })
 
@@ -316,12 +371,42 @@ describe('webhook', () => {
       await handleWebhookEvent(
         {
           event: 'message.revoked',
-          payload: { before: { id: 'MSGID123' }, after: { id: 'MSGID123' } },
+          payload: {
+            before: { id: 'MSGID123' },
+            after: { id: 'MSGID123', from: '120363XXXX@g.us' },
+          },
         },
         logger,
       )
 
-      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123')
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123', 'wa:120363XXXX@g.us')
+    })
+
+    it('falls back to after._data.key.remoteJid for the group', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        {
+          event: 'message.revoked',
+          payload: {
+            revokedMessageId: 'MSGID123',
+            before: null,
+            after: { _data: { key: { remoteJid: '120363XXXX@g.us' } } },
+          },
+        },
+        logger,
+      )
+
+      expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123', 'wa:120363XXXX@g.us')
+    })
+
+    it('ignores a revoke with no resolvable group', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        { event: 'message.revoked', payload: { revokedMessageId: 'MSGID123', after: {} } },
+        logger,
+      )
+
+      expect(mockForwardDeleteBeerLog).not.toHaveBeenCalled()
     })
 
     it('does not call deletePhoto when forwardDeleteBeerLog returns null (not a beer log)', async () => {
@@ -352,7 +437,10 @@ describe('webhook', () => {
     it('ignores event when neither revokedMessageId nor before.id is present', async () => {
       const { handleWebhookEvent } = await import('../webhook.js')
       await handleWebhookEvent(
-        { event: 'message.revoked', payload: { before: null, after: {} } },
+        {
+          event: 'message.revoked',
+          payload: { before: null, after: { from: '120363XXXX@g.us' } },
+        },
         logger,
       )
       expect(mockForwardDeleteBeerLog).not.toHaveBeenCalled()

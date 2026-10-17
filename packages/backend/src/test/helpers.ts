@@ -44,3 +44,10 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     await p.query(sql)
   }
 }
+
+let messageSeq = 0
+
+/** Ingestion dedups on message id, so every seeded beer needs a fresh one. */
+export function nextMessageId(): string {
+  return `MSG${(++messageSeq).toString().padStart(6, '0')}`
+}

@@ -1,10 +1,11 @@
 import type pg from 'pg'
+import { withTransaction, type Queryable } from './client.js'
 import { normalisePhoneForSearch } from '../lib/phone.js'
 import type {
   Group,
   GroupListItem,
   User,
-  BeerLog,
+  BeerLogOutcome,
   FeedItem,
   LeaderboardEntry,
   UserStatsResponse,
@@ -359,35 +360,87 @@ export async function searchUsers(
 
 // ─── Beer Logs ────────────────────────────────────────────────────────────────
 
-export async function insertBeerLog(
-  pool: pg.Pool,
-  userId: string,
-  groupId: string,
-  photoUrl: string,
-  loggedAt: string,
-  sourceMessageId?: string,
-  photoHash?: string,
-): Promise<BeerLog | null> {
-  const { rows } = await pool.query<BeerLog>(
-    `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id, photo_hash)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (photo_hash) DO NOTHING
-     RETURNING id, user_id AS "userId", group_id AS "groupId", photo_url AS "photoUrl",
-               logged_at AS "loggedAt", created_at AS "createdAt"`,
-    [userId, groupId, photoUrl, loggedAt, sourceMessageId ?? null, photoHash ?? null],
-  )
-  return rows[0] ?? null
+// Without this, an ingest and a revoke of the same message can each miss the
+// other's write under READ COMMITTED, leaving a revoked beer in place.
+async function lockMessage(
+  client: Queryable,
+  sourceGroupId: string,
+  sourceMessageId: string,
+): Promise<void> {
+  await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))`, [
+    sourceGroupId,
+    sourceMessageId,
+  ])
 }
 
-export async function deleteBeerLogBySourceMessageId(
+export async function insertBeerLog(
   pool: pg.Pool,
+  p: {
+    userId: string
+    groupId: string
+    sourceGroupId: string
+    photoUrl: string
+    loggedAt: string
+    sourceMessageId: string
+    photoHash?: string
+  },
+): Promise<BeerLogOutcome> {
+  return withTransaction(pool, async (client) => {
+    await lockMessage(client, p.sourceGroupId, p.sourceMessageId)
+
+    const { rowCount: revoked } = await client.query(
+      `SELECT 1 FROM beer_log_revocations
+        WHERE source_group_id = $1 AND source_message_id = $2`,
+      [p.sourceGroupId, p.sourceMessageId],
+    )
+    if (revoked) return 'revoked'
+
+    try {
+      const { rowCount } = await client.query(
+        `INSERT INTO beer_logs (user_id, group_id, photo_url, logged_at, source_message_id, photo_hash)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (group_id, source_message_id) WHERE source_message_id IS NOT NULL
+           DO NOTHING`,
+        [p.userId, p.groupId, p.photoUrl, p.loggedAt, p.sourceMessageId, p.photoHash ?? null],
+      )
+      return rowCount ? 'created' : 'duplicate'
+    } catch (err) {
+      // Until V18 drops it, UNIQUE(photo_hash) rejects a byte-identical photo
+      // from another message. Treat that as a duplicate, as before.
+      if ((err as { code?: string }).code === '23505') return 'duplicate'
+      throw err
+    }
+  })
+}
+
+// The tombstone is written even when there is no row: the revoke can arrive
+// before the message.
+export async function revokeBeerLog(
+  pool: pg.Pool,
+  sourceGroupId: string,
   sourceMessageId: string,
 ): Promise<{ id: string; photoUrl: string } | null> {
-  const { rows } = await pool.query<{ id: string; photoUrl: string }>(
-    `DELETE FROM beer_logs WHERE source_message_id = $1 RETURNING id, photo_url AS "photoUrl"`,
-    [sourceMessageId],
-  )
-  return rows[0] ?? null
+  return withTransaction(pool, async (client) => {
+    await lockMessage(client, sourceGroupId, sourceMessageId)
+
+    await client.query(
+      `INSERT INTO beer_log_revocations (source_group_id, source_message_id)
+       VALUES ($1, $2)
+       ON CONFLICT (source_group_id, source_message_id) DO NOTHING`,
+      [sourceGroupId, sourceMessageId],
+    )
+
+    const { rows } = await client.query<{ id: string; photoUrl: string }>(
+      `DELETE FROM beer_logs bl
+        USING groups g
+        WHERE bl.group_id = g.id
+          AND g.source_group_id = $1
+          AND bl.source_message_id = $2
+        RETURNING bl.id, bl.photo_url AS "photoUrl"`,
+      [sourceGroupId, sourceMessageId],
+    )
+    return rows[0] ?? null
+  })
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────

@@ -40,6 +40,26 @@ export function createPool(connectionString: string): pg.Pool {
   return new Pool({ connectionString })
 }
 
+export type Queryable = Pick<pg.Pool, 'query'>
+
+export async function withTransaction<T>(
+  pool: pg.Pool,
+  fn: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await fn(client)
+    await client.query('COMMIT')
+    return result
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 export async function closePool(): Promise<void> {
   if (_pool) {
     await _pool.end()
