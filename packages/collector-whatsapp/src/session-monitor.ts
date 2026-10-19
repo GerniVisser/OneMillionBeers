@@ -81,10 +81,10 @@ async function maybeAlert(session: string, status: string, logger: Logger): Prom
     return
   }
 
-  const statusPageUrl = `${config.PUBLIC_BASE_URL}/whatsapp/status?token=${config.STATUS_TOKEN}&session=${encodeURIComponent(session)}`
+  const adminUrl = `${config.PUBLIC_BASE_URL}/admin`
   try {
-    await sendReauthAlert(session, status, statusPageUrl)
-    logger.warn({ session, statusPageUrl }, 'Re-auth alert sent')
+    await sendReauthAlert(session, status, adminUrl)
+    logger.warn({ session }, 'Re-auth alert sent')
   } catch (err) {
     // Reset so the next poll retries rather than staying silent for the full
     // repeat interval — a bad SES config previously silenced alerts entirely.

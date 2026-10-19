@@ -8,6 +8,9 @@ services:
     ports:
       - '80:80'
       - '443:443'
+    environment:
+      # Rendered to the /admin password file at start; unset rejects every login.
+      ADMIN_HTPASSWD: ${ADMIN_HTPASSWD:-}
     volumes:
       - certbot-www:/var/www/certbot:ro
       - certbot-certs:/etc/letsencrypt:ro
@@ -121,7 +124,6 @@ services:
       WAHA_SESSIONS: ${WAHA_SESSIONS:-default}
       COLLECTOR_PORT: '8080'
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
-      STATUS_TOKEN: ${STATUS_TOKEN}
       ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
       ALERT_EMAIL: ${ALERT_EMAIL}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL}
