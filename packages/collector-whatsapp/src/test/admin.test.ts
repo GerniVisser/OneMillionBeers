@@ -5,12 +5,16 @@ const mockListSessions = vi.fn()
 const mockSessionAction = vi.fn()
 const mockGetQrCodePng = vi.fn()
 const mockRequestPairingCode = vi.fn()
+const mockGetSessionStatus = vi.fn()
+const mockWaitForStatus = vi.fn()
 
 vi.mock('../waha-client.js', () => ({
   listSessions: mockListSessions,
   sessionAction: mockSessionAction,
   getQrCodePng: mockGetQrCodePng,
   requestPairingCode: mockRequestPairingCode,
+  getSessionStatus: mockGetSessionStatus,
+  waitForStatus: mockWaitForStatus,
 }))
 
 const testConfig = { WAHA_SESSIONS: ['prod', 'backup'] }
@@ -38,6 +42,9 @@ describe('admin', () => {
     mockSessionAction.mockReset()
     mockGetQrCodePng.mockReset()
     mockRequestPairingCode.mockReset()
+    mockGetSessionStatus.mockReset().mockResolvedValue('SCAN_QR_CODE')
+    mockWaitForStatus.mockReset().mockResolvedValue(true)
+    mockSessionAction.mockResolvedValue(undefined)
     mockSessionAction.mockResolvedValue(undefined)
     testConfig.WAHA_SESSIONS = ['prod', 'backup']
   })
@@ -148,6 +155,51 @@ describe('admin', () => {
 
       expect(res.json()).toEqual({ code: 'ABCD1234' })
       expect(mockRequestPairingCode).toHaveBeenCalledWith('prod', '27820000001')
+      await server.close()
+    })
+
+    it('opens a fresh pairing window before asking for the code', async () => {
+      mockRequestPairingCode.mockResolvedValue({ ok: true, code: 'ABCD1234' })
+      const server = await buildAdmin()
+      await server.inject({
+        method: 'POST',
+        url: '/admin/api/sessions/prod/pair',
+        payload: { phoneNumber: '27820000001' },
+      })
+
+      expect(mockSessionAction).toHaveBeenCalledWith('prod', 'restart')
+      expect(mockSessionAction.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRequestPairingCode.mock.invocationCallOrder[0]!,
+      )
+      await server.close()
+    })
+
+    it('refuses a number that is not waiting to be linked, without restarting it', async () => {
+      mockGetSessionStatus.mockResolvedValue('WORKING')
+      const server = await buildAdmin()
+      const res = await server.inject({
+        method: 'POST',
+        url: '/admin/api/sessions/prod/pair',
+        payload: { phoneNumber: '27820000001' },
+      })
+
+      expect(res.statusCode).toBe(409)
+      expect(mockSessionAction).not.toHaveBeenCalled()
+      expect(mockRequestPairingCode).not.toHaveBeenCalled()
+      await server.close()
+    })
+
+    it('gives up when the fresh window does not open', async () => {
+      mockWaitForStatus.mockResolvedValue(false)
+      const server = await buildAdmin()
+      const res = await server.inject({
+        method: 'POST',
+        url: '/admin/api/sessions/prod/pair',
+        payload: { phoneNumber: '27820000001' },
+      })
+
+      expect(res.statusCode).toBe(502)
+      expect(mockRequestPairingCode).not.toHaveBeenCalled()
       await server.close()
     })
 

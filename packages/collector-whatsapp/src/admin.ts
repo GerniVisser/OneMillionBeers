@@ -5,7 +5,9 @@ import {
   listSessions,
   sessionAction,
   getQrCodePng,
+  getSessionStatus,
   requestPairingCode,
+  waitForStatus,
   type SessionAction,
 } from './waha-client.js'
 
@@ -77,6 +79,25 @@ export function registerAdminRoutes(server: FastifyInstance, logger: Logger): vo
     // WhatsApp wants digits only, in full international form.
     if (!/^\d{8,15}$/.test(phoneNumber)) {
       return reply.status(400).send({ error: 'Phone number must be 8–15 digits, no + or spaces' })
+    }
+
+    // Never restart a linked number from here.
+    if ((await getSessionStatus(name).catch(() => null)) !== 'SCAN_QR_CODE') {
+      return reply
+        .status(409)
+        .send({ error: 'Only a number waiting to be linked can get a code. Log it out first.' })
+    }
+    // A code dies when WAHA closes the pairing window (~2.5 min), so open a fresh
+    // window first and every code gets all of it.
+    try {
+      await sessionAction(name, 'restart')
+    } catch (err) {
+      return reply.status(502).send({ error: (err as Error).message })
+    }
+    if (!(await waitForStatus(name, 'SCAN_QR_CODE'))) {
+      return reply
+        .status(502)
+        .send({ error: 'The number did not get ready for pairing. Try again.' })
     }
 
     const result = await requestPairingCode(name, phoneNumber)
@@ -163,17 +184,21 @@ async function act(name, action) {
 }
 
 async function pair(name, input, out) {
-  out.textContent = 'Requesting…'
+  if (busy) return
+  // The server restarts the session first; a refresh meanwhile would rebuild this card.
+  busy = true
+  out.textContent = 'Opening a fresh pairing window…'
   try {
     const { code } = await api('/admin/api/sessions/' + encodeURIComponent(name) + '/pair', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber: input.value.replace(/\\D/g, '') }),
     })
-    out.innerHTML = 'On that phone: Settings &rarr; Linked devices &rarr; Link with phone number, then enter <code>' + esc(code) + '</code>'
+    out.innerHTML = 'Within 2 minutes, on that phone: Settings &rarr; Linked devices &rarr; Link with phone number, then enter <code>' + esc(code) + '</code>'
   } catch (e) {
     out.innerHTML = '<span class="err">' + esc(e.message) + '</span>'
   }
+  busy = false
 }
 
 function card(s) {
@@ -184,6 +209,9 @@ function card(s) {
       '<span class="badge ' + esc(s.status) + '">' + esc(s.status) + '</span></div>' +
       '<p class="meta">' + (s.phone ? '+' + esc(s.phone) + (s.pushName ? ' · ' + esc(s.pushName) : '') : 'not linked') + '</p>' +
       '<div class="actions"></div>' +
+      (s.status === 'FAILED'
+        ? '<p class="meta">Restart first. If it fails again, it was unlinked or a pairing was abandoned: log out, then pair again.</p>'
+        : '') +
       (linkable ? '<div class="link"></div>' : '') +
     '</div>'
   ).firstElementChild

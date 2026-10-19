@@ -238,6 +238,20 @@ export async function sessionAction(session: string, action: SessionAction): Pro
   if (!res.ok) throw new Error(`WAHA ${action} returned ${res.status}`)
 }
 
+// False if the session has not reached `status` within timeoutMs.
+export async function waitForStatus(
+  session: string,
+  status: SessionStatus,
+  timeoutMs = 15_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if ((await getSessionStatus(session).catch(() => null)) === status) return true
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  return false
+}
+
 // The alternative to a QR, entered on the phone being linked. On refusal WAHA's
 // message is returned, since it says why (it only works in SCAN_QR_CODE).
 export async function requestPairingCode(
