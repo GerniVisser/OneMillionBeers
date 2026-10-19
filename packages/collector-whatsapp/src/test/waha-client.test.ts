@@ -131,7 +131,7 @@ describe('waha-client', () => {
             'group.v2.join',
             'group.v2.update',
           ],
-          retries: { policy: 'constant', delaySeconds: 2, attempts: 5 },
+          retries: { policy: 'exponential', delaySeconds: 2, attempts: 8 },
         },
       ],
       noweb: { markOnline: false },

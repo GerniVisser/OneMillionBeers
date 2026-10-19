@@ -143,10 +143,13 @@ describe('webhook', () => {
     expect(mockDeletePhoto).not.toHaveBeenCalled()
   })
 
-  it('collapses two bots delivering the same message at the same moment', async () => {
+  it("still logs a message when the other number's copy fails while both are in flight", async () => {
     mockImageFetch()
+    mockForwardBeerLog
+      .mockRejectedValueOnce(new Error('backend error'))
+      .mockResolvedValueOnce('created')
     const { handleWebhookEvent } = await import('../webhook.js')
-    await Promise.all([
+    await Promise.allSettled([
       handleWebhookEvent(
         makeImagePayload({ id: 'false_120363XXXX@g.us_MSGID123_27821111111@lid' }),
         logger,
@@ -157,8 +160,33 @@ describe('webhook', () => {
       ),
     ])
 
-    expect(mockUploadPhoto).toHaveBeenCalledOnce()
-    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
+    expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
+    expect(mockForwardBeerLog.mock.calls[1]![0].sourceMessageId).toBe('MSGID123')
+  })
+
+  it('names the number that delivered a message in its logs', async () => {
+    mockImageFetch()
+    mockForwardDeleteBeerLog.mockResolvedValue(null)
+    const lines: Array<Record<string, unknown>> = []
+    const capture = pino(
+      { level: 'info' },
+      { write: (line: string) => lines.push(JSON.parse(line)) },
+    )
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent({ ...makeImagePayload(), session: 'backup' }, capture)
+    await handleWebhookEvent(
+      {
+        event: 'message.revoked',
+        session: 'backup',
+        payload: { revokedMessageId: 'MSGID123', after: { from: '120363XXXX@g.us' } },
+      },
+      capture,
+    )
+
+    const forwarded = lines.find((l) => l.msg === 'Beer log forwarded')
+    const revoked = lines.find((l) => l.msg === 'Message revoked — checking for beer log')
+    expect(forwarded?.session).toBe('backup')
+    expect(revoked?.session).toBe('backup')
   })
 
   it('dispatches session.status event to handleSessionStatusChange', async () => {
@@ -187,6 +215,33 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
+  // WhatsApp re-encodes every photo message to JPEG, so anything else is not a
+  // beer photo. Stickers arrive as image/webp and used to be logged as beers.
+  it('ignores a sticker (image/webp)', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    const body = makeImagePayload()
+    ;(body.payload as Record<string, unknown>).media = {
+      mimetype: 'image/webp',
+      url: 'http://waha:3000/api/files/sticker.webp',
+    }
+    await handleWebhookEvent(body, logger)
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+    expect(mockForwardBeerLog).not.toHaveBeenCalled()
+  })
+
+  it('ignores a non-JPEG image', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    const body = makeImagePayload()
+    ;(body.payload as Record<string, unknown>).media = {
+      mimetype: 'image/png',
+      url: 'http://waha:3000/api/files/screenshot.png',
+    }
+    await handleWebhookEvent(body, logger)
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+  })
+
   it('ignores private chat messages (chatId ends in @s.whatsapp.net)', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     const body = makeImagePayload({ chatId: '1234567890@s.whatsapp.net' })
@@ -194,19 +249,26 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
-  it('does not call forwardBeerLog when uploadPhoto throws', async () => {
+  it('asks for redelivery when the photo cannot be uploaded', async () => {
     mockImageFetch()
     mockUploadPhoto.mockRejectedValue(new Error('S3 error'))
-    const { handleWebhookEvent } = await import('../webhook.js')
-    await handleWebhookEvent(makeImagePayload(), logger)
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
     expect(mockForwardBeerLog).not.toHaveBeenCalled()
   })
 
-  it('does not rethrow when forwardBeerLog throws', async () => {
+  it('asks for redelivery when the backend cannot store the beer', async () => {
     mockImageFetch()
     mockForwardBeerLog.mockRejectedValue(new Error('backend error'))
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
+  })
+
+  it('does not ask for redelivery when the media cannot be downloaded', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const { handleWebhookEvent } = await import('../webhook.js')
     await expect(handleWebhookEvent(makeImagePayload(), logger)).resolves.toBeUndefined()
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
   it.each(['default', 'backup'])('syncs a group the moment %s joins it', async (session) => {
@@ -280,7 +342,7 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
-  it('discards when response Content-Type is not image/', async () => {
+  it('discards when response Content-Type is not image/jpeg', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -294,34 +356,6 @@ describe('webhook', () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     await handleWebhookEvent(makeImagePayload(), logger)
     expect(mockUploadPhoto).not.toHaveBeenCalled()
-  })
-
-  it('discards a duplicate webhook delivery for the same message ID fired concurrently', async () => {
-    // Simulates WAHA retrying the webhook before the collector has responded.
-    // Both calls start before either resolves; the second should be dropped.
-    mockImageFetch()
-    const { handleWebhookEvent } = await import('../webhook.js')
-
-    await Promise.all([
-      handleWebhookEvent(makeImagePayload(), logger),
-      handleWebhookEvent(makeImagePayload(), logger), // same msgId — duplicate
-    ])
-
-    expect(mockUploadPhoto).toHaveBeenCalledOnce()
-    expect(mockForwardBeerLog).toHaveBeenCalledOnce()
-  })
-
-  it('processes the same message ID again after the first delivery completes', async () => {
-    // Verifies the processingMsgIds Set is cleaned up via finally, so a genuine
-    // re-delivery after a crash is not permanently blocked.
-    mockImageFetch()
-    const { handleWebhookEvent } = await import('../webhook.js')
-
-    await handleWebhookEvent(makeImagePayload(), logger)
-    await handleWebhookEvent(makeImagePayload(), logger) // sequential, not concurrent
-
-    expect(mockUploadPhoto).toHaveBeenCalledTimes(2)
-    expect(mockForwardBeerLog).toHaveBeenCalledTimes(2)
   })
 
   describe('message.revoked', () => {
@@ -409,10 +443,12 @@ describe('webhook', () => {
       expect(mockDeletePhoto).not.toHaveBeenCalled()
     })
 
-    it('does not throw when forwardDeleteBeerLog rejects', async () => {
+    it('asks for redelivery when the backend cannot record the revoke', async () => {
       mockForwardDeleteBeerLog.mockRejectedValue(new Error('network error'))
-      const { handleWebhookEvent } = await import('../webhook.js')
-      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).resolves.toBeUndefined()
+      const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+      await expect(handleWebhookEvent(makeRevokedPayload(), logger)).rejects.toBeInstanceOf(
+        RetryLater,
+      )
       expect(mockDeletePhoto).not.toHaveBeenCalled()
     })
 

@@ -52,13 +52,10 @@ services:
         tag: backend/{{.ID}}
 
   waha:
-    # Pinned deliberately so the running version is reproducible. Upgrade as a
-    # planned action (WAHA is NOT in the deploy.yml pull/up list):
-    #   docker compose --env-file .env --env-file .env.sha pull waha
-    #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
-    # The session lives in the waha-sessions volume, so recreating the container
-    # keeps the pairing. If the status page shows SCAN_QR_CODE afterwards, re-pair
-    # at /whatsapp/status?token=...
+    # Never rename this service: deploy.yml runs `up --remove-orphans` with it in
+    # the list, so a rename deletes the running container without starting the new one.
+    # Deploys apply config changes but never pull, so bumping the tag is a
+    # deliberate upgrade. The pairing lives in the waha-sessions volume.
     #
     # WhatsApp periodically invalidates the WhatsApp Web version baked into the
     # NOWEB engine, which breaks login with a registration loop
@@ -67,18 +64,30 @@ services:
     # WAHA_NOWEB_WA_VERSION=auto-web fetches the current version on start (falls
     # back to the built-in one if the fetch fails or is older) so a stale image no
     # longer strands the session. Do not change it after the QR has been scanned.
-    image: devlikeapro/waha:latest-2026.8.2
+    image: devlikeapro/waha:latest-2026.9.2
     expose:
       - '3000'
     restart: unless-stopped
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: ${WAHA_API_KEY}
-      WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
+      # The collector creates the sessions; WAHA only restores them.
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       # Only images reach the collector; skip downloading video/audio/documents.
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+      # The collector fetches the media on every webhook attempt, and retries span
+      # ~17 min (waha-client.ts). The default lifetime is 180 s.
+      WHATSAPP_FILES_LIFETIME: '1800'
+    # /ping needs no API key. Liveness only, on purpose: an unpaired number must
+    # not mark WAHA unhealthy while the others are working.
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:3000/ping']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     # Capped because an unbounded WAHA leaked until the kernel OOM-killer took the
     # whole t3.small down on 2026-10-06. Restarting it costs nothing; losing the
     # host costs the site.

@@ -22,8 +22,9 @@ function sessionConfig() {
       {
         url: config.WAHA_WEBHOOK_URL,
         events: WEBHOOK_EVENTS,
-        // Covers a collector restart (~10 s) instead of dropping the event.
-        retries: { policy: 'constant', delaySeconds: 2, attempts: 5 },
+        // 4 s, 8 s, … ~17 min in all, so an outage of the backend, S3 or the collector
+        // that long loses nothing. WHATSAPP_FILES_LIFETIME must outlast it.
+        retries: { policy: 'exponential', delaySeconds: 2, attempts: 8 },
       },
     ],
     // The default marks the number online, which mutes notifications on the phone.

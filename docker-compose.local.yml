@@ -35,16 +35,19 @@ services:
 
   waha:
     # Keep in step with docker-compose.yml so local dev reproduces production.
-    image: devlikeapro/waha:latest-2026.8.2
+    image: devlikeapro/waha:latest-2026.9.2
     network_mode: host
     environment:
       PORT: '3100'
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: local-api-key
-      WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+      # The collector fetches the media on every webhook attempt, and retries span
+      # ~17 min (waha-client.ts). The default lifetime is 180 s.
+      WHATSAPP_FILES_LIFETIME: '1800'
       WAHA_PRINT_QR: 'true'
     volumes:
       - waha-sessions:/app/.sessions
