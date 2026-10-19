@@ -225,7 +225,8 @@ async function refresh() {
 }
 
 refresh()
-setInterval(refresh, 5000)
+// 6 a minute, inside the gateway's 30r/m on /admin with room for actions.
+setInterval(refresh, 10000)
 </script>
 </body>
 </html>`
