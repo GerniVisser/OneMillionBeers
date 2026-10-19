@@ -136,6 +136,11 @@ code{font-size:1.5rem;letter-spacing:.18em;font-weight:700}
 const $ = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))
 let busy = false
+// Cards are rebuilt only when what they show changes, so a refresh does not wipe a
+// phone number being typed or a pairing code on screen.
+const cards = new Map()
+let layout = ''
+const qrSrc = (name) => '/admin/api/sessions/' + encodeURIComponent(name) + '/qr?t=' + Date.now()
 
 async function api(path, options) {
   const res = await fetch(path, options)
@@ -194,7 +199,7 @@ function card(s) {
   if (linkable) {
     const link = el.querySelector('.link')
     // A QR can't be scanned on the phone being linked; a pairing code can.
-    link.append($('<img alt="QR code" src="/admin/api/sessions/' + encodeURIComponent(s.name) + '/qr?t=' + Date.now() + '">'))
+    link.append($('<img alt="QR code" src="' + qrSrc(s.name) + '">'))
     const row = $('<div class="row"><input inputmode="numeric" placeholder="27821234567"><button>Get code</button></div>').firstElementChild
     const out = document.createElement('p')
     out.className = 'meta'
@@ -210,14 +215,31 @@ async function refresh() {
   try {
     data = await api('/admin/api/overview')
   } catch (e) {
+    layout = ''
     document.getElementById('root').innerHTML = '<div class="warn">Could not load: ' + esc(e.message) + '</div>'
     return
   }
+  const els = data.sessions.map((s) => {
+    const key = [s.status, s.phone, s.pushName].join('|')
+    const kept = cards.get(s.name)
+    if (kept && kept.key === key) {
+      const qr = kept.el.querySelector('.link img')
+      if (qr) qr.src = qrSrc(s.name)
+      return kept.el
+    }
+    const fresh = { key, el: card(s) }
+    cards.set(s.name, fresh)
+    return fresh.el
+  })
+  const next = [data.wahaReachable, data.unmanaged, data.sessions.map((s) => s.name + '=' + cards.get(s.name).key)].join(';')
+  if (next === layout) return
+  layout = next
+
   const root = document.createElement('div')
   if (!data.wahaReachable) {
     root.append($('<div class="warn">WAHA is not responding. Nothing is being ingested.</div>'))
   }
-  data.sessions.forEach((s) => root.append(card(s)))
+  els.forEach((el) => root.append(el))
   if (data.unmanaged.length) {
     root.append($('<p class="sub">Also in WAHA, not in WAHA_SESSIONS: ' + esc(data.unmanaged.join(', ')) + '</p>'))
   }
