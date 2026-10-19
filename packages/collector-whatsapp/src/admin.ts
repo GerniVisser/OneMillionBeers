@@ -161,6 +161,9 @@ let busy = false
 // phone number being typed or a pairing code on screen.
 const cards = new Map()
 let layout = ''
+// Kept per number, so even a rebuilt card still shows them.
+const typed = new Map()
+const shown = new Map()
 const qrSrc = (name) => '/admin/api/sessions/' + encodeURIComponent(name) + '/qr?t=' + Date.now()
 
 async function api(path, options) {
@@ -185,19 +188,22 @@ async function act(name, action) {
 
 async function pair(name, input, out) {
   if (busy) return
-  // The server restarts the session first; a refresh meanwhile would rebuild this card.
+  // The server restarts the session first; refreshes wait until the code is back.
   busy = true
   out.textContent = 'Opening a fresh pairing window…'
+  let html
   try {
     const { code } = await api('/admin/api/sessions/' + encodeURIComponent(name) + '/pair', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber: input.value.replace(/\\D/g, '') }),
     })
-    out.innerHTML = 'Within 2 minutes, on that phone: Settings &rarr; Linked devices &rarr; Link with phone number, then enter <code>' + esc(code) + '</code>'
+    html = 'Within 2 minutes, on that phone: Settings &rarr; Linked devices &rarr; Link with phone number, then enter <code>' + esc(code) + '</code>'
   } catch (e) {
-    out.innerHTML = '<span class="err">' + esc(e.message) + '</span>'
+    html = '<span class="err">' + esc(e.message) + '</span>'
   }
+  shown.set(name, html)
+  out.innerHTML = html
   busy = false
 }
 
@@ -229,9 +235,13 @@ function card(s) {
     // A QR can't be scanned on the phone being linked; a pairing code can.
     link.append($('<img alt="QR code" src="' + qrSrc(s.name) + '">'))
     const row = $('<div class="row"><input inputmode="numeric" placeholder="27821234567"><button>Get code</button></div>').firstElementChild
+    const input = row.querySelector('input')
+    input.value = typed.get(s.name) ?? ''
+    input.oninput = () => typed.set(s.name, input.value)
     const out = document.createElement('p')
     out.className = 'meta'
-    row.querySelector('button').onclick = () => pair(s.name, row.querySelector('input'), out)
+    out.innerHTML = shown.get(s.name) ?? ''
+    row.querySelector('button').onclick = () => pair(s.name, input, out)
     link.append(row, out)
   }
   return el
@@ -242,10 +252,17 @@ async function refresh() {
   let data
   try {
     data = await api('/admin/api/overview')
+    // Fetched before a pairing started: the session is mid-restart and the answer stale.
+    if (busy) return
   } catch (e) {
     layout = ''
     document.getElementById('root').innerHTML = '<div class="warn">Could not load: ' + esc(e.message) + '</div>'
     return
+  }
+  for (const s of data.sessions) {
+    if (s.status === 'SCAN_QR_CODE') continue
+    typed.delete(s.name)
+    shown.delete(s.name)
   }
   const els = data.sessions.map((s) => {
     const key = [s.status, s.phone, s.pushName].join('|')
