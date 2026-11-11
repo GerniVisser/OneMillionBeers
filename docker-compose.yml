@@ -71,6 +71,11 @@ services:
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: ${WAHA_API_KEY}
+      # Unset, WAHA generates a dashboard login on every start and prints it to
+      # the logs. Swagger is off for the same reason; the dashboard covers it.
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_SWAGGER_ENABLED: 'false'
       WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
       # Only images reach the collector; skip downloading video/audio/documents.
@@ -88,6 +93,36 @@ services:
         awslogs-group: /omb/waha
         awslogs-region: us-east-1
         tag: 'waha/{{.ID}}'
+
+  tailscale:
+    # Operator access to the WAHA dashboard over the tailnet, never the internet.
+    # It only dials out, so nothing is published and the security group is
+    # unchanged. Setup and access policy: doc/INFRA.md, "WAHA Dashboard (Operator)".
+    image: tailscale/tailscale:v1.104.2
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: omb-prod
+      # The key is used only while there is no saved state, so a spent
+      # single-use key can be deleted from SSM.
+      TS_AUTH_ONCE: 'true'
+      TS_STATE_DIR: /var/lib/tailscale
+      # Userspace mode reaches only what the serve config lists, not the rest of
+      # this network.
+      TS_USERSPACE: 'true'
+      TS_SERVE_CONFIG: /config/serve.json
+    configs:
+      - source: tailscale-serve
+        target: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    mem_limit: 96m
+    # No /omb/tailscale log group exists; local logs avoid a Terraform change.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
 
   collector-whatsapp:
     image: ghcr.io/${GITHUB_REPOSITORY}/omb-collector-whatsapp:${GIT_SHA}
@@ -146,3 +181,12 @@ volumes:
   certbot-www:
   certbot-certs:
   waha-sessions:
+  tailscale-state:
+
+# Inline because only docker-compose.yml is copied to the instance. `$$` stops
+# compose interpolating; tailscale fills in the node's own name.
+configs:
+  tailscale-serve:
+    content: |
+      {"TCP": {"443": {"HTTPS": true}},
+       "Web": {"$${TS_CERT_DOMAIN}:443": {"Handlers": {"/": {"Proxy": "http://waha:3000"}}}}}

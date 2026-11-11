@@ -112,6 +112,7 @@ No IAM user for GitHub Actions — images go to GHCR (not ECR), EC2 access is vi
 | S3 requests          | 100K PUT + 1M GET            | ~$0.05      |
 | DynamoDB — tf locks  | On-demand, near-zero usage   | ~$0.00      |
 | Data transfer out    | ~5 GB/mo                     | ~$0.45      |
+| Tailscale            | Personal plan (operator VPN) | $0.00       |
 | **Total**            |                              | **~$35/mo** |
 
 Free tier note: RDS db.t4g.micro and EC2 t3.micro are free-tier eligible for 12 months on new AWS accounts.
@@ -432,6 +433,156 @@ DBeaver → localhost:2222
 ```
 
 SSM authenticates via AWS credentials. SSH authenticates via the `~/.ssh/omb` keypair. No inbound ports are opened in the security group.
+
+---
+
+## WAHA Dashboard (Operator)
+
+WAHA's built-in dashboard manages the WhatsApp numbers: status of each session,
+start / stop / restart / log out, and re-linking by QR or pairing code. It is
+reachable only over a private Tailscale network (a tailnet), from a phone or a
+PC, at:
+
+```
+https://omb-prod.<tailnet>.ts.net/dashboard
+```
+
+Nothing about it is exposed to the internet: no port is published, no nginx
+route exists, and the security group is unchanged.
+
+### How it works
+
+```
+phone / PC (Tailscale app)
+        ↓ WireGuard, end-to-end encrypted; direct, or via a Tailscale relay
+tailscale container (Docker network, outbound connections only)
+        ↓ HTTP, inside Docker
+waha:3000  (/dashboard and /api)
+```
+
+- The `tailscale` container dials **out** to Tailscale's coordination server and
+  to its peers, over the same egress path as every other container. Replies are
+  let back in by the stateful security group, so no inbound rule is needed.
+- It runs in **userspace mode** and proxies only what its serve config lists
+  (`configs: tailscale-serve` in `docker-compose.yml`): HTTPS on 443 to
+  `http://waha:3000`. Postgres, the backend and the collector are not reachable
+  through it.
+- Tailscale issues the `ts.net` certificate from Let's Encrypt, so the hostname
+  appears in public certificate-transparency logs. It does not resolve outside
+  the tailnet.
+- Devices use a split tunnel: only traffic to the tailnet goes through it.
+
+Three independent checks guard WAHA: the tailnet access policy (who can reach
+`tag:omb-server`, and on which port), WAHA's dashboard login, and the
+`X-Api-Key` header on every API call.
+
+### One-time setup
+
+**1. Tailnet.** Sign in at [login.tailscale.com](https://login.tailscale.com).
+The free Personal plan covers this (non-commercial use only).
+
+**2. DNS.** Under **DNS**, keep MagicDNS on and enable **HTTPS Certificates**.
+
+**3. Access policy.** Under **Access controls**, create the tag `omb-server`
+(owner `autogroup:admin`), then one rule. The equivalent policy JSON:
+
+```json
+{
+  "tagOwners": { "tag:omb-server": ["autogroup:admin"] },
+  "grants": [{ "src": ["autogroup:member"], "dst": ["tag:omb-server"], "ip": ["tcp:443"] }],
+  "tests": [
+    {
+      "src": "<you>@github",
+      "accept": ["tag:omb-server:443"],
+      "deny": ["tag:omb-server:22", "tag:omb-server:3000"]
+    }
+  ]
+}
+```
+
+With no other grants, the server cannot reach your devices and devices cannot
+reach each other.
+
+**4. Auth key.** Under **Settings → Keys**, generate an auth key: reusable
+**off**, expiry **1 day**, pre-approved **on**, tags **`tag:omb-server`**. Store
+it from your own terminal before the deploy that starts the container:
+
+```bash
+aws ssm put-parameter --name /omb/TS_AUTHKEY --type SecureString --region us-east-1 \
+  --value 'tskey-auth-…'
+```
+
+The container logs in with it once and keeps its identity in the
+`tailscale-state` volume (`TS_AUTH_ONCE`). After the first successful deploy,
+delete the parameter:
+
+```bash
+aws ssm delete-parameter --name /omb/TS_AUTHKEY --region us-east-1
+```
+
+A new key is only needed if that volume is lost.
+
+**5. Devices.** Install Tailscale on the phone and the PC and sign in with the
+same account. Check from the PC:
+
+```bash
+tailscale ping omb-prod   # "via DERP" = relayed, an IP:port = direct; both work
+```
+
+### Logging in to the dashboard
+
+**Dashboard login.** `/omb/WAHA_DASHBOARD_USERNAME` and
+`/omb/WAHA_DASHBOARD_PASSWORD` (SecureString). Keep them in a password manager
+too. Use characters that survive the unquoted `.env`: no `$`, quotes, spaces or
+`#`. Without them WAHA generates a new login on every start and prints it to
+its logs.
+
+WAHA is not in the deploy's `up` list, so a change to either parameter (or to
+`WAHA_API_KEY`) takes effect only when WAHA is recreated. The pairing survives
+in `waha-sessions`; ingestion pauses for about a minute. On the instance, after
+a deploy has refreshed `.env`:
+
+```bash
+cd /opt/onemillionbeers
+sudo docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
+```
+
+**API key.** The dashboard is a browser app that calls WAHA's API directly and
+can manage several WAHA servers, so the dashboard login does not give it the
+API key. Once per browser: open **Workers**, edit the **WAHA** entry, leave the
+URL as is, and paste `WAHA_API_KEY`:
+
+```bash
+aws ssm get-parameter --name /omb/WAHA_API_KEY --region us-east-1 --query Parameter.Value --output text
+```
+
+The key is stored in that browser's `localStorage`, and the dashboard puts it in
+media links (`?x-api-key=`), so it can end up in browser history.
+
+### Lost or replaced device
+
+1. Remove the device under **Machines** in the Tailscale admin console. It loses
+   access immediately.
+2. Rotate `WAHA_API_KEY`: the dashboard stored it on that device. This changes
+   the collector and WAHA together, and WAHA is not in the deploy's `up` list,
+   so recreate it deliberately after the deploy.
+
+### Troubleshooting
+
+- **Certificate error on first visit.** The first Let's Encrypt order can fail
+  as `invalid` while the DNS challenge propagates. Retry from the instance:
+  `docker exec onemillionbeers-tailscale-1 tailscale cert --cert-file=/tmp/c.crt --key-file=/tmp/c.key omb-prod.<tailnet>.ts.net && docker exec onemillionbeers-tailscale-1 rm /tmp/c.crt /tmp/c.key`
+- **The node is `omb-prod-1`, not `omb-prod`.** Another device already holds the
+  name. Remove the stale one under **Machines**, then rename this one.
+- **Container stuck asking to log in.** `/omb/TS_AUTHKEY` was missing, spent or
+  expired on a fresh `tailscale-state` volume. Create a new key (step 4) and
+  redeploy.
+- **Tailscale itself is down.** Existing connections usually keep working. The
+  fallback is an SSM shell on the instance and WAHA's API from inside its
+  container, e.g.
+  `sudo docker exec onemillionbeers-waha-1 sh -c 'curl -s -H "X-Api-Key: $WAHA_API_KEY" localhost:3000/api/sessions'`.
+  WAHA's port is not published on the host, so an SSM port-forward does not
+  reach it.
 
 ---
 
