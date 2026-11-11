@@ -55,6 +55,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const mimetype = media?.mimetype as string | undefined
   if (!hasMedia || !mimetype?.startsWith('image/')) return
 
+  // An HD photo arrives as two messages with different ids and bytes: the
+  // standard-quality parent, then this HD copy. The parent is the beer.
+  if (isHdChild(payload)) {
+    logger.info({ chatId }, 'HD copy of an already-received photo — discarding')
+    return
+  }
+
   const msgId = payload.id as string
   if (!msgId) {
     logger.warn({ chatId }, 'Message has no ID — discarding')
@@ -171,6 +178,15 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   } finally {
     processingMsgIds.delete(msgId)
   }
+}
+
+function isHdChild(payload: Record<string, unknown>): boolean {
+  const message = (payload._data as Record<string, unknown> | undefined)?.message as
+    | Record<string, unknown>
+    | undefined
+  const contextInfo = message?.messageContextInfo as Record<string, unknown> | undefined
+  const association = contextInfo?.messageAssociation as Record<string, unknown> | undefined
+  return association?.associationType === 'HD_IMAGE_DUAL_UPLOAD'
 }
 
 function extractS3Key(photoUrl: string, storagePublicUrl: string, bucket: string): string | null {
