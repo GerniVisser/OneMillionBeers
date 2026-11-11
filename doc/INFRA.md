@@ -531,17 +531,21 @@ tailscale ping omb-prod   # "via DERP" = relayed, an IP:port = direct; both work
 
 ### Logging in to the dashboard
 
-**Dashboard login.** WAHA has no `WAHA_DASHBOARD_USERNAME` / `PASSWORD` set, so
-it generates them when the container starts and prints them once. CloudWatch
-keeps only 14 days, so read them from Docker's local log copy, in your own
-terminal:
+**Dashboard login.** `/omb/WAHA_DASHBOARD_USERNAME` and
+`/omb/WAHA_DASHBOARD_PASSWORD` (SecureString). Keep them in a password manager
+too. Use characters that survive the unquoted `.env`: no `$`, quotes, spaces or
+`#`. Without them WAHA generates a new login on every start and prints it to
+its logs.
+
+WAHA is not in the deploy's `up` list, so a change to either parameter (or to
+`WAHA_API_KEY`) takes effect only when WAHA is recreated. The pairing survives
+in `waha-sessions`; ingestion pauses for about a minute. On the instance, after
+a deploy has refreshed `.env`:
 
 ```bash
-aws ssm start-session --target i-01f6dd64f9a0d4f29 --region us-east-1
-sudo docker logs onemillionbeers-waha-1 2>&1 | grep -E 'WAHA_DASHBOARD_(USERNAME|PASSWORD)'
+cd /opt/onemillionbeers
+sudo docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
 ```
-
-They change every time WAHA is recreated. Keep them in a password manager.
 
 **API key.** The dashboard is a browser app that calls WAHA's API directly and
 can manage several WAHA servers, so the dashboard login does not give it the

@@ -71,6 +71,11 @@ services:
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
       WAHA_API_KEY: ${WAHA_API_KEY}
+      # Unset, WAHA generates a dashboard login on every start and prints it to
+      # the logs. Swagger is off for the same reason; the dashboard covers it.
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_SWAGGER_ENABLED: 'false'
       WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
       # Only images reach the collector; skip downloading video/audio/documents.
