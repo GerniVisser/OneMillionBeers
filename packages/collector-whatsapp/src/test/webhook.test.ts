@@ -131,6 +131,30 @@ describe('webhook', () => {
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 
+  it('ignores the HD copy of a photo sent as an HD dual upload', async () => {
+    mockImageFetch()
+    const { handleWebhookEvent } = await import('../webhook.js')
+    await handleWebhookEvent(
+      makeImagePayload({
+        id: 'HDCHILD456',
+        _data: {
+          key: { id: 'HDCHILD456' },
+          message: {
+            messageContextInfo: {
+              messageAssociation: {
+                associationType: 'HD_IMAGE_DUAL_UPLOAD',
+                parentMessageKey: { remoteJid: '120363XXXX@g.us', id: 'MSGID123' },
+              },
+            },
+          },
+        },
+      }),
+      logger,
+    )
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+    expect(mockForwardBeerLog).not.toHaveBeenCalled()
+  })
+
   it('ignores private chat messages (chatId ends in @s.whatsapp.net)', async () => {
     const { handleWebhookEvent } = await import('../webhook.js')
     const body = makeImagePayload({ chatId: '1234567890@s.whatsapp.net' })
