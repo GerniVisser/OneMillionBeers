@@ -78,7 +78,8 @@ export async function syncGroup(
   }
 }
 
-// Every working number syncs the groups it sees, so group details keep updating while any one is up.
+// Each group is synced once, through the first working number that sees it, so group
+// details keep updating while any one is up.
 export async function syncAllGroups(logger: Logger): Promise<void> {
   logger.info('Starting group sync')
   let sessions: string[]
@@ -88,10 +89,12 @@ export async function syncAllGroups(logger: Logger): Promise<void> {
     logger.warn({ err }, 'Could not list WAHA sessions — skipping group sync')
     return
   }
+  const synced = new Set<string>()
   for (const session of sessions) {
-    const groups = await listAllGroups(session)
+    const groups = (await listAllGroups(session)).filter(({ id }) => !synced.has(id))
     logger.info({ session, count: groups.length }, 'Groups to sync')
     for (const { id, subject } of groups) {
+      synced.add(id)
       await syncGroup(session, id, subject, logger)
     }
   }
