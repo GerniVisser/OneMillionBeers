@@ -59,6 +59,15 @@ describe('group sync', () => {
     expect(syncedGroups()).toEqual(['wa:a@g.us', 'wa:b@g.us'])
   })
 
+  it('syncs a group that several numbers share once', async () => {
+    groupsBySession({ one: ['a@g.us', 'b@g.us'], two: ['b@g.us', 'c@g.us'] })
+    const { syncAllGroups } = await import('../group-sync.js')
+    await syncAllGroups(logger)
+
+    expect(syncedGroups()).toEqual(['wa:a@g.us', 'wa:b@g.us', 'wa:c@g.us'])
+    expect(mockGetGroupPictureUrl).not.toHaveBeenCalledWith('two', 'b@g.us')
+  })
+
   it('keeps syncing when one number is down', async () => {
     // listAllGroups returns [] when WAHA cannot list a session's groups.
     groupsBySession({ two: ['b@g.us'] })

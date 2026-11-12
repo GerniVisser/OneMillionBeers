@@ -205,7 +205,7 @@ resource "aws_cloudwatch_metric_alarm" "beers_lost" {
   ok_actions          = local.alarm_actions
 }
 
-# Logged for any number that is FAILED or SCAN_QR_CODE, at least every 5 minutes
+# Logged for any number that is FAILED or SCAN_QR_CODE, about every minute
 # while it stays that way. Nothing restarts it: 15 minutes means it needs the operator.
 resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
   name           = "omb-whatsapp-session-unhealthy"

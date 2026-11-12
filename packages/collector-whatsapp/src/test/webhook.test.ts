@@ -286,10 +286,24 @@ describe('webhook', () => {
     await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
   })
 
-  it('does not ask for redelivery when the media cannot be downloaded', async () => {
+  it('does not ask for redelivery when WAHA no longer has the media', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const { handleWebhookEvent } = await import('../webhook.js')
     await expect(handleWebhookEvent(makeImagePayload(), logger)).resolves.toBeUndefined()
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+  })
+
+  it('asks for redelivery when WAHA fails to serve the media', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502 }))
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
+    expect(mockUploadPhoto).not.toHaveBeenCalled()
+  })
+
+  it('asks for redelivery when the media download times out', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('timed out', 'TimeoutError')))
+    const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+    await expect(handleWebhookEvent(makeImagePayload(), logger)).rejects.toBeInstanceOf(RetryLater)
     expect(mockUploadPhoto).not.toHaveBeenCalled()
   })
 

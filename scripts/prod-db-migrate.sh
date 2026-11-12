@@ -6,9 +6,11 @@ set -euo pipefail
 
 ENV_FILE="${1:-.env}"
 
-DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
+# deploy.yml single-quotes every .env value.
+DB_URL=$(grep '^DATABASE_URL=' "$ENV_FILE" | cut -d= -f2- | sed "s/^'\\(.*\\)'$/\\1/")
+export DB_URL
 
-parse() { python3 -c "from urllib.parse import urlparse; u=urlparse('${DB_URL}'); print($1)"; }
+parse() { python3 -c "import os; from urllib.parse import urlparse; u=urlparse(os.environ['DB_URL']); print($1)"; }
 HOST=$(parse "u.hostname")
 PORT=$(parse "u.port or 5432")
 DBPATH=$(parse "u.path")

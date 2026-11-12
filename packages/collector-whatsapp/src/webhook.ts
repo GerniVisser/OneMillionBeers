@@ -10,8 +10,9 @@ const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
 
 let firstMessage = true
 
-// Our own storage (S3 or the backend) failed: the route answers 503 and WAHA
-// delivers the event again. Safe because ingestion is idempotent.
+// A failure that a later attempt can get past (S3, the backend, or WAHA's media
+// endpoint being down): the route answers 503 and WAHA delivers the event again.
+// Safe because ingestion is idempotent.
 export class RetryLater extends Error {}
 
 export async function handleWebhookEvent(body: unknown, logger: Logger): Promise<void> {
@@ -69,9 +70,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const mimetype = media?.mimetype as string | undefined
   if (!hasMedia || !mimetype) return
 
-  // Beer photos are always image/jpeg — WhatsApp re-encodes every photo message.
-  // Accepting any image/* meant stickers (image/webp) were logged as beers, and
-  // stored mislabelled, because the S3 key and ContentType are both hardcoded JPEG.
+  // WhatsApp re-encodes every photo message as JPEG; stickers are image/webp.
   if (mimetype !== 'image/jpeg') {
     logger.debug({ chatId, mimetype }, 'Media is not a JPEG photo — discarding')
     return
@@ -143,7 +142,12 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       signal: AbortSignal.timeout(30_000),
       headers: { 'x-api-key': config.WAHA_API_KEY },
     })
-    if (!res.ok) throw new Error(`Media fetch returned ${res.status}`)
+    if (res.status >= 500) throw new Error(`Media fetch returned ${res.status}`)
+    // A 4xx (e.g. the file expired) fails the same way on every redelivery.
+    if (!res.ok) {
+      logger.error({ status: res.status, mediaUrl }, 'Failed to download media — discarding')
+      return
+    }
     const contentLength = Number(res.headers.get('content-length') ?? 0)
     if (contentLength > MAX_MEDIA_BYTES) {
       logger.warn({ chatId, contentLength }, 'Media response too large — discarding')
@@ -157,7 +161,7 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     buffer = Buffer.from(await res.arrayBuffer())
   } catch (err) {
     logger.error({ err, mediaUrl }, 'Failed to download media — discarding')
-    return
+    throw new RetryLater()
   }
 
   const photoHash = createHash('sha256').update(buffer).digest('hex')
