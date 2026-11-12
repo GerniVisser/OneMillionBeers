@@ -14,7 +14,6 @@ services:
     depends_on:
       - backend
       - frontend
-      - collector-whatsapp
     restart: unless-stopped
     mem_limit: 128m
     logging:
@@ -159,15 +158,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY}
-      # Defaulted so the deploy works before /omb/WAHA_SESSIONS exists.
-      WAHA_SESSIONS: ${WAHA_SESSIONS:-default}
       COLLECTOR_PORT: '8080'
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
-      STATUS_TOKEN: ${STATUS_TOKEN}
-      ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
-      ALERT_EMAIL: ${ALERT_EMAIL}
-      SES_FROM_EMAIL: ${SES_FROM_EMAIL}
-      AWS_REGION: ${AWS_REGION}
     mem_limit: 256m
     logging:
       driver: awslogs

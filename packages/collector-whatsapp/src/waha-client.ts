@@ -6,41 +6,15 @@ function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }
 }
 
-export async function getSessionStatus(session: string): Promise<SessionStatus> {
-  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`, {
+// Every session WAHA knows, paired in its dashboard; the collector keeps no list.
+export async function listSessions(): Promise<Array<{ name: string; status: SessionStatus }>> {
+  const res = await fetch(`${config.WAHA_BASE_URL}/api/sessions`, {
     headers: wahaHeaders(),
     signal: AbortSignal.timeout(10_000),
   })
-  if (!res.ok) throw new Error(`WAHA getSessionStatus returned ${res.status}`)
-  const data = (await res.json()) as { status: SessionStatus }
-  return data.status
-}
-
-/**
- * Restarts the session in place, reusing the stored credentials. Recovers a
- * FAILED session caused by a transient WhatsApp-side disconnect; does not help
- * when WhatsApp has de-authorized the linked device (that needs a QR re-scan).
- */
-export async function restartSession(session: string): Promise<void> {
-  const res = await fetch(
-    `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}/restart`,
-    {
-      method: 'POST',
-      headers: wahaHeaders(),
-      signal: AbortSignal.timeout(30_000),
-    },
-  )
-  if (!res.ok) throw new Error(`WAHA restartSession returned ${res.status}`)
-}
-
-export async function getQrCodePng(session: string): Promise<Buffer> {
-  const res = await fetch(
-    `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/auth/qr?format=image`,
-    { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) },
-  )
-  if (!res.ok) throw new Error(`WAHA getQrCodePng returned ${res.status}`)
-  const buf = await res.arrayBuffer()
-  return Buffer.from(buf)
+  if (!res.ok) throw new Error(`WAHA listSessions returned ${res.status}`)
+  const sessions = (await res.json()) as Array<{ name: string; status: SessionStatus }>
+  return sessions.map(({ name, status }) => ({ name, status }))
 }
 
 /**

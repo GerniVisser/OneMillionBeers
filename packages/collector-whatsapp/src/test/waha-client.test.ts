@@ -4,7 +4,6 @@ vi.mock('../config.js', () => ({
   config: {
     WAHA_BASE_URL: 'http://waha:3000',
     WAHA_API_KEY: 'test-api-key',
-    WAHA_SESSIONS: ['default'],
   },
 }))
 
@@ -17,44 +16,28 @@ describe('waha-client', () => {
     vi.unstubAllGlobals()
   })
 
-  it('getSessionStatus returns the session status string', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ name: 'default', status: 'WORKING' }),
-      }),
-    )
-    const { getSessionStatus } = await import('../waha-client.js')
-    const status = await getSessionStatus('default')
-    expect(status).toBe('WORKING')
+  it('listSessions returns each session name and status', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { name: 'default', status: 'WORKING', me: { id: '27@c.us' }, config: {} },
+        { name: 'backup', status: 'FAILED' },
+      ],
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { listSessions } = await import('../waha-client.js')
+
+    expect(await listSessions()).toEqual([
+      { name: 'default', status: 'WORKING' },
+      { name: 'backup', status: 'FAILED' },
+    ])
+    expect(fetchMock.mock.calls[0]![0]).toBe('http://waha:3000/api/sessions')
   })
 
-  it('getSessionStatus throws on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
-    const { getSessionStatus } = await import('../waha-client.js')
-    await expect(getSessionStatus('default')).rejects.toThrow('500')
-  })
-
-  it('getQrCodePng returns a Buffer from the response', async () => {
-    const fakeData = new Uint8Array([1, 2, 3]).buffer
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        arrayBuffer: async () => fakeData,
-      }),
-    )
-    const { getQrCodePng } = await import('../waha-client.js')
-    const buf = await getQrCodePng('default')
-    expect(Buffer.isBuffer(buf)).toBe(true)
-    expect(buf[0]).toBe(1)
-  })
-
-  it('getQrCodePng throws on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
-    const { getQrCodePng } = await import('../waha-client.js')
-    await expect(getQrCodePng('default')).rejects.toThrow('404')
+  it('listSessions throws on non-2xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+    const { listSessions } = await import('../waha-client.js')
+    await expect(listSessions()).rejects.toThrow('401')
   })
 
   it('getGroupName returns the group name on success', async () => {

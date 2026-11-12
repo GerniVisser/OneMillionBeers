@@ -1,6 +1,11 @@
 import { type Logger } from 'pino'
 import { uploadGroupAvatar, coreConfig, internalAuthHeader } from '@omb/collector-core'
-import { getGroupPictureUrl, getGroupInviteCode, listAllGroups } from './waha-client.js'
+import {
+  getGroupPictureUrl,
+  getGroupInviteCode,
+  listAllGroups,
+  listSessions,
+} from './waha-client.js'
 import { config } from './config.js'
 
 async function downloadBuffer(url: string): Promise<Buffer | null> {
@@ -73,10 +78,17 @@ export async function syncGroup(
   }
 }
 
-// Every number syncs the groups it sees, so group details keep updating while any one is up.
+// Every working number syncs the groups it sees, so group details keep updating while any one is up.
 export async function syncAllGroups(logger: Logger): Promise<void> {
   logger.info('Starting group sync')
-  for (const session of config.WAHA_SESSIONS) {
+  let sessions: string[]
+  try {
+    sessions = (await listSessions()).filter((s) => s.status === 'WORKING').map((s) => s.name)
+  } catch (err) {
+    logger.warn({ err }, 'Could not list WAHA sessions — skipping group sync')
+    return
+  }
+  for (const session of sessions) {
     const groups = await listAllGroups(session)
     logger.info({ session, count: groups.length }, 'Groups to sync')
     for (const { id, subject } of groups) {
