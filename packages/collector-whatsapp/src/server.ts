@@ -8,7 +8,7 @@ export function buildServer(logger: Logger) {
   const server = Fastify({ logger: false })
 
   // Answered only once the event is stored: any non-2xx makes WAHA deliver it
-  // again, on the `retries` schedule in waha-client.ts.
+  // again (WHATSAPP_HOOK_RETRIES_* in docker-compose.yml).
   server.post('/webhook', async (req, reply) => {
     try {
       await handleWebhookEvent(req.body, logger)

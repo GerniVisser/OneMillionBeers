@@ -18,7 +18,6 @@ const WhatsAppConfigSchema = CoreConfigSchema.extend({
       ),
     ])
     .refine((names) => names.length > 0, 'WAHA_SESSIONS must name at least one session'),
-  WAHA_WEBHOOK_URL: z.string().url(),
   // Webhooks report status changes; the poll catches any missed while we were down.
   WAHA_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   // Slower than the status poll: NOWEB's group listing is rate-limited.
