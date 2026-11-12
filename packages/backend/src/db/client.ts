@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import tls from 'node:tls'
 import pg from 'pg'
 
 const { Pool } = pg
@@ -28,8 +29,17 @@ export function getPool(connectionString?: string): pg.Pool {
 
     _pool = new Pool({
       connectionString: finalUrl,
+      // Long enough that bursty traffic reuses connections instead of handshaking anew.
+      idleTimeoutMillis: 300_000,
       ...(isRds
-        ? { ssl: { rejectUnauthorized: true, ca: readFileSync(RDS_CA_BUNDLE, 'utf-8') } }
+        ? {
+            ssl: {
+              rejectUnauthorized: true,
+              // Built once: a context made from the 114-cert bundle holds ~0.8 MB of native
+              // memory V8 does not count, so one per connection piles up until the container is OOM-killed.
+              secureContext: tls.createSecureContext({ ca: readFileSync(RDS_CA_BUNDLE, 'utf-8') }),
+            },
+          }
         : {}),
     })
   }
