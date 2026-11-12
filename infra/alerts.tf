@@ -205,8 +205,8 @@ resource "aws_cloudwatch_metric_alarm" "beers_lost" {
   ok_actions          = local.alarm_actions
 }
 
-# Logged for any number that is FAILED or SCAN_QR_CODE. A FAILED session is
-# auto-restarted, so one occurrence can heal itself; 15 minutes means it has not.
+# Logged for any number that is FAILED or SCAN_QR_CODE, at least every 5 minutes
+# while it stays that way. Nothing restarts it: 15 minutes means it needs the operator.
 resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
   name           = "omb-whatsapp-session-unhealthy"
   log_group_name = aws_cloudwatch_log_group.collector_whatsapp.name
@@ -222,7 +222,7 @@ resource "aws_cloudwatch_log_metric_filter" "whatsapp_session" {
 
 resource "aws_cloudwatch_metric_alarm" "whatsapp_session" {
   alarm_name          = "omb-whatsapp-session-unhealthy"
-  alarm_description   = "A WhatsApp number has been FAILED or SCAN_QR_CODE for 15 minutes. The other numbers keep ingesting; re-link it at /admin. The email names which one."
+  alarm_description   = "A WhatsApp number has been FAILED or SCAN_QR_CODE for 15 minutes. The other numbers keep ingesting. Restart or re-link it in the WAHA dashboard (doc/INFRA.md); the /omb/collector-whatsapp log names the session."
   namespace           = "OMB"
   metric_name         = "WhatsAppSessionUnhealthy"
   statistic           = "Sum"

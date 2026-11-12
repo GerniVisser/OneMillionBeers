@@ -8,8 +8,6 @@ vi.mock('../webhook.js', () => ({
   handleWebhookEvent: mockHandleWebhookEvent,
   RetryLater: MockRetryLater,
 }))
-vi.mock('../waha-client.js', () => ({ getSessionStatus: vi.fn(), getQrCodePng: vi.fn() }))
-vi.mock('../config.js', () => ({ config: { WAHA_SESSIONS: ['default'], STATUS_TOKEN: 't' } }))
 
 const { buildServer } = await import('../server.js')
 

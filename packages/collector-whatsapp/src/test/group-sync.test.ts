@@ -4,11 +4,13 @@ import { pino } from 'pino'
 const mockListAllGroups = vi.fn()
 const mockGetGroupPictureUrl = vi.fn()
 const mockGetGroupInviteCode = vi.fn()
+const mockListSessions = vi.fn()
 
 vi.mock('../waha-client.js', () => ({
   listAllGroups: mockListAllGroups,
   getGroupPictureUrl: mockGetGroupPictureUrl,
   getGroupInviteCode: mockGetGroupInviteCode,
+  listSessions: mockListSessions,
 }))
 vi.mock('@omb/collector-core', () => ({
   uploadGroupAvatar: vi.fn(),
@@ -16,7 +18,7 @@ vi.mock('@omb/collector-core', () => ({
   internalAuthHeader: () => ({ Authorization: 'Bearer test' }),
 }))
 vi.mock('../config.js', () => ({
-  config: { WAHA_SESSIONS: ['one', 'two'], WAHA_GROUP_SYNC_INTERVAL_MS: 1_800_000 },
+  config: { WAHA_GROUP_SYNC_INTERVAL_MS: 1_800_000 },
 }))
 
 const logger = pino({ level: 'silent' })
@@ -29,6 +31,10 @@ describe('group sync', () => {
     mockListAllGroups.mockReset()
     mockGetGroupPictureUrl.mockReset().mockResolvedValue(null)
     mockGetGroupInviteCode.mockReset().mockResolvedValue(null)
+    mockListSessions.mockReset().mockResolvedValue([
+      { name: 'one', status: 'WORKING' },
+      { name: 'two', status: 'WORKING' },
+    ])
     fetchMock = vi.fn().mockResolvedValue({ ok: true })
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -69,5 +75,26 @@ describe('group sync', () => {
 
     expect(mockGetGroupPictureUrl).toHaveBeenCalledWith('two', 'b@g.us')
     expect(mockGetGroupInviteCode).toHaveBeenCalledWith('two', 'b@g.us')
+  })
+
+  it('reads groups only through numbers that are WORKING', async () => {
+    mockListSessions.mockResolvedValue([
+      { name: 'one', status: 'SCAN_QR_CODE' },
+      { name: 'two', status: 'WORKING' },
+    ])
+    groupsBySession({ one: ['a@g.us'], two: ['b@g.us'] })
+    const { syncAllGroups } = await import('../group-sync.js')
+    await syncAllGroups(logger)
+
+    expect(mockListAllGroups).toHaveBeenCalledTimes(1)
+    expect(syncedGroups()).toEqual(['wa:b@g.us'])
+  })
+
+  it('skips the sync when WAHA cannot list its sessions', async () => {
+    mockListSessions.mockRejectedValue(new Error('ECONNREFUSED'))
+    const { syncAllGroups } = await import('../group-sync.js')
+    await syncAllGroups(logger)
+
+    expect(mockListAllGroups).not.toHaveBeenCalled()
   })
 })

@@ -24,7 +24,6 @@ vi.mock('../group-sync.js', () => ({ syncGroup: mockSyncGroup }))
 vi.mock('../config.js', () => ({
   config: {
     WAHA_BASE_URL: 'http://waha:3000',
-    WAHA_SESSIONS: ['default'],
     WAHA_API_KEY: 'test-key',
     STORAGE_PUBLIC_URL: 'https://s3.example.com',
     STORAGE_BUCKET: 'omb-bucket',
