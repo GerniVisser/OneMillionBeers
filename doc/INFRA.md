@@ -533,19 +533,13 @@ tailscale ping omb-prod   # "via DERP" = relayed, an IP:port = direct; both work
 
 **Dashboard login.** `/omb/WAHA_DASHBOARD_USERNAME` and
 `/omb/WAHA_DASHBOARD_PASSWORD` (SecureString). Keep them in a password manager
-too. Use characters that survive the unquoted `.env`: no `$`, quotes, spaces or
-`#`. Without them WAHA generates a new login on every start and prints it to
-its logs.
+too. The deploy single-quotes every value in `.env`, so anything but a single
+quote is safe. Without them WAHA generates a new login on every start and prints
+it to its logs.
 
-WAHA is not in the deploy's `up` list, so a change to either parameter (or to
-`WAHA_API_KEY`) takes effect only when WAHA is recreated. The pairing survives
-in `waha-sessions`; ingestion pauses for about a minute. On the instance, after
-a deploy has refreshed `.env`:
-
-```bash
-cd /opt/onemillionbeers
-sudo docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
-```
+The deploy's `up` includes WAHA, so a change to either parameter (or to
+`WAHA_API_KEY`) recreates it on the next deploy. The pairing survives in
+`waha-sessions`; ingestion pauses for about a minute.
 
 **API key.** The dashboard is a browser app that calls WAHA's API directly and
 can manage several WAHA servers, so the dashboard login does not give it the
@@ -559,13 +553,30 @@ aws ssm get-parameter --name /omb/WAHA_API_KEY --region us-east-1 --query Parame
 The key is stored in that browser's `localStorage`, and the dashboard puts it in
 media links (`?x-api-key=`), so it can end up in browser history.
 
+### Adding a WhatsApp number
+
+Pair it in the dashboard (**Sessions → Start New**, then QR or pairing code). That
+is all: WAHA's global webhook (`WHATSAPP_HOOK_*` in `docker-compose.yml`) sends
+every session's messages to the collector, and the collector finds the session by
+asking WAHA. So every number linked in this WAHA is a beer source; only bot numbers
+belong here. A number left half-paired keeps the session alarm firing, so stop or
+delete it.
+
+A session's own webhooks are delivered on top of the global one. Leave them empty,
+or every event reaches the collector twice. Ingestion counts the second copy as a
+duplicate, so nothing breaks, but the work doubles.
+
+**Once, after the release that introduced the global webhook:** the `default`
+session still has the webhook the old collector set on it. In the dashboard open
+**Sessions → default → Configuration**, delete its webhook and save. WAHA restarts
+the session in a couple of seconds and keeps the pairing.
+
 ### Lost or replaced device
 
 1. Remove the device under **Machines** in the Tailscale admin console. It loses
    access immediately.
 2. Rotate `WAHA_API_KEY`: the dashboard stored it on that device. This changes
-   the collector and WAHA together, and WAHA is not in the deploy's `up` list,
-   so recreate it deliberately after the deploy.
+   the collector and WAHA together on the next deploy.
 
 ### Troubleshooting
 

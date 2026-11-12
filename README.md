@@ -31,7 +31,7 @@ docker compose -f docker-compose.dev.yml up
 
 This starts nginx, the backend API, the collector, PostgreSQL, and MinIO (S3-compatible storage). No cloud services or tunnelling required — Baileys connects outbound to WhatsApp directly.
 
-On first run, scan the QR code printed by the collector to authenticate the WhatsApp session.
+On first run, pair a WhatsApp number in the WAHA dashboard (http://localhost:3100/dashboard).
 
 ## Common commands
 

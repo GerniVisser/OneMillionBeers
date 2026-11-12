@@ -24,12 +24,20 @@ export const BeerLogRequestSchema = z.object({
   timestamp: IsoDatetimeSchema,
   photoUrl: z.string().url(),
   pushName: z.string().max(512).nullable().optional(),
-  sourceMessageId: z.string().min(1).optional(),
+  sourceMessageId: z.string().min(1), // with sourceGroupId, the dedup key
   photoHash: z.string().length(64).optional(), // SHA-256 hex digest
 })
 export type BeerLogRequest = z.infer<typeof BeerLogRequestSchema>
 
-// DELETE /v1/internal/beer-log/by-message/:sourceMessageId (Collector → Backend)
+// POST /v1/internal/beer-log response (Backend → Collector)
+export const BeerLogResponseSchema = z.object({
+  ok: z.literal(true),
+  outcome: z.enum(['created', 'duplicate', 'revoked']),
+})
+export type BeerLogResponse = z.infer<typeof BeerLogResponseSchema>
+export type BeerLogOutcome = BeerLogResponse['outcome']
+
+// DELETE /v1/internal/beer-log/by-message/:sourceMessageId?sourceGroupId= (Collector → Backend)
 export const BeerLogDeleteResponseSchema = z.object({
   ok: z.boolean(),
   photoUrl: z.string().url().optional(),

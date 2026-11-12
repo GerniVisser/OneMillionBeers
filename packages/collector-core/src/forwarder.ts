@@ -1,4 +1,10 @@
-import { BeerLogRequestSchema, BeerLogDeleteResponseSchema, type BeerLogRequest } from '@omb/shared'
+import {
+  BeerLogRequestSchema,
+  BeerLogResponseSchema,
+  BeerLogDeleteResponseSchema,
+  type BeerLogRequest,
+  type BeerLogOutcome,
+} from '@omb/shared'
 import { config } from './config.js'
 import { pino } from 'pino'
 
@@ -9,7 +15,7 @@ export function internalAuthHeader(): Record<string, string> {
   return { Authorization: `Bearer ${config.INTERNAL_API_TOKEN}` }
 }
 
-export async function forwardBeerLog(payload: BeerLogRequest): Promise<void> {
+export async function forwardBeerLog(payload: BeerLogRequest): Promise<BeerLogOutcome> {
   // Belt-and-suspenders: validate outbound payload before sending
   BeerLogRequestSchema.parse(payload)
 
@@ -26,17 +32,23 @@ export async function forwardBeerLog(payload: BeerLogRequest): Promise<void> {
     logger.error({ status: response.status, body: text }, 'Backend rejected beer log')
     throw new Error(`Backend returned ${response.status}`)
   }
+
+  return BeerLogResponseSchema.parse(await response.json()).outcome
 }
 
-export async function forwardDeleteBeerLog(sourceMessageId: string): Promise<string | null> {
-  const url = `${config.BACKEND_URL}/v1/internal/beer-log/by-message/${encodeURIComponent(sourceMessageId)}`
+/** Returns the photo URL to delete, or null if no beer log matched. */
+export async function forwardDeleteBeerLog(
+  sourceMessageId: string,
+  sourceGroupId: string,
+): Promise<string | null> {
+  const url =
+    `${config.BACKEND_URL}/v1/internal/beer-log/by-message/${encodeURIComponent(sourceMessageId)}` +
+    `?sourceGroupId=${encodeURIComponent(sourceGroupId)}`
   const response = await fetch(url, {
     method: 'DELETE',
     headers: internalAuthHeader(),
     signal: AbortSignal.timeout(10_000),
   })
-
-  if (response.status === 404) return null
 
   if (!response.ok) {
     const text = await response.text().catch(() => '(unreadable)')

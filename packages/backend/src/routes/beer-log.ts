@@ -5,7 +5,7 @@ import {
   findOrCreateGroup,
   upsertUser,
   insertBeerLog,
-  deleteBeerLogBySourceMessageId,
+  revokeBeerLog,
   getGlobalCount,
   getLatestBeer,
 } from '../db/queries.js'
@@ -45,18 +45,17 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
       findOrCreateGroup(pool, sourceGroupId, groupName),
     ])
 
-    const inserted = await insertBeerLog(
-      pool,
-      user.id,
-      group.id,
+    const outcome = await insertBeerLog(pool, {
+      userId: user.id,
+      groupId: group.id,
+      sourceGroupId,
       photoUrl,
-      timestamp,
+      loggedAt: timestamp,
       sourceMessageId,
       photoHash,
-    )
+    })
 
-    // null means the photo_hash already exists — duplicate photo, silently accepted
-    if (inserted) {
+    if (outcome === 'created') {
       const [count, latest] = await Promise.all([getGlobalCount(pool), getLatestBeer(pool)])
       broadcast({
         type: 'count',
@@ -65,7 +64,7 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
       })
     }
 
-    return reply.status(201).send({ ok: true })
+    return reply.status(201).send({ ok: true, outcome })
   })
 
   app.delete(
@@ -73,16 +72,21 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
     { config: { rateLimit: false } },
     async (request, reply) => {
       const { sourceMessageId } = request.params as { sourceMessageId: string }
-
-      const deleted = await deleteBeerLogBySourceMessageId(pool, sourceMessageId)
-      if (!deleted) {
-        return reply.status(404).send({ ok: false })
+      const { sourceGroupId } = request.query as { sourceGroupId?: string }
+      if (!sourceGroupId) {
+        return reply.status(400).send({ ok: false, error: 'sourceGroupId is required' })
       }
 
-      const count = await getGlobalCount(pool)
-      broadcast({ type: 'remove', id: deleted.id, count })
+      const deleted = await revokeBeerLog(pool, sourceGroupId, sourceMessageId)
+      if (deleted) {
+        const count = await getGlobalCount(pool)
+        broadcast({ type: 'remove', id: deleted.id, count })
+      }
 
-      return reply.status(200).send({ ok: true, photoUrl: deleted.photoUrl })
+      // 200 even when no row matched: the revocation itself was recorded.
+      return reply
+        .status(200)
+        .send({ ok: true, ...(deleted ? { photoUrl: deleted.photoUrl } : {}) })
     },
   )
 }

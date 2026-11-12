@@ -1,37 +1,52 @@
 import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
 import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
+import { type BeerLogOutcome } from '@omb/shared'
 import { handleSessionStatusChange } from './session-monitor.js'
+import { syncGroup } from './group-sync.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
 
 let firstMessage = true
 
-// Guards against duplicate webhook deliveries for the same message.
-// WAHA retries when the collector doesn't respond within its timeout window;
-// without this, both deliveries race through and insert two DB rows.
-const processingMsgIds = new Set<string>()
+// A failure that a later attempt can get past (S3, the backend, or WAHA's media
+// endpoint being down): the route answers 503 and WAHA delivers the event again.
+// Safe because ingestion is idempotent.
+export class RetryLater extends Error {}
 
 export async function handleWebhookEvent(body: unknown, logger: Logger): Promise<void> {
   const event = (body as Record<string, unknown>)?.event
   if (typeof event !== 'string') return
 
+  const session = ((body as Record<string, unknown>)?.session as string | undefined) ?? 'unknown'
+
   if (event === 'session.status') {
     const status = ((body as Record<string, unknown>).payload as Record<string, unknown>)?.status
     if (typeof status === 'string') {
-      await handleSessionStatusChange(status, logger)
+      await handleSessionStatusChange(session, status, logger)
     }
     return
   }
 
   if (event === 'message') {
-    await handleMessage(body as Record<string, unknown>, logger)
+    await handleMessage(body as Record<string, unknown>, logger.child({ session }))
     return
   }
 
   if (event === 'message.revoked') {
-    await handleRevokedMessage(body as Record<string, unknown>, logger)
+    await handleRevokedMessage(body as Record<string, unknown>, logger.child({ session }))
+    return
+  }
+
+  if (event === 'group.v2.join') {
+    // Sync now rather than at the next poll.
+    const group = ((body as Record<string, unknown>).payload as Record<string, unknown> | undefined)
+      ?.group as Record<string, unknown> | undefined
+    const id = group?.id as string | undefined
+    if (!id) return
+    logger.info({ session, id }, 'Joined a WhatsApp group — syncing it now')
+    await syncGroup(session, id, (group?.subject as string | undefined) ?? id, logger)
     return
   }
 
@@ -53,7 +68,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const hasMedia = payload.hasMedia
   const media = payload.media as Record<string, unknown> | undefined
   const mimetype = media?.mimetype as string | undefined
-  if (!hasMedia || !mimetype?.startsWith('image/')) return
+  if (!hasMedia || !mimetype) return
+
+  // WhatsApp re-encodes every photo message as JPEG; stickers are image/webp.
+  if (mimetype !== 'image/jpeg') {
+    logger.debug({ chatId, mimetype }, 'Media is not a JPEG photo — discarding')
+    return
+  }
 
   // An HD photo arrives as two messages with different ids and bytes: the
   // standard-quality parent, then this HD copy. The parent is the beer.
@@ -62,121 +83,126 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     return
   }
 
-  const msgId = payload.id as string
-  if (!msgId) {
+  const data = payload._data as Record<string, unknown> | undefined
+  const dataKey = data?.key as Record<string, unknown> | undefined
+
+  // NOWEB's payload.id embeds the receiving participant, so it can differ between
+  // our numbers. _data.key.id is the bare hash: the same for all, and what revokes carry.
+  const sourceMessageId = (dataKey?.id as string | undefined) ?? (payload.id as string | undefined)
+  if (!sourceMessageId) {
     logger.warn({ chatId }, 'Message has no ID — discarding')
     return
   }
 
-  if (processingMsgIds.has(msgId)) {
-    logger.warn({ msgId, chatId }, 'Duplicate webhook delivery for message — discarding')
+  logger.debug({ chatId }, 'Processing photo from WhatsApp group')
+
+  // WhatsApp's newer LID protocol uses a device-linked identifier (ends in @lid)
+  // as the primary participant field instead of a phone number. Fall back to
+  // _data.key.participantAlt which always carries the real phone JID.
+  const participantRaw = payload.participant as string | undefined
+  const isLid = participantRaw?.endsWith('@lid')
+  const participantAlt = dataKey?.participantAlt as string | undefined
+
+  const senderJid = (
+    isLid && participantAlt ? participantAlt : (participantRaw ?? payload.from)
+  ) as string
+  const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
+  const sourceGroupId = 'wa:' + chatId
+  const pushName = (data?.pushName as string | undefined) ?? null
+  // Don't fetch group name per-message — WAHA NOWEB calls groupFetchAllParticipating
+  // under the hood (fetches ALL groups from WhatsApp) which hits rate limits immediately
+  // when messages arrive frequently. Group names are kept current by the periodic group
+  // sync; the backend DB guard prevents this JID fallback from overwriting a real name.
+  const groupName = chatId
+  const timestamp = new Date((payload.timestamp as number) * 1000).toISOString()
+  const mediaUrl = media!.url as string
+
+  if (!mediaUrl) {
+    logger.warn({ chatId }, 'Media URL absent — discarding')
     return
   }
-  processingMsgIds.add(msgId)
 
+  // WAHA may return media URLs with its own internal origin (e.g. http://localhost:3000)
+  // rather than the configured WAHA_BASE_URL. Rewrite to always fetch via the configured base.
+  let fetchUrl: string
   try {
-    logger.warn({ chatId }, 'Processing photo from WhatsApp group')
+    const parsed = new URL(mediaUrl)
+    const base = new URL(config.WAHA_BASE_URL)
+    parsed.protocol = base.protocol
+    parsed.host = base.host
+    fetchUrl = parsed.toString()
+  } catch {
+    logger.warn({ chatId, mediaUrl }, 'Media URL invalid — discarding')
+    return
+  }
 
-    // WhatsApp's newer LID protocol uses a device-linked identifier (ends in @lid)
-    // as the primary participant field instead of a phone number. Fall back to
-    // _data.key.participantAlt which always carries the real phone JID.
-    const participantRaw = payload.participant as string | undefined
-    const isLid = participantRaw?.endsWith('@lid')
-    const data = payload._data as Record<string, unknown> | undefined
-
-    const dataKey = data?.key as Record<string, unknown> | undefined
-    const participantAlt = dataKey?.participantAlt as string | undefined
-
-    const senderJid = (
-      isLid && participantAlt ? participantAlt : (participantRaw ?? payload.from)
-    ) as string
-    const senderId = 'wa:' + senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
-    const sourceGroupId = 'wa:' + chatId
-    const pushName = (data?.pushName as string | undefined) ?? null
-    // Don't fetch group name per-message — WAHA NOWEB calls groupFetchAllParticipating
-    // under the hood (fetches ALL groups from WhatsApp) which hits rate limits immediately
-    // when messages arrive frequently. Group names are kept current by the periodic group
-    // sync; the backend DB guard prevents this JID fallback from overwriting a real name.
-    const groupName = chatId
-    const timestamp = new Date((payload.timestamp as number) * 1000).toISOString()
-    const mediaUrl = media!.url as string
-
-    if (!mediaUrl) {
-      logger.warn({ chatId }, 'Media URL absent — discarding')
+  let buffer: Buffer
+  try {
+    const res = await fetch(fetchUrl, {
+      signal: AbortSignal.timeout(30_000),
+      headers: { 'x-api-key': config.WAHA_API_KEY },
+    })
+    if (res.status >= 500) throw new Error(`Media fetch returned ${res.status}`)
+    // A 4xx (e.g. the file expired) fails the same way on every redelivery.
+    if (!res.ok) {
+      logger.error({ status: res.status, mediaUrl }, 'Failed to download media — discarding')
       return
     }
-
-    // WAHA may return media URLs with its own internal origin (e.g. http://localhost:3000)
-    // rather than the configured WAHA_BASE_URL. Rewrite to always fetch via the configured base.
-    let fetchUrl: string
-    try {
-      const parsed = new URL(mediaUrl)
-      const base = new URL(config.WAHA_BASE_URL)
-      parsed.protocol = base.protocol
-      parsed.host = base.host
-      fetchUrl = parsed.toString()
-    } catch {
-      logger.warn({ chatId, mediaUrl }, 'Media URL invalid — discarding')
+    const contentLength = Number(res.headers.get('content-length') ?? 0)
+    if (contentLength > MAX_MEDIA_BYTES) {
+      logger.warn({ chatId, contentLength }, 'Media response too large — discarding')
       return
     }
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.startsWith('image/jpeg')) {
+      logger.warn({ chatId, contentType }, 'Media response is not a JPEG — discarding')
+      return
+    }
+    buffer = Buffer.from(await res.arrayBuffer())
+  } catch (err) {
+    logger.error({ err, mediaUrl }, 'Failed to download media — discarding')
+    throw new RetryLater()
+  }
 
-    let buffer: Buffer
+  const photoHash = createHash('sha256').update(buffer).digest('hex')
+  // Every number that receives the message derives this key, so they write one object.
+  const safeMessageId = sourceMessageId.replace(/[^A-Za-z0-9._-]/g, '-')
+  const key = `photos/${chatId.replace('@g.us', '')}/${safeMessageId}.jpg`
+
+  let photoUrl: string
+  try {
+    photoUrl = await uploadPhoto(key, buffer)
+  } catch (err) {
+    logger.error({ err, key }, 'Failed to upload photo — discarding')
+    throw new RetryLater()
+  }
+
+  let outcome: BeerLogOutcome
+  try {
+    outcome = await forwardBeerLog({
+      sourceGroupId,
+      groupName,
+      senderId,
+      timestamp,
+      photoUrl,
+      pushName,
+      sourceMessageId,
+      photoHash,
+    })
+    logger.info({ sourceGroupId, senderId, key, outcome }, 'Beer log forwarded')
+  } catch (err) {
+    logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
+    throw new RetryLater()
+  }
+
+  // Never delete on 'duplicate': the key is shared with the copy that won.
+  if (outcome === 'revoked') {
     try {
-      const res = await fetch(fetchUrl, {
-        signal: AbortSignal.timeout(30_000),
-        headers: { 'x-api-key': config.WAHA_API_KEY },
-      })
-      if (!res.ok) throw new Error(`Media fetch returned ${res.status}`)
-      const contentLength = Number(res.headers.get('content-length') ?? 0)
-      if (contentLength > MAX_MEDIA_BYTES) {
-        logger.warn({ chatId, contentLength }, 'Media response too large — discarding')
-        return
-      }
-      const contentType = res.headers.get('content-type') ?? ''
-      if (!contentType.startsWith('image/')) {
-        logger.warn({ chatId, contentType }, 'Media response is not an image — discarding')
-        return
-      }
-      buffer = Buffer.from(await res.arrayBuffer())
+      await deletePhoto(key)
+      logger.info({ sourceMessageId, key }, 'Beer photo deleted from S3')
     } catch (err) {
-      logger.error({ err, mediaUrl }, 'Failed to download media — discarding')
-      return
+      logger.error({ err, key }, 'Failed to delete photo for a revoked message')
     }
-
-    // WAHA NOWEB: payload.id is the full composite key
-    // (false_{group}@g.us_{hash}_{participant}@lid) but _data.key.id is the bare
-    // message hash, which matches revokedMessageId in message.revoked events.
-    // Use the bare hash as sourceMessageId; keep the full msgId for the S3 key.
-    const sourceMessageId = (dataKey?.id as string | undefined) ?? msgId
-
-    const photoHash = createHash('sha256').update(buffer).digest('hex')
-    const key = `photos/${chatId.replace('@g.us', '')}/${msgId}.jpg`
-
-    let photoUrl: string
-    try {
-      photoUrl = await uploadPhoto(key, buffer)
-    } catch (err) {
-      logger.error({ err, key }, 'Failed to upload photo — discarding')
-      return
-    }
-
-    try {
-      await forwardBeerLog({
-        sourceGroupId,
-        groupName,
-        senderId,
-        timestamp,
-        photoUrl,
-        pushName,
-        sourceMessageId,
-        photoHash,
-      })
-      logger.info({ sourceGroupId, senderId, key }, 'Beer log forwarded')
-    } catch (err) {
-      logger.error({ err, sourceGroupId }, 'Failed to forward beer log')
-    }
-  } finally {
-    processingMsgIds.delete(msgId)
   }
 }
 
@@ -215,14 +241,25 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     return
   }
 
+  // payload.after is the revoke itself, posted in the same chat as its target.
+  const after = payload.after as Record<string, unknown> | undefined
+  const afterKey = (after?._data as Record<string, unknown> | undefined)?.key as
+    | Record<string, unknown>
+    | undefined
+  const groupJid = (after?.from ?? afterKey?.remoteJid) as string | undefined
+  if (!groupJid?.endsWith('@g.us')) {
+    logger.warn({ msgId }, 'message.revoked event has no group JID — ignoring')
+    return
+  }
+
   logger.info({ msgId }, 'Message revoked — checking for beer log')
 
   let photoUrl: string | null
   try {
-    photoUrl = await forwardDeleteBeerLog(msgId)
+    photoUrl = await forwardDeleteBeerLog(msgId, 'wa:' + groupJid)
   } catch (err) {
     logger.error({ err, msgId }, 'Failed to delete beer log for revoked message')
-    return
+    throw new RetryLater()
   }
 
   if (!photoUrl) {

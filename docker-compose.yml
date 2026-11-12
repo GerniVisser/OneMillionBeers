@@ -14,7 +14,6 @@ services:
     depends_on:
       - backend
       - frontend
-      - collector-whatsapp
     restart: unless-stopped
     mem_limit: 128m
     logging:
@@ -49,13 +48,11 @@ services:
         tag: backend/{{.ID}}
 
   waha:
-    # Pinned deliberately so the running version is reproducible. Upgrade as a
-    # planned action (WAHA is NOT in the deploy.yml pull/up list):
-    #   docker compose --env-file .env --env-file .env.sha pull waha
-    #   docker compose --env-file .env --env-file .env.sha up -d --no-deps waha
-    # The session lives in the waha-sessions volume, so recreating the container
-    # keeps the pairing. If the status page shows SCAN_QR_CODE afterwards, re-pair
-    # at /whatsapp/status?token=...
+    # Never rename this service: deploy.yml runs `up --remove-orphans` with it in
+    # the list, so a rename deletes the running container without starting the new one.
+    # Deploys recreate it on a config change. They skip it in `pull`, but `up`
+    # fetches a tag the host lacks, so bumping the tag upgrades WAHA on the next
+    # deploy. The pairing lives in the waha-sessions volume.
     #
     # WhatsApp periodically invalidates the WhatsApp Web version baked into the
     # NOWEB engine, which breaks login with a registration loop
@@ -64,7 +61,7 @@ services:
     # WAHA_NOWEB_WA_VERSION=auto-web fetches the current version on start (falls
     # back to the built-in one if the fetch fails or is older) so a stale image no
     # longer strands the session. Do not change it after the QR has been scanned.
-    image: devlikeapro/waha:latest-2026.8.2
+    image: devlikeapro/waha:latest-2026.9.2
     expose:
       - '3000'
     restart: unless-stopped
@@ -76,11 +73,31 @@ services:
       WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
       WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
       WHATSAPP_SWAGGER_ENABLED: 'false'
-      WHATSAPP_START_SESSION: default
       WAHA_NOWEB_WA_VERSION: auto-web
+      # Sessions are created in the dashboard; WAHA brings them back after a restart.
+      WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       # Only images reach the collector; skip downloading video/audio/documents.
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
+      # The collector fetches the media on every webhook attempt, so it must outlive
+      # the retries below. The default lifetime is 180 s.
+      WHATSAPP_FILES_LIFETIME: '1800'
+      # Every session delivers to the collector, so a number paired in the dashboard
+      # needs nothing else. The collector answers 503 when it could not store an
+      # event; retries back off from 4 s over ~17 min.
+      WHATSAPP_HOOK_URL: http://collector-whatsapp:8080/webhook
+      WHATSAPP_HOOK_EVENTS: message,message.revoked,session.status,group.v2.join
+      WHATSAPP_HOOK_RETRIES_POLICY: exponential
+      WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: '2'
+      WHATSAPP_HOOK_RETRIES_ATTEMPTS: '8'
+    # /ping needs no API key. Liveness only, on purpose: an unpaired number must
+    # not mark WAHA unhealthy while the others are working.
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://localhost:3000/ping']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     # Capped because an unbounded WAHA leaked until the kernel OOM-killer took the
     # whole t3.small down on 2026-10-06. Restarting it costs nothing; losing the
     # host costs the site.
@@ -142,14 +159,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY}
-      WAHA_WEBHOOK_URL: http://collector-whatsapp:8080/webhook
       COLLECTOR_PORT: '8080'
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
-      STATUS_TOKEN: ${STATUS_TOKEN}
-      ENABLE_ALERTS: ${ENABLE_ALERTS:-false}
-      ALERT_EMAIL: ${ALERT_EMAIL}
-      SES_FROM_EMAIL: ${SES_FROM_EMAIL}
-      AWS_REGION: ${AWS_REGION}
     mem_limit: 256m
     logging:
       driver: awslogs
