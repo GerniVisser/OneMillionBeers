@@ -553,6 +553,24 @@ aws ssm get-parameter --name /omb/WAHA_API_KEY --region us-east-1 --query Parame
 The key is stored in that browser's `localStorage`, and the dashboard puts it in
 media links (`?x-api-key=`), so it can end up in browser history.
 
+### Adding a WhatsApp number
+
+Pair it in the dashboard (**Sessions → Start New**, then QR or pairing code). That
+is all: WAHA's global webhook (`WHATSAPP_HOOK_*` in `docker-compose.yml`) sends
+every session's messages to the collector, and the collector finds the session by
+asking WAHA. So every number linked in this WAHA is a beer source; only bot numbers
+belong here. A number left half-paired keeps the session alarm firing, so stop or
+delete it.
+
+A session's own webhooks are delivered on top of the global one. Leave them empty,
+or every event reaches the collector twice. Ingestion counts the second copy as a
+duplicate, so nothing breaks, but the work doubles.
+
+**Once, after the release that introduced the global webhook:** the `default`
+session still has the webhook the old collector set on it. In the dashboard open
+**Sessions → default → Configuration**, delete its webhook and save. WAHA restarts
+the session in a couple of seconds and keeps the pairing.
+
 ### Lost or replaced device
 
 1. Remove the device under **Machines** in the Tailscale admin console. It loses

@@ -45,9 +45,17 @@ services:
       WHATSAPP_RESTART_ALL_SESSIONS: 'True'
       WAHA_EVENTS_DOWNLOAD_MEDIA: 'true'
       WAHA_EVENTS_DOWNLOAD_MEDIA_MIMETYPES: image
-      # The collector fetches the media on every webhook attempt, and retries span
-      # ~17 min (waha-client.ts). The default lifetime is 180 s.
+      # The collector fetches the media on every webhook attempt, so it must outlive
+      # the retries below. The default lifetime is 180 s.
       WHATSAPP_FILES_LIFETIME: '1800'
+      # Every session delivers to the collector, so a number paired in the dashboard
+      # needs nothing else. The collector answers 503 when it could not store an
+      # event; retries back off from 4 s over ~17 min.
+      WHATSAPP_HOOK_URL: http://localhost:8080/webhook
+      WHATSAPP_HOOK_EVENTS: message,message.revoked,session.status,group.v2.join
+      WHATSAPP_HOOK_RETRIES_POLICY: exponential
+      WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: '2'
+      WHATSAPP_HOOK_RETRIES_ATTEMPTS: '8'
       WAHA_PRINT_QR: 'true'
     volumes:
       - waha-sessions:/app/.sessions

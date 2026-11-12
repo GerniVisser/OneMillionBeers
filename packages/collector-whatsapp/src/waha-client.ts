@@ -2,50 +2,8 @@ import { config } from './config.js'
 
 export type SessionStatus = 'STOPPED' | 'STARTING' | 'SCAN_QR_CODE' | 'WORKING' | 'FAILED'
 
-// Events the collector handles — kept in sync with webhook.ts handler
-const WEBHOOK_EVENTS = [
-  'message',
-  'message.revoked',
-  'session.status',
-  'group.v2.join',
-  'group.v2.update',
-]
-
 function wahaHeaders() {
   return { 'x-api-key': config.WAHA_API_KEY, 'Content-Type': 'application/json' }
-}
-
-// No hmac: /webhook is only reachable on the Docker network. Revisit if that changes.
-function sessionConfig() {
-  return {
-    webhooks: [
-      {
-        url: config.WAHA_WEBHOOK_URL,
-        events: WEBHOOK_EVENTS,
-        // 4 s, 8 s, … ~17 min in all, so an outage of the backend, S3 or the collector
-        // that long loses nothing. WHATSAPP_FILES_LIFETIME must outlast it.
-        retries: { policy: 'exponential', delaySeconds: 2, attempts: 8 },
-      },
-    ],
-    // The default marks the number online, which mutes notifications on the phone.
-    noweb: { markOnline: false },
-  }
-}
-
-function ownedFields(cfg: unknown): string {
-  const c = cfg as
-    | {
-        webhooks?: Array<{ url?: string; events?: string[]; retries?: unknown }>
-        noweb?: { markOnline?: boolean }
-      }
-    | undefined
-  const hook = c?.webhooks?.[0]
-  return JSON.stringify([
-    hook?.url ?? null,
-    [...(hook?.events ?? [])].sort(),
-    hook?.retries ?? null,
-    c?.noweb?.markOnline ?? true,
-  ])
 }
 
 export async function getSessionStatus(session: string): Promise<SessionStatus> {
@@ -73,45 +31,6 @@ export async function restartSession(session: string): Promise<void> {
     },
   )
   if (!res.ok) throw new Error(`WAHA restartSession returned ${res.status}`)
-}
-
-export type ReconcileResult =
-  | { action: 'created' }
-  | { action: 'updated'; status: SessionStatus }
-  | { action: 'unchanged'; status: SessionStatus }
-
-// Creates the session if missing; otherwise PUTs only on drift, because a PUT
-// restarts the session. Never touches pairing or status.
-export async function reconcileSession(session: string): Promise<ReconcileResult> {
-  const url = `${config.WAHA_BASE_URL}/api/sessions/${encodeURIComponent(session)}`
-  const res = await fetch(url, { headers: wahaHeaders(), signal: AbortSignal.timeout(10_000) })
-
-  if (res.status === 404) {
-    const created = await fetch(`${config.WAHA_BASE_URL}/api/sessions`, {
-      method: 'POST',
-      headers: wahaHeaders(),
-      body: JSON.stringify({ name: session, start: true, config: sessionConfig() }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!created.ok) throw new Error(`WAHA create session returned ${created.status}`)
-    return { action: 'created' }
-  }
-
-  if (!res.ok) throw new Error(`WAHA getSession returned ${res.status}`)
-  const data = (await res.json()) as { status: SessionStatus; config?: unknown }
-
-  if (ownedFields(data.config) === ownedFields(sessionConfig())) {
-    return { action: 'unchanged', status: data.status }
-  }
-
-  const updated = await fetch(url, {
-    method: 'PUT',
-    headers: wahaHeaders(),
-    body: JSON.stringify({ config: sessionConfig() }),
-    signal: AbortSignal.timeout(10_000),
-  })
-  if (!updated.ok) throw new Error(`WAHA update session returned ${updated.status}`)
-  return { action: 'updated', status: data.status }
 }
 
 export async function getQrCodePng(session: string): Promise<Buffer> {
