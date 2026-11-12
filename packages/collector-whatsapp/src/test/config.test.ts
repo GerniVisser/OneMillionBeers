@@ -45,9 +45,9 @@ describe('config', () => {
     expect(config.COLLECTOR_PORT).toBe(8080)
   })
 
-  it('defaults WAHA_POLL_INTERVAL_MS to five minutes', async () => {
+  it('defaults WAHA_POLL_INTERVAL_MS to one minute', async () => {
     const { config } = await import('../config.js')
-    expect(config.WAHA_POLL_INTERVAL_MS).toBe(300_000)
+    expect(config.WAHA_POLL_INTERVAL_MS).toBe(60_000)
   })
 
   it('defaults WAHA_GROUP_SYNC_INTERVAL_MS to thirty minutes', async () => {
