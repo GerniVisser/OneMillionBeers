@@ -406,7 +406,7 @@ export async function insertBeerLog(
       return rowCount ? 'created' : 'duplicate'
     } catch (err) {
       // Until V18 drops it, UNIQUE(photo_hash) rejects a byte-identical photo
-      // from another message. Treat that as a duplicate, as before.
+      // from another message.
       if ((err as { code?: string }).code === '23505') return 'duplicate'
       throw err
     }

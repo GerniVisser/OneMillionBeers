@@ -50,8 +50,9 @@ services:
   waha:
     # Never rename this service: deploy.yml runs `up --remove-orphans` with it in
     # the list, so a rename deletes the running container without starting the new one.
-    # Deploys apply config changes but never pull, so bumping the tag is a
-    # deliberate upgrade. The pairing lives in the waha-sessions volume.
+    # Deploys recreate it on a config change. They skip it in `pull`, but `up`
+    # fetches a tag the host lacks, so bumping the tag upgrades WAHA on the next
+    # deploy. The pairing lives in the waha-sessions volume.
     #
     # WhatsApp periodically invalidates the WhatsApp Web version baked into the
     # NOWEB engine, which breaks login with a registration loop
