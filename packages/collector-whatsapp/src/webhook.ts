@@ -77,6 +77,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     return
   }
 
+  // An HD photo arrives as two messages with different ids and bytes: the
+  // standard-quality parent, then this HD copy. The parent is the beer.
+  if (isHdChild(payload)) {
+    logger.info({ chatId }, 'HD copy of an already-received photo — discarding')
+    return
+  }
+
   const data = payload._data as Record<string, unknown> | undefined
   const dataKey = data?.key as Record<string, unknown> | undefined
 
@@ -193,6 +200,15 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
       logger.error({ err, key }, 'Failed to delete photo for a revoked message')
     }
   }
+}
+
+function isHdChild(payload: Record<string, unknown>): boolean {
+  const message = (payload._data as Record<string, unknown> | undefined)?.message as
+    | Record<string, unknown>
+    | undefined
+  const contextInfo = message?.messageContextInfo as Record<string, unknown> | undefined
+  const association = contextInfo?.messageAssociation as Record<string, unknown> | undefined
+  return association?.associationType === 'HD_IMAGE_DUAL_UPLOAD'
 }
 
 function extractS3Key(photoUrl: string, storagePublicUrl: string, bucket: string): string | null {
