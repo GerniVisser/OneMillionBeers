@@ -573,6 +573,33 @@ export async function getGroupFeed(
   return { items: rows, total }
 }
 
+// Ranked by how many people currently react to it; a tie goes to the newer beer.
+export async function getBeerOfTheWeek(pool: pg.Pool): Promise<FeedItem | null> {
+  const { rows } = await pool.query<FeedItem>(
+    `SELECT
+       bl.id,
+       bl.photo_url AS "photoUrl",
+       bl.logged_at AS "loggedAt",
+       json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
+       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group,
+       ${REACTION_SUMMARY_SQL} AS reactions
+     FROM beer_logs bl
+     JOIN (
+       SELECT beer_log_id, COUNT(*) AS n
+       FROM beer_log_reactions
+       WHERE emoji IS NOT NULL
+       GROUP BY beer_log_id
+     ) rc ON rc.beer_log_id = bl.id
+     JOIN users u ON bl.user_id = u.id
+     JOIN groups g ON bl.group_id = g.id
+     WHERE bl.logged_at >= now() - interval '7 days'
+       AND g.disabled = FALSE
+     ORDER BY rc.n DESC, bl.logged_at DESC
+     LIMIT 1`,
+  )
+  return rows[0] ?? null
+}
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<LeaderboardEntry[]> {

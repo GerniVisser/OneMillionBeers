@@ -18,10 +18,12 @@
     getGlobalHourly,
     getGlobalMonthly,
     getGlobalCountries,
+    getBeerOfTheWeek,
   } from '$lib/api'
   import { transformSseToFeedItem } from '$lib/utils'
   import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
+  import BeerOfTheWeek from '$lib/components/BeerOfTheWeek.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
@@ -42,6 +44,7 @@
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
+  let beerOfTheWeek = $state(untrack(() => data.beerOfTheWeek))
   // Deferred chart data — populated after initial render (see onMount)
   let activity = $state<GlobalActivityResponse>({ days: [] })
   let hourly = $state<GlobalHourlyResponse>({ hours: [] })
@@ -104,10 +107,23 @@
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
 
   let refetchTimer: ReturnType<typeof setTimeout> | null = null
+  let beerOfTheWeekTimer: ReturnType<typeof setTimeout> | null = null
+
+  // A reaction anywhere can change which beer leads the week.
+  function refetchBeerOfTheWeek() {
+    if (beerOfTheWeekTimer) clearTimeout(beerOfTheWeekTimer)
+    beerOfTheWeekTimer = setTimeout(async () => {
+      beerOfTheWeek = (await getBeerOfTheWeek(fetch)).beer
+    }, 1500)
+  }
 
   $effect(() => {
     const event = getLastSseEvent()
-    if (!event || event.type === 'reactions') return
+    if (!event) return
+    if (event.type === 'reactions') {
+      refetchBeerOfTheWeek()
+      return
+    }
 
     // untrack: only lastEvent should be a reactive dependency.
     // Reads of feedItems, pendingItems, isNearTop etc. inside here must not
@@ -122,6 +138,7 @@
         pendingItems = pendingItems.filter((p) => p.id !== event.id)
         feedTotal = Math.max(0, feedTotal - 1)
         if (wasInFeed) feedOffset = Math.max(0, feedOffset - 1)
+        if (event.id === beerOfTheWeek?.id) refetchBeerOfTheWeek()
       } else {
         sessionCount += 1
         flashCount += 1
@@ -172,16 +189,25 @@
     // Reads getResyncCount() as the sole dependency; everything else is untracked.
     getResyncCount()
     untrack(async () => {
-      const [countData, feedData, newStats, newActivity, newHourly, newMonthly, newCountries] =
-        await Promise.all([
-          getGlobalCount(fetch),
-          getGlobalFeed(fetch, { limit: 20, offset: 0 }),
-          getGlobalStats(fetch),
-          getGlobalActivity(fetch),
-          getGlobalHourly(fetch),
-          getGlobalMonthly(fetch),
-          getGlobalCountries(fetch),
-        ])
+      const [
+        countData,
+        feedData,
+        newStats,
+        newActivity,
+        newHourly,
+        newMonthly,
+        newCountries,
+        newBeerOfTheWeek,
+      ] = await Promise.all([
+        getGlobalCount(fetch),
+        getGlobalFeed(fetch, { limit: 20, offset: 0 }),
+        getGlobalStats(fetch),
+        getGlobalActivity(fetch),
+        getGlobalHourly(fetch),
+        getGlobalMonthly(fetch),
+        getGlobalCountries(fetch),
+        getBeerOfTheWeek(fetch),
+      ])
       liveCount = countData.count
       feedItems = feedData.items
       feedOffset = feedData.items.length
@@ -192,6 +218,7 @@
       hourly = newHourly
       monthly = newMonthly
       countries = newCountries
+      beerOfTheWeek = newBeerOfTheWeek.beer
     })
   })
 
@@ -381,6 +408,14 @@
         <div class="content-grid">
           <!-- Feed -->
           <section class="feed-section">
+            {#if beerOfTheWeek}
+              <BeerOfTheWeek
+                beer={beerOfTheWeek}
+                onopen={(item) => {
+                  lightboxItem = item
+                }}
+              />
+            {/if}
             <FeedGrid
               items={feedItems}
               loading={loadingMore && feedItems.length === 0}
