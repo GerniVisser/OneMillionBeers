@@ -6,12 +6,12 @@
     items = [],
     loading = false,
     newestId = '',
-    onlongpress,
+    onopen,
   }: {
     items?: FeedItem[]
     loading?: boolean
     newestId?: string
-    onlongpress?: (item: FeedItem) => void
+    onopen?: (item: FeedItem) => void
   } = $props()
 </script>
 
@@ -26,7 +26,7 @@
 {:else}
   <div class="grid">
     {#each items as item (item.id)}
-      <BeerCard {item} isNew={item.id === newestId} {onlongpress} />
+      <BeerCard {item} isNew={item.id === newestId} {onopen} />
     {/each}
   </div>
 {/if}

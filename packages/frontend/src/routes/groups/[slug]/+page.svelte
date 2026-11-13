@@ -380,7 +380,7 @@
         <FeedGrid
           items={feedItems}
           loading={loadingMore && feedItems.length === 0}
-          onlongpress={(item) => {
+          onopen={(item) => {
             lightboxItem = item
           }}
         />

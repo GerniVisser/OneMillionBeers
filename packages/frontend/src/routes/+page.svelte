@@ -425,7 +425,7 @@
               items={feedItems}
               loading={loadingMore && feedItems.length === 0}
               {newestId}
-              onlongpress={(item) => {
+              onopen={(item) => {
                 lightboxItem = item
               }}
             />
