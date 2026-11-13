@@ -37,7 +37,7 @@
 <!-- Desktop sidebar -->
 <aside class="sidebar">
   <a href="/" class="sidebar-logo">
-    <span class="logo-icon">🍺</span>
+    <img class="logo-icon" src="/favicon.svg" alt="" width="32" height="32" />
     <span class="logo-text">OneMillionBeers</span>
   </a>
 
@@ -400,8 +400,9 @@
   }
 
   .logo-icon {
-    font-size: 1.4rem;
-    line-height: 1;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
   }
 
   .logo-text {
