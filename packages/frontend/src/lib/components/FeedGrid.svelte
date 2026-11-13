@@ -38,8 +38,6 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-    /* Room for the reaction bubble hanging below each card */
-    row-gap: 16px;
     width: 100%;
   }
 

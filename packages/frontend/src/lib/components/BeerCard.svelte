@@ -60,82 +60,77 @@
   }
 </script>
 
-<div class="card-wrap" class:has-reactions={reactionTotal > 0}>
-  <div
-    class="card"
-    class:card-new={animating}
-    class:card-pressed={isPressed}
-    onpointerdown={handlePointerDown}
-    onpointermove={handlePointerMove}
-    onpointerup={cancelPress}
-    onpointercancel={cancelPress}
-    onpointerleave={cancelPress}
-    onanimationend={() => (animating = false)}
-    role="button"
-    tabindex="0"
-    aria-label="Beer photo by {displayName} — long press to enlarge"
-  >
-    <!--
+<div
+  class="card"
+  class:card-new={animating}
+  class:has-reactions={reactionTotal > 0}
+  class:card-pressed={isPressed}
+  onpointerdown={handlePointerDown}
+  onpointermove={handlePointerMove}
+  onpointerup={cancelPress}
+  onpointercancel={cancelPress}
+  onpointerleave={cancelPress}
+  onanimationend={() => (animating = false)}
+  role="button"
+  tabindex="0"
+  aria-label="Beer photo by {displayName} — long press to enlarge"
+>
+  <!--
     photo-wrap is the container query root. Its fixed 3:4 aspect-ratio gives
     Masonry a stable, measurable height before any image loads.
   -->
-    <div class="photo-wrap">
-      <div class="skeleton" class:skeleton-hidden={imageLoaded} aria-hidden="true"></div>
+  <div class="photo-wrap">
+    <div class="skeleton" class:skeleton-hidden={imageLoaded} aria-hidden="true"></div>
 
-      <img
-        src={item.photoUrl}
-        alt="Beer logged by {displayName}"
-        loading="lazy"
-        class="photo"
-        class:photo-loaded={imageLoaded}
-        onload={() => (imageLoaded = true)}
-      />
+    <img
+      src={item.photoUrl}
+      alt="Beer logged by {displayName}"
+      loading="lazy"
+      class="photo"
+      class:photo-loaded={imageLoaded}
+      onload={() => (imageLoaded = true)}
+    />
 
-      <!-- Gradient only needed when text is present; hidden via container query at tiny sizes -->
-      <div class="overlay" aria-hidden="true"></div>
+    <!-- Gradient only needed when text is present; hidden via container query at tiny sizes -->
+    <div class="overlay" aria-hidden="true"></div>
 
-      <!-- Flag: top-left, scales with card via cqi -->
-      {#if item.user.countryCode}
-        <div class="flag-badge">
-          <CountryFlag countryCode={item.user.countryCode} />
-        </div>
-      {/if}
-
-      <!-- Progressive meta: what's shown depends on card width via @container -->
-      <!-- Priority order: group → time → name -->
-      <div class="meta">
-        <a href="/groups/{item.group.slug}" class="meta-group">{item.group.name}</a>
-        <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
-        <span class="meta-time">{ago}</span>
+    <!-- Flag: top-left, scales with card via cqi -->
+    {#if item.user.countryCode}
+      <div class="flag-badge">
+        <CountryFlag countryCode={item.user.countryCode} />
       </div>
+    {/if}
+
+    <!-- Progressive meta: what's shown depends on card width via @container -->
+    <!-- Priority order: group → time → name -->
+    <div class="meta">
+      <a href="/groups/{item.group.slug}" class="meta-group">{item.group.name}</a>
+      <a href="/users/{item.user.slug}" class="meta-name">{displayName}</a>
+      <span class="meta-time">{ago}</span>
     </div>
-  </div>
 
-  {#if reactionTotal > 0}
-    {#key reactionTotal}
-      <div
-        class="reactions"
-        role="img"
-        aria-label="{reactionTotal} {reactionTotal === 1 ? 'reaction' : 'reactions'}: {reactions
-          .map((r) => r.emoji)
-          .join(' ')}"
-      >
-        {#each reactions.slice(0, 3) as r (r.emoji)}
-          <span class="reaction-emoji">{r.emoji}</span>
-        {/each}
-        {#if reactionTotal > 1}
-          <span class="reaction-count">{reactionTotal}</span>
-        {/if}
-      </div>
-    {/key}
-  {/if}
+    {#if reactionTotal > 0}
+      {#key reactionTotal}
+        <div
+          class="reactions"
+          role="img"
+          aria-label="{reactionTotal} {reactionTotal === 1 ? 'reaction' : 'reactions'}: {reactions
+            .map((r) => r.emoji)
+            .join(' ')}"
+        >
+          {#each reactions.slice(0, 3) as r (r.emoji)}
+            <span class="reaction-emoji">{r.emoji}</span>
+          {/each}
+          {#if reactionTotal > 1}
+            <span class="reaction-count">{reactionTotal}</span>
+          {/if}
+        </div>
+      {/key}
+    {/if}
+  </div>
 </div>
 
 <style>
-  .card-wrap {
-    position: relative;
-  }
-
   .card {
     border-radius: 0.75rem;
     overflow: hidden;
@@ -319,7 +314,8 @@
   @container card (max-width: 79px) {
     .flag-badge,
     .overlay,
-    .meta {
+    .meta,
+    .reactions {
       display: none;
     }
   }
@@ -360,11 +356,10 @@
   /* Large (190px+): grid layout — default styles apply */
 
   /* ── Reaction bubble ────────────────────────────────────────────────── */
-  /* Hangs off the card's bottom-left edge like WhatsApp's, so it sits outside .card's overflow clip */
   .reactions {
     position: absolute;
-    left: 0.5rem;
-    bottom: -0.6rem;
+    right: 0.45rem;
+    bottom: 0.4rem;
     z-index: 3;
     display: flex;
     align-items: center;
@@ -387,9 +382,9 @@
     color: var(--color-text-muted);
   }
 
-  /* Keep the time and name clear of the bubble */
+  /* Lifts the name and time so the bubble sits just below the time */
   .has-reactions .meta {
-    padding-bottom: 1rem;
+    padding-bottom: 1.85rem;
   }
 
   @keyframes reaction-pop {
