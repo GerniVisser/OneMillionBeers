@@ -87,6 +87,10 @@
     </div>
 
     <div class="progress-wrap">
+      <div class="progress-labels">
+        <span><strong>{pct}%</strong> of the way to 1,000,000</span>
+        <span>{remaining} to go</span>
+      </div>
       <div
         class="progress-track"
         role="progressbar"
@@ -96,10 +100,6 @@
         aria-label="Progress to one million beers"
       >
         <div class="progress-fill" style="width: {pct}%;"></div>
-      </div>
-      <div class="progress-labels">
-        <span><strong>{pct}%</strong> of the way</span>
-        <span>{remaining} to go</span>
       </div>
     </div>
   </div>
@@ -216,36 +216,52 @@
     width: 100%;
   }
 
-  .progress-track {
-    background-color: var(--color-bg-surface);
-    border-radius: 9999px;
-    height: 8px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      var(--color-beer-dark),
-      var(--color-beer-amber),
-      var(--color-accent-glow)
-    );
-    border-radius: 9999px;
-    transition: width 1s ease-out;
-  }
-
   .progress-labels {
     display: flex;
     justify-content: space-between;
-    margin-top: 0.35rem;
-    font-size: 0.72rem;
+    align-items: baseline;
+    margin-bottom: 0.35rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
   }
 
   .progress-labels strong {
     font-weight: 700;
     color: var(--color-beer-foam);
+  }
+
+  .progress-track {
+    height: 0.7rem;
+    border-radius: 9999px;
+    background: rgba(13, 8, 3, 0.85);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    overflow: hidden;
+  }
+
+  /* Beer with a thin foam head where it ends */
+  .progress-fill {
+    position: relative;
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(
+      90deg,
+      var(--color-beer-dark),
+      var(--color-beer-amber),
+      var(--color-accent-glow)
+    );
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.35);
+    transition: width 1s ease-out;
+  }
+
+  .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 0.35rem;
+    border-radius: 9999px;
+    background: #fff7e0;
   }
 
   .milestone-banner {
