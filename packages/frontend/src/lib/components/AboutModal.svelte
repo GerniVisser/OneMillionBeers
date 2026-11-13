@@ -32,7 +32,7 @@
   </button>
 
   <div class="modal-header">
-    <img class="beer-icon" src="/favicon.svg" alt="" width="56" height="56" />
+    <img class="beer-icon" src="/logo.svg" alt="" width="56" height="56" />
     <h2 class="modal-title">OneMillionBeers</h2>
     <p class="modal-tagline">One mission. One million beers.</p>
   </div>

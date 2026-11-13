@@ -154,9 +154,10 @@
 
   .hero-title {
     font-family: var(--font-display);
-    font-size: clamp(1.25rem, 4vw, 1.75rem);
+    font-size: clamp(1.4rem, 4.5vw, 2rem);
+    font-weight: 800;
     color: var(--color-beer-head);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.01em;
     margin-bottom: 0.75rem;
   }
 

@@ -7,9 +7,7 @@
   --color-bg-surface: #231810;
   --color-border: #3d2a14;
   --color-border-muted: #2a1e0e;
-  /* Navigation surfaces sit a shade above the page so they read as clickable */
-  --color-bg-nav: rgba(30, 21, 10, 0.97);
-  --color-bg-tabs: rgba(24, 16, 7, 0.97);
+  --color-bg-nav: rgba(18, 12, 5, 0.97);
 
   /* Amber palette */
   --color-beer-amber: #f59e0b;
