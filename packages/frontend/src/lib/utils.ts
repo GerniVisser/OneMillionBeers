@@ -101,5 +101,6 @@ export function transformSseToFeedItem(
       name: latestBeer.groupName,
       slug: latestBeer.groupSlug,
     },
+    reactions: [],
   }
 }

@@ -107,7 +107,7 @@
 
   $effect(() => {
     const event = getLastSseEvent()
-    if (!event) return
+    if (!event || event.type === 'reactions') return
 
     // untrack: only lastEvent should be a reactive dependency.
     // Reads of feedItems, pendingItems, isNearTop etc. inside here must not

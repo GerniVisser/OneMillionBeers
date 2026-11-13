@@ -42,6 +42,7 @@ export {
   BeerLogReactionRequestSchema,
   BeerLogReactionResponseSchema,
   FeedItemSchema,
+  ReactionSummarySchema,
   type BeerLog,
   type BeerLogRequest,
   type BeerLogResponse,
@@ -51,6 +52,7 @@ export {
   type BeerLogReactionResponse,
   type BeerLogReactionOutcome,
   type FeedItem,
+  type ReactionSummary,
 } from './beer.js'
 
 export {

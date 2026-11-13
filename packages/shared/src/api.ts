@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { UuidSchema, IsoDatetimeSchema } from './primitives.js'
 import { UserSummarySchema } from './user.js'
+import { ReactionSummarySchema } from './beer.js'
 
 // GET /v1/users/search
 export const UserSearchQuerySchema = z.object({
@@ -105,6 +106,11 @@ export const SseEventSchema = z.discriminatedUnion('type', [
     type: z.literal('remove'),
     id: UuidSchema, // beer_log.id of the deleted row
     count: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal('reactions'),
+    id: UuidSchema, // beer_log.id whose reactions changed
+    reactions: ReactionSummarySchema,
   }),
 ])
 export type SseEvent = z.infer<typeof SseEventSchema>

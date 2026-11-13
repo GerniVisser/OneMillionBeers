@@ -62,6 +62,15 @@ export const BeerLogReactionResponseSchema = z.object({
 export type BeerLogReactionResponse = z.infer<typeof BeerLogReactionResponseSchema>
 export type BeerLogReactionOutcome = BeerLogReactionResponse['outcome']
 
+// Most-used emoji first
+export const ReactionSummarySchema = z.array(
+  z.object({
+    emoji: z.string().min(1),
+    count: z.number().int().positive(),
+  }),
+)
+export type ReactionSummary = z.infer<typeof ReactionSummarySchema>
+
 // Feed item — used for both group feed and global feed
 // createdAt excluded (DB bookkeeping, not displayed)
 export const FeedItemSchema = z.object({
@@ -70,5 +79,6 @@ export const FeedItemSchema = z.object({
   loggedAt: IsoDatetimeSchema,
   user: UserSummarySchema,
   group: GroupSummarySchema,
+  reactions: ReactionSummarySchema,
 })
 export type FeedItem = z.infer<typeof FeedItemSchema>

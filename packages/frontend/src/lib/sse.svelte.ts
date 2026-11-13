@@ -1,13 +1,22 @@
-import type { SseEvent } from '@omb/shared'
+import type { ReactionSummary, SseEvent } from '@omb/shared'
 import { browser } from '$app/environment'
+import { SvelteMap } from 'svelte/reactivity'
 
 let lastEvent = $state<SseEvent | null>(null)
 // Incremented whenever the page returns from a stale background state.
 // Pages watch this to trigger a full resync.
 let resyncCount = $state(0)
 
+// Kept per beer rather than read from lastEvent, which a burst of events overwrites.
+const liveReactions = new SvelteMap<string, ReactionSummary>()
+
 export function getLastSseEvent(): SseEvent | null {
   return lastEvent
+}
+
+/** The newest reactions pushed for a beer since the page loaded, if any. */
+export function getLiveReactions(beerLogId: string): ReactionSummary | undefined {
+  return liveReactions.get(beerLogId)
 }
 
 export function getResyncCount(): number {
@@ -20,7 +29,9 @@ export function initSseConnection(): () => void {
   const es = new EventSource('/api/v1/global/stream')
   es.onmessage = (e: MessageEvent) => {
     try {
-      lastEvent = JSON.parse(e.data) as SseEvent
+      const event = JSON.parse(e.data) as SseEvent
+      if (event.type === 'reactions') liveReactions.set(event.id, event.reactions)
+      lastEvent = event
     } catch {
       // ignore malformed events
     }
