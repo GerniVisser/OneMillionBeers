@@ -79,12 +79,16 @@ export {
   GlobalMonthlyResponseSchema,
   CountryStatSchema,
   GlobalCountriesResponseSchema,
+  TopGroupSchema,
+  GlobalHighlightsResponseSchema,
   type GlobalStatsResponse,
   type GlobalActivityResponse,
   type GlobalHourlyResponse,
   type GlobalMonthlyResponse,
   type CountryStat,
   type GlobalCountriesResponse,
+  type TopGroup,
+  type GlobalHighlightsResponse,
 } from './global-stats.js'
 
 export {

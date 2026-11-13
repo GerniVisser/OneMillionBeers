@@ -6,6 +6,7 @@ import type {
   GlobalMonthlyResponse,
   GlobalCountriesResponse,
   BeerOfTheWeekResponse,
+  GlobalHighlightsResponse,
   FeedItem,
   LeaderboardResponse,
   GroupLeaderboardResponse,
@@ -86,6 +87,15 @@ export function getGlobalFeed(
 export function getBeerOfTheWeek(fetch: typeof globalThis.fetch): Promise<BeerOfTheWeekResponse> {
   return get<BeerOfTheWeekResponse>(fetch, '/global/beer-of-the-week').catch(() => ({
     beer: null,
+  }))
+}
+
+// A failure leaves the top-groups card empty rather than failing the page.
+export function getGlobalHighlights(
+  fetch: typeof globalThis.fetch,
+): Promise<GlobalHighlightsResponse> {
+  return get<GlobalHighlightsResponse>(fetch, '/global/highlights').catch(() => ({
+    topGroups: [],
   }))
 }
 

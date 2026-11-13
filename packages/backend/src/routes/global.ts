@@ -12,6 +12,7 @@ import {
   getGlobalCountries,
   getLatestBeer,
   getBeerOfTheWeek,
+  getGlobalHighlights,
 } from '../db/queries.js'
 import { subscribe } from '../lib/sse.js'
 
@@ -33,6 +34,10 @@ export const globalRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, {
   app.get('/v1/global/beer-of-the-week', async (_request, reply) => {
     const beer = await getBeerOfTheWeek(pool)
     return reply.send({ beer })
+  })
+
+  app.get('/v1/global/highlights', async (_request, reply) => {
+    return reply.send(await getGlobalHighlights(pool))
   })
 
   app.get('/v1/global/leaderboard', async (_request, reply) => {

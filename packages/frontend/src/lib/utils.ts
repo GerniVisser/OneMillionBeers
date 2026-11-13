@@ -104,3 +104,27 @@ export function transformSseToFeedItem(
     reactions: [],
   }
 }
+
+// Activity dates are UTC calendar days, so these windows are counted in UTC too.
+const DAY_MS = 86_400_000
+const utcDay = (daysAgo: number) =>
+  new Date(Date.now() - daysAgo * DAY_MS).toISOString().slice(0, 10)
+
+/** Beers logged from `fromDaysAgo` up to and including `toDaysAgo` (0 = today). */
+export function sumDays(days: ActivityDay[], fromDaysAgo: number, toDaysAgo: number): number {
+  const from = utcDay(fromDaysAgo)
+  const to = utcDay(toDaysAgo)
+  return days.filter((d) => d.date >= from && d.date <= to).reduce((n, d) => n + d.count, 0)
+}
+
+export function sumThisMonth(days: ActivityDay[]): number {
+  const month = utcDay(0).slice(0, 7)
+  return days.filter((d) => d.date.startsWith(month)).reduce((n, d) => n + d.count, 0)
+}
+
+/** The last 7 days, and their % change on the 7 before (null when there is nothing to compare). */
+export function lastSevenDays(days: ActivityDay[]): { total: number; change: number | null } {
+  const total = sumDays(days, 6, 0)
+  const prev = sumDays(days, 13, 7)
+  return { total, change: prev > 0 ? Math.round(((total - prev) / prev) * 100) : null }
+}

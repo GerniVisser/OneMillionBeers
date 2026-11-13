@@ -8,6 +8,7 @@ import {
   getGlobalMonthly,
   getGlobalCountries,
   getBeerOfTheWeek,
+  getGlobalHighlights,
 } from '$lib/api'
 
 export const load: PageLoad = async ({ fetch }) => {
@@ -27,5 +28,6 @@ export const load: PageLoad = async ({ fetch }) => {
     hourly: getGlobalHourly(fetch),
     monthly: getGlobalMonthly(fetch),
     countries: getGlobalCountries(fetch),
+    highlights: getGlobalHighlights(fetch),
   }
 }

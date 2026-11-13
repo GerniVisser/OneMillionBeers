@@ -17,6 +17,7 @@ import type {
   HourBucket,
   MonthBucket,
   CountryStat,
+  GlobalHighlightsResponse,
 } from '@omb/shared'
 
 // ─── Groups ─────────────────────────────────────────────────────────────────
@@ -877,6 +878,21 @@ export async function getGlobalCountries(pool: pg.Pool): Promise<CountryStat[]> 
 }
 
 // ─── User Stats ────────────────────────────────────────────────────────────────
+
+export async function getGlobalHighlights(pool: pg.Pool): Promise<GlobalHighlightsResponse> {
+  const { rows } = await pool.query<GlobalHighlightsResponse['topGroups'][number]>(
+    `SELECT g.id, g.name, g.slug, g.avatar_url AS "avatarUrl",
+            COUNT(bl.id)::int AS "totalBeers",
+            COUNT(DISTINCT bl.user_id)::int AS "memberCount"
+     FROM groups g
+     JOIN beer_logs bl ON bl.group_id = g.id
+     WHERE g.hidden = FALSE AND g.disabled = FALSE
+     GROUP BY g.id
+     ORDER BY "totalBeers" DESC, g.name
+     LIMIT 5`,
+  )
+  return { topGroups: rows }
+}
 
 export async function getUserStats(
   pool: pg.Pool,
