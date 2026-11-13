@@ -217,7 +217,6 @@
   <div class="hero-glow" aria-hidden="true"></div>
 
   <div class="hero-body">
-    <!-- Desktop: avatar left, text right -->
     <div class="hero-layout">
       <!-- Avatar -->
       <div class="hero-avatar-wrap">
@@ -238,18 +237,20 @@
 
       <!-- Name + progress stacked -->
       <div class="hero-text">
-        <p class="hero-eyebrow">Group</p>
+        <div class="hero-meta">
+          <p class="hero-eyebrow">Group</p>
+          {#if data.profile.joinable}
+            <button class="join-btn" onclick={() => (joinModalOpen = true)}>
+              <svg class="join-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path
+                  d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
+                />
+              </svg>
+              Join Group
+            </button>
+          {/if}
+        </div>
         <h1 class="hero-name glow-amber">{data.profile.name}</h1>
-        {#if data.profile.joinable}
-          <button class="join-btn" onclick={() => (joinModalOpen = true)}>
-            <svg class="join-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path
-                d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
-              />
-            </svg>
-            Join Group
-          </button>
-        {/if}
         <div class="hero-progress">
           <ProgressBar count={data.profile.totalBeers} />
         </div>
@@ -474,18 +475,17 @@
     overflow: hidden;
     background: linear-gradient(165deg, #0d0803 0%, #1e1005 45%, #2d1a08 80%, #3d2510 100%);
     border-bottom: 1px solid #5c3d1a;
-    padding: 2.5rem 1.25rem 0;
+    padding: 1.25rem 1rem 0;
     box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
   }
 
   /* Radial amber bloom behind the avatar */
   .hero-glow {
     position: absolute;
-    top: -80px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 420px;
-    height: 420px;
+    top: -110px;
+    left: 0;
+    width: 320px;
+    height: 320px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, transparent 65%);
     pointer-events: none;
@@ -498,17 +498,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.75rem;
+    gap: 1rem;
   }
 
-  /* ── Layout: mobile = stacked centre, desktop = side-by-side ── */
   .hero-layout {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 1.25rem;
+    gap: 0.9rem;
     width: 100%;
-    text-align: center;
   }
 
   /* ── Avatar ──────────────────────────────────────── */
@@ -517,8 +514,8 @@
   }
 
   .avatar-ring {
-    width: 100px;
-    height: 100px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     padding: 3px;
     /* conic gradient gives a brushed-gold ring effect */
@@ -548,7 +545,7 @@
 
   .avatar-initials {
     font-family: var(--font-display);
-    font-size: 2rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: var(--color-beer-head);
     letter-spacing: 0.04em;
@@ -567,9 +564,15 @@
   .hero-text {
     display: flex;
     flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hero-meta {
+    display: flex;
     align-items: center;
-    gap: 0.85rem;
-    width: 100%;
+    gap: 0.5rem;
   }
 
   .hero-eyebrow {
@@ -584,7 +587,8 @@
 
   .hero-name {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 7vw, 3.5rem);
+    font-size: clamp(1.4rem, 6vw, 2.5rem);
+    overflow-wrap: anywhere;
     color: var(--color-beer-head);
     letter-spacing: 0.03em;
     line-height: 1.05;
@@ -627,6 +631,7 @@
   .hero-progress {
     width: 100%;
     max-width: 440px;
+    margin-top: 0.2rem;
   }
 
   /* ── Integrated stats bar ────────────────────────── */
@@ -639,7 +644,7 @@
     border: 1px solid var(--color-border);
     border-bottom: none; /* merges flush into the tab bar below */
     border-radius: 0.85rem 0.85rem 0 0;
-    padding: 1rem 0.5rem;
+    padding: 0.65rem 0.5rem;
     backdrop-filter: blur(8px);
   }
 
@@ -656,7 +661,7 @@
 
   .hstat-value {
     font-family: var(--font-display);
-    font-size: clamp(1.15rem, 3.8vw, 1.5rem);
+    font-size: clamp(1rem, 3.4vw, 1.3rem);
     font-weight: 700;
     color: var(--color-beer-amber);
     line-height: 1;
@@ -848,30 +853,22 @@
     text-align: center;
   }
 
-  /* ── Tablet+: avatar left, text right ───────────── */
   @media (min-width: 640px) {
     .hero {
-      padding: 3rem 2rem 0;
+      padding: 1.75rem 2rem 0;
     }
 
     .hero-layout {
-      flex-direction: row;
-      align-items: flex-end;
-      text-align: left;
-      gap: 2rem;
-    }
-
-    .hero-text {
-      align-items: flex-start;
+      gap: 1.5rem;
     }
 
     .avatar-ring {
-      width: 120px;
-      height: 120px;
+      width: 88px;
+      height: 88px;
     }
 
     .avatar-initials {
-      font-size: 2.4rem;
+      font-size: 1.8rem;
     }
 
     .hero-stats {
@@ -888,12 +885,12 @@
     }
 
     .avatar-ring {
-      width: 136px;
-      height: 136px;
+      width: 100px;
+      height: 100px;
     }
 
     .avatar-initials {
-      font-size: 2.75rem;
+      font-size: 2rem;
     }
   }
 </style>
