@@ -105,6 +105,11 @@
   const peakHour = $derived(getPeakHour(hourly.hours))
 
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
+  const PODIUM = [
+    { medal: '🥇', color: 'var(--color-rank-gold)' },
+    { medal: '🥈', color: 'var(--color-rank-silver)' },
+    { medal: '🥉', color: 'var(--color-rank-bronze)' },
+  ]
 
   let refetchTimer: ReturnType<typeof setTimeout> | null = null
   let beerOfTheWeekTimer: ReturnType<typeof setTimeout> | null = null
@@ -526,14 +531,30 @@
 
           {#if countries.length > 0}
             <div class="country-leaderboard">
-              <h3 class="country-lb-title">Countries</h3>
+              <div class="country-lb-head">
+                <h3 class="country-lb-title">Countries</h3>
+                <span class="country-lb-title">Beers</span>
+              </div>
               <ol class="country-lb-list">
                 {#each countries as country, i}
                   {@const name = regionNames.of(country.countryCode) ?? country.countryCode}
-                  <li class="country-lb-row">
-                    <span class="country-lb-rank">{i + 1}</span>
+                  {@const podium = PODIUM[i]}
+                  <li
+                    class="country-lb-row"
+                    class:country-lb-row--podium={podium}
+                    style={podium ? `--podium-color: ${podium.color}` : undefined}
+                  >
+                    <span class="country-lb-rank" aria-label="Rank {i + 1}">
+                      {podium ? podium.medal : i + 1}
+                    </span>
                     <CountryFlag countryCode={country.countryCode} size={16} />
-                    <span class="country-lb-name">{name}</span>
+                    <span class="country-lb-name-wrap">
+                      <span class="country-lb-name">{name}</span>
+                      <span class="country-lb-users">
+                        {country.userCount.toLocaleString()}
+                        {country.userCount === 1 ? 'user' : 'users'}
+                      </span>
+                    </span>
                     <span class="country-lb-count">{country.beerCount.toLocaleString()}</span>
                   </li>
                 {/each}
@@ -686,14 +707,20 @@
     overflow: hidden;
   }
 
+  .country-lb-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.6rem;
+    flex-shrink: 0;
+  }
+
   .country-lb-title {
     font-size: 0.65rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-muted);
-    margin-bottom: 0.6rem;
-    flex-shrink: 0;
   }
 
   .country-lb-list {
@@ -717,6 +744,27 @@
     border-bottom: none;
   }
 
+  .country-lb-row--podium {
+    margin: 0 -0.5rem 0.3rem;
+    padding: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--podium-color) 45%, transparent);
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--podium-color) 12%, transparent);
+  }
+
+  .country-lb-row--podium .country-lb-rank {
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .country-lb-row--podium .country-lb-name {
+    font-weight: 700;
+  }
+
+  .country-lb-row--podium .country-lb-count {
+    color: var(--podium-color);
+  }
+
   .country-lb-rank {
     width: 1.4rem;
     font-size: 0.68rem;
@@ -726,8 +774,19 @@
     flex-shrink: 0;
   }
 
-  .country-lb-name {
+  .country-lb-name-wrap {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .country-lb-users {
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+  }
+
+  .country-lb-name {
     font-size: 0.82rem;
     color: var(--color-beer-foam);
     white-space: nowrap;
@@ -763,11 +822,11 @@
     }
 
     .country-leaderboard {
-      width: 220px;
+      width: 260px;
       flex-shrink: 0;
       margin: 0;
       /* Match the map's natural height: (available width - leaderboard - gap) × 500/960 */
-      max-height: calc((min(100vw, 1200px) - 2rem - 220px - 1rem) * 500 / 960);
+      max-height: calc((min(100vw, 1200px) - 2rem - 260px - 1rem) * 500 / 960);
       overflow: hidden;
       display: flex;
       flex-direction: column;
