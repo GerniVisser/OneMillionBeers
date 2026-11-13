@@ -4,7 +4,14 @@ vi.mock('@aws-sdk/client-s3', () => {
   const send = vi.fn().mockResolvedValue({})
   const S3Client = vi.fn(() => ({ send }))
   const PutObjectCommand = vi.fn((input: unknown) => input)
-  return { S3Client, PutObjectCommand, _send: send }
+  const DeleteObjectCommand = vi.fn((input: unknown) => input)
+  return { S3Client, PutObjectCommand, DeleteObjectCommand, _send: send }
+})
+
+vi.mock('@aws-sdk/client-cloudfront', () => {
+  const CloudFrontClient = vi.fn()
+  const CreateInvalidationCommand = vi.fn((input: unknown) => input)
+  return { CloudFrontClient, CreateInvalidationCommand }
 })
 
 vi.mock('../config.js', () => ({
@@ -40,6 +47,20 @@ describe('uploadPhoto', () => {
       Body: buffer,
       ContentType: 'image/jpeg',
     })
+  })
+
+  it('deletes from S3 without creating a CloudFront client when no CDN is configured', async () => {
+    const { deletePhoto } = await import('../uploader.js')
+    const { DeleteObjectCommand } = await import('@aws-sdk/client-s3')
+    const { CloudFrontClient } = await import('@aws-sdk/client-cloudfront')
+
+    await deletePhoto('photos/-1001234567890/ABC123.jpg')
+
+    expect(DeleteObjectCommand).toHaveBeenCalledWith({
+      Bucket: 'omb-photos',
+      Key: 'photos/-1001234567890/ABC123.jpg',
+    })
+    expect(CloudFrontClient).not.toHaveBeenCalled()
   })
 
   it('passes an AbortSignal to client.send for timeout enforcement', async () => {
