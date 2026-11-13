@@ -322,7 +322,7 @@
 <div class="page">
   <!-- Hero section — full progress card at top of page -->
   <div class="hero-wrap">
-    <HeroCard count={liveCount} {sessionCount} {flashCount} />
+    <HeroCard count={liveCount} {sessionCount} {flashCount} {stats} />
   </div>
 
   <!-- Tab bar -->
