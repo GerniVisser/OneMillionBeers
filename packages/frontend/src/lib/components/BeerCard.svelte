@@ -360,10 +360,10 @@
   /* Large (190px+): grid layout — default styles apply */
 
   /* ── Reaction bubble ────────────────────────────────────────────────── */
-  /* Hangs off the card's bottom-right edge like WhatsApp's, so it sits outside .card's overflow clip */
+  /* Hangs off the card's bottom-left edge like WhatsApp's, so it sits outside .card's overflow clip */
   .reactions {
     position: absolute;
-    right: 0.5rem;
+    left: 0.5rem;
     bottom: -0.6rem;
     z-index: 3;
     display: flex;
