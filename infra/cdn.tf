@@ -84,28 +84,23 @@ resource "aws_cloudfront_cache_policy" "avatars" {
 }
 
 # Browser copies cannot be invalidated, so they live a day, not as long as the edge copy.
-resource "aws_cloudfront_response_headers_policy" "photos" {
-  name = "omb-photos"
-
-  custom_headers_config {
-    items {
-      header   = "Cache-Control"
-      value    = "public, max-age=86400"
-      override = true
+# A function, not a response headers policy: a policy also stamps the header on
+# S3's 403 for a missing object, and the browser then caches the error for a day.
+# CloudFront does not run viewer-response functions on origin errors.
+resource "aws_cloudfront_function" "cache_control" {
+  name    = "omb-photos-cache-control"
+  runtime = "cloudfront-js-2.0"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var response = event.response;
+      if (response.statusCode < 400) {
+        var maxAge = event.request.uri.startsWith('/group-avatars/') ? 3600 : 86400;
+        response.headers['cache-control'] = { value: 'public, max-age=' + maxAge };
+      }
+      return response;
     }
-  }
-}
-
-resource "aws_cloudfront_response_headers_policy" "avatars" {
-  name = "omb-avatars"
-
-  custom_headers_config {
-    items {
-      header   = "Cache-Control"
-      value    = "public, max-age=3600"
-      override = true
-    }
-  }
+  EOT
 }
 
 resource "aws_cloudfront_distribution" "photos" {
@@ -128,22 +123,30 @@ resource "aws_cloudfront_distribution" "photos" {
   }
 
   default_cache_behavior {
-    target_origin_id           = "photos-s3"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD"]
-    cached_methods             = ["GET", "HEAD"]
-    cache_policy_id            = aws_cloudfront_cache_policy.photos.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.photos.id
+    target_origin_id       = "photos-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = aws_cloudfront_cache_policy.photos.id
+
+    function_association {
+      event_type   = "viewer-response"
+      function_arn = aws_cloudfront_function.cache_control.arn
+    }
   }
 
   ordered_cache_behavior {
-    path_pattern               = "group-avatars/*"
-    target_origin_id           = "photos-s3"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["GET", "HEAD"]
-    cached_methods             = ["GET", "HEAD"]
-    cache_policy_id            = aws_cloudfront_cache_policy.avatars.id
-    response_headers_policy_id = aws_cloudfront_response_headers_policy.avatars.id
+    path_pattern           = "group-avatars/*"
+    target_origin_id       = "photos-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = aws_cloudfront_cache_policy.avatars.id
+
+    function_association {
+      event_type   = "viewer-response"
+      function_arn = aws_cloudfront_function.cache_control.arn
+    }
   }
 
   restrictions {
