@@ -109,9 +109,7 @@
 
 <style>
   .board {
-    background:
-      radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.12), transparent 60%),
-      var(--color-bg-card);
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: 0.85rem;
     padding: 1rem 0.85rem 0.75rem;
@@ -173,27 +171,17 @@
 
   .ring {
     position: relative;
-    width: 3.4rem;
-    height: 3.4rem;
+    width: 3rem;
+    height: 3rem;
     border-radius: 50%;
-    padding: 2.5px;
-    background: conic-gradient(
-      from 0deg,
-      var(--rank-color),
-      color-mix(in srgb, var(--rank-color) 55%, #2d1a08) 35%,
-      var(--rank-color) 50%,
-      color-mix(in srgb, var(--rank-color) 55%, #2d1a08) 65%,
-      var(--rank-color)
-    );
-    box-shadow: 0 0 22px color-mix(in srgb, var(--rank-color) 35%, transparent);
-    margin-bottom: 0.65rem;
+    padding: 2px;
+    background: color-mix(in srgb, var(--rank-color) 70%, transparent);
+    margin-bottom: 0.6rem;
   }
 
   .podium-spot--first .ring {
-    width: 4.4rem;
-    height: 4.4rem;
-    padding: 3px;
-    box-shadow: 0 0 30px color-mix(in srgb, var(--rank-color) 50%, transparent);
+    width: 3.6rem;
+    height: 3.6rem;
   }
 
   .ring-inner {
@@ -219,19 +207,19 @@
     left: 50%;
     bottom: -0.55rem;
     transform: translateX(-50%);
-    min-width: 1.3rem;
-    height: 1.3rem;
-    padding: 0 0.3rem;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.25rem;
     border-radius: 999px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--rank-color);
-    color: #1a0f05;
+    background: var(--color-bg-card);
+    border: 1px solid color-mix(in srgb, var(--rank-color) 70%, transparent);
+    color: var(--rank-color);
     font-family: var(--font-display);
-    font-size: 0.72rem;
-    font-weight: 800;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    font-size: 0.65rem;
+    font-weight: 700;
   }
 
   .podium-name {
@@ -249,18 +237,17 @@
   }
 
   .podium-count {
-    margin-top: 0.15rem;
+    margin-top: 0.1rem;
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 700;
     line-height: 1.1;
-    color: var(--rank-color);
+    color: var(--color-beer-amber);
     font-variant-numeric: tabular-nums;
   }
 
   .podium-spot--first .podium-count {
-    font-size: 1.55rem;
-    text-shadow: 0 0 18px color-mix(in srgb, var(--rank-color) 45%, transparent);
+    font-size: 1.3rem;
   }
 
   .podium-unit {
@@ -273,22 +260,18 @@
 
   .pedestal {
     width: 100%;
-    height: 1.6rem;
-    border-radius: 0.5rem 0.5rem 0 0;
-    border-top: 2px solid var(--rank-color);
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--rank-color) 22%, transparent),
-      transparent
-    );
+    height: 1rem;
+    border-radius: 0.4rem 0.4rem 0 0;
+    border-top: 1px solid color-mix(in srgb, var(--rank-color) 55%, transparent);
+    background: var(--color-bg-surface);
   }
 
   .podium-spot--first .pedestal {
-    height: 2.6rem;
+    height: 1.6rem;
   }
 
   .podium-spot--third .pedestal {
-    height: 1rem;
+    height: 0.6rem;
   }
 
   /* ── Ranks 4+ ──────────────────────────────────────────── */
@@ -360,7 +343,7 @@
   }
 
   .row-bar {
-    height: 4px;
+    height: 3px;
     border-radius: 999px;
     background: var(--color-bg-surface);
     overflow: hidden;
@@ -370,7 +353,7 @@
     display: block;
     height: 100%;
     border-radius: 999px;
-    background: linear-gradient(90deg, var(--color-beer-dark), var(--color-beer-amber));
+    background: color-mix(in srgb, var(--color-beer-amber) 70%, transparent);
   }
 
   .row-score {
@@ -383,7 +366,7 @@
 
   .row-count {
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--color-beer-amber);
     font-variant-numeric: tabular-nums;
@@ -407,13 +390,13 @@
     }
 
     .ring {
-      width: 4.25rem;
-      height: 4.25rem;
+      width: 3.6rem;
+      height: 3.6rem;
     }
 
     .podium-spot--first .ring {
-      width: 5.5rem;
-      height: 5.5rem;
+      width: 4.3rem;
+      height: 4.3rem;
     }
 
     .podium-name {
