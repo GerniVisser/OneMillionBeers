@@ -9,7 +9,6 @@
     GlobalMonthlyResponse,
     GlobalCountriesResponse,
     GlobalHighlightsResponse,
-    LeaderboardResponse,
   } from '@omb/shared'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import {
@@ -22,7 +21,6 @@
     getGlobalCountries,
     getBeerOfTheWeek,
     getGlobalHighlights,
-    getGlobalLeaderboard,
   } from '$lib/api'
   import { transformSseToFeedItem } from '$lib/utils'
   import HeroCard from '$lib/components/HeroCard.svelte'
@@ -56,11 +54,7 @@
   let hourly = $state<GlobalHourlyResponse>({ hours: [] })
   let monthly = $state<GlobalMonthlyResponse>({ months: [] })
   let countries = $state<GlobalCountriesResponse>([])
-  let highlights = $state<GlobalHighlightsResponse>({
-    topGroups: [],
-    reactions: { total: 0, topEmojis: [] },
-  })
-  let leaders = $state<LeaderboardResponse>({ entries: [] })
+  let highlights = $state<GlobalHighlightsResponse>({ topGroups: [] })
   let loadingMore = $state(false)
   let sessionCount = $state(0)
 
@@ -106,15 +100,6 @@
     stats.activeMemberCount > 0 ? (stats.totalBeers / stats.activeMemberCount).toFixed(1) : '–',
   )
 
-  const topDrinkers = $derived(
-    leaders.entries.slice(0, 5).map((e) => ({
-      key: e.user.id,
-      href: `/users/${e.user.slug}`,
-      name: e.user.displayName ?? e.user.pseudoName ?? 'Anonymous',
-      countryCode: e.user.countryCode,
-      count: e.beerCount,
-    })),
-  )
   const topGroups = $derived(
     highlights.topGroups.map((g) => ({
       key: g.id,
@@ -151,20 +136,11 @@
     }, 1500)
   }
 
-  let highlightsTimer: ReturnType<typeof setTimeout> | null = null
-  function refetchHighlights() {
-    if (highlightsTimer) clearTimeout(highlightsTimer)
-    highlightsTimer = setTimeout(async () => {
-      highlights = await getGlobalHighlights(fetch)
-    }, 1500)
-  }
-
   $effect(() => {
     const event = getLastSseEvent()
     if (!event) return
     if (event.type === 'reactions') {
       refetchBeerOfTheWeek()
-      refetchHighlights()
       return
     }
 
@@ -211,7 +187,7 @@
       // Debounced aggregate refetch — runs for both additions and removals
       if (refetchTimer) clearTimeout(refetchTimer)
       refetchTimer = setTimeout(async () => {
-        const [newStats, newActivity, newHourly, newMonthly, newCountries, newHl, newLeaders] =
+        const [newStats, newActivity, newHourly, newMonthly, newCountries, newHl] =
           await Promise.all([
             getGlobalStats(fetch),
             getGlobalActivity(fetch),
@@ -219,7 +195,6 @@
             getGlobalMonthly(fetch),
             getGlobalCountries(fetch),
             getGlobalHighlights(fetch),
-            getGlobalLeaderboard(fetch),
           ])
         stats = newStats
         activity = newActivity
@@ -227,7 +202,6 @@
         monthly = newMonthly
         countries = newCountries
         highlights = newHl
-        leaders = newLeaders
       }, 1500)
     })
   })
@@ -247,7 +221,6 @@
         newCountries,
         newBeerOfTheWeek,
         newHighlights,
-        newLeaders,
       ] = await Promise.all([
         getGlobalCount(fetch),
         getGlobalFeed(fetch, { limit: 20, offset: 0 }),
@@ -258,7 +231,6 @@
         getGlobalCountries(fetch),
         getBeerOfTheWeek(fetch),
         getGlobalHighlights(fetch),
-        getGlobalLeaderboard(fetch),
       ])
       liveCount = countData.count
       feedItems = feedData.items
@@ -272,7 +244,6 @@
       countries = newCountries
       beerOfTheWeek = newBeerOfTheWeek.beer
       highlights = newHighlights
-      leaders = newLeaders
     })
   })
 
@@ -305,14 +276,12 @@
       data.monthly,
       data.countries,
       data.highlights,
-      data.leaders,
-    ]).then(([a, h, m, c, hl, l]) => {
+    ]).then(([a, h, m, c, hl]) => {
       activity = a
       hourly = h
       monthly = m
       countries = c
       highlights = hl
-      leaders = l
     })
 
     // Establish initial scroll state immediately
@@ -588,33 +557,8 @@
             </div>
           </div>
 
-          <div class="charts-pair">
-            <div class="chart-card">
-              <TopList title="Top drinkers" unit="Beers" items={topDrinkers} />
-            </div>
-            <div class="chart-card">
-              <TopList title="Top groups" unit="Beers" items={topGroups} />
-            </div>
-          </div>
-
           <div class="chart-card">
-            <h3 class="chart-title">Reactions</h3>
-            {#if highlights.reactions.total > 0}
-              <p class="reactions-total">
-                <span class="reactions-count">{highlights.reactions.total.toLocaleString()}</span>
-                emoji reactions on beer photos
-              </p>
-              <ul class="reaction-chips">
-                {#each highlights.reactions.topEmojis as r (r.emoji)}
-                  <li class="reaction-chip">
-                    <span class="reaction-emoji">{r.emoji}</span>
-                    <span class="reaction-n">{r.count.toLocaleString()}</span>
-                  </li>
-                {/each}
-              </ul>
-            {:else}
-              <p class="empty-msg">No reactions yet. React to a beer photo in your group!</p>
-            {/if}
+            <TopList title="Top groups" unit="Beers" items={topGroups} />
           </div>
 
           <!-- Monthly trend line chart -->
@@ -999,50 +943,6 @@
 
   .tile-delta--up {
     color: var(--color-positive);
-  }
-
-  .reactions-total {
-    font-size: 0.8rem;
-    color: var(--color-text-muted);
-  }
-
-  .reactions-count {
-    font-family: var(--font-display);
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--color-beer-amber);
-    margin-right: 0.25rem;
-  }
-
-  .reaction-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.75rem 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .reaction-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.25rem 0.65rem;
-    border-radius: 999px;
-    background: var(--color-bg-surface);
-    border: 1px solid var(--color-border);
-  }
-
-  .reaction-emoji {
-    font-size: 1.05rem;
-    line-height: 1.2;
-  }
-
-  .reaction-n {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    font-variant-numeric: tabular-nums;
   }
 
   .chart-card {

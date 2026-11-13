@@ -870,40 +870,18 @@ export async function getGlobalCountries(pool: pg.Pool): Promise<CountryStat[]> 
 // ─── User Stats ────────────────────────────────────────────────────────────────
 
 export async function getGlobalHighlights(pool: pg.Pool): Promise<GlobalHighlightsResponse> {
-  const [groups, total, emojis] = await Promise.all([
-    pool.query<GlobalHighlightsResponse['topGroups'][number]>(
-      `SELECT g.id, g.name, g.slug, g.avatar_url AS "avatarUrl",
-              COUNT(bl.id)::int AS "totalBeers",
-              COUNT(DISTINCT bl.user_id)::int AS "memberCount"
-       FROM groups g
-       JOIN beer_logs bl ON bl.group_id = g.id
-       WHERE g.hidden = FALSE AND g.disabled = FALSE
-       GROUP BY g.id
-       ORDER BY "totalBeers" DESC, g.name
-       LIMIT 5`,
-    ),
-    pool.query<{ total: number }>(
-      `SELECT COUNT(*)::int AS total
-       FROM beer_log_reactions r
-       JOIN beer_logs bl ON bl.id = r.beer_log_id
-       JOIN groups g ON g.id = bl.group_id
-       WHERE r.emoji IS NOT NULL AND g.disabled = FALSE`,
-    ),
-    pool.query<{ emoji: string; count: number }>(
-      `SELECT r.emoji, COUNT(*)::int AS count
-       FROM beer_log_reactions r
-       JOIN beer_logs bl ON bl.id = r.beer_log_id
-       JOIN groups g ON g.id = bl.group_id
-       WHERE r.emoji IS NOT NULL AND g.disabled = FALSE
-       GROUP BY r.emoji
-       ORDER BY count DESC, r.emoji
-       LIMIT 6`,
-    ),
-  ])
-  return {
-    topGroups: groups.rows,
-    reactions: { total: total.rows[0].total, topEmojis: emojis.rows },
-  }
+  const { rows } = await pool.query<GlobalHighlightsResponse['topGroups'][number]>(
+    `SELECT g.id, g.name, g.slug, g.avatar_url AS "avatarUrl",
+            COUNT(bl.id)::int AS "totalBeers",
+            COUNT(DISTINCT bl.user_id)::int AS "memberCount"
+     FROM groups g
+     JOIN beer_logs bl ON bl.group_id = g.id
+     WHERE g.hidden = FALSE AND g.disabled = FALSE
+     GROUP BY g.id
+     ORDER BY "totalBeers" DESC, g.name
+     LIMIT 5`,
+  )
+  return { topGroups: rows }
 }
 
 export async function getUserStats(

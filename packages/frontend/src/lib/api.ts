@@ -89,18 +89,17 @@ export function getBeerOfTheWeek(fetch: typeof globalThis.fetch): Promise<BeerOf
   }))
 }
 
-// Stats-tab extras: a failure leaves their cards empty rather than failing the page.
+// A failure leaves the top-groups card empty rather than failing the page.
 export function getGlobalHighlights(
   fetch: typeof globalThis.fetch,
 ): Promise<GlobalHighlightsResponse> {
   return get<GlobalHighlightsResponse>(fetch, '/global/highlights').catch(() => ({
     topGroups: [],
-    reactions: { total: 0, topEmojis: [] },
   }))
 }
 
 export function getGlobalLeaderboard(fetch: typeof globalThis.fetch): Promise<LeaderboardResponse> {
-  return get<LeaderboardResponse>(fetch, '/global/leaderboard').catch(() => ({ entries: [] }))
+  return get<LeaderboardResponse>(fetch, '/global/leaderboard')
 }
 
 export function getGlobalStats(fetch: typeof globalThis.fetch): Promise<GlobalStatsResponse> {

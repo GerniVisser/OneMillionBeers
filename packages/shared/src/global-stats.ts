@@ -29,7 +29,7 @@ export const GlobalCountriesResponseSchema = z.array(CountryStatSchema)
 export type CountryStat = z.infer<typeof CountryStatSchema>
 export type GlobalCountriesResponse = z.infer<typeof GlobalCountriesResponseSchema>
 
-// GET /v1/global/highlights — leading groups and how people react to beers
+// GET /v1/global/highlights — the leading groups
 export const TopGroupSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -41,10 +41,6 @@ export const TopGroupSchema = z.object({
 
 export const GlobalHighlightsResponseSchema = z.object({
   topGroups: z.array(TopGroupSchema),
-  reactions: z.object({
-    total: z.number().int().nonnegative(),
-    topEmojis: z.array(z.object({ emoji: z.string(), count: z.number().int().positive() })),
-  }),
 })
 
 export type TopGroup = z.infer<typeof TopGroupSchema>

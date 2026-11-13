@@ -232,26 +232,6 @@ describe('GET /v1/global/highlights', () => {
     })
   }
 
-  async function react(
-    sourceGroupId: string,
-    sourceMessageId: string,
-    emoji: string | null,
-    reactorId: string,
-  ) {
-    await app.inject({
-      method: 'POST',
-      url: '/v1/internal/beer-log/reaction',
-      headers: internalHeaders,
-      payload: {
-        sourceGroupId,
-        sourceMessageId,
-        reactorId,
-        emoji,
-        timestamp: '2024-06-01T12:05:00.000Z',
-      },
-    })
-  }
-
   const highlights = async () =>
     (await app.inject({ method: 'GET', url: '/v1/global/highlights' })).json()
 
@@ -259,7 +239,7 @@ describe('GET /v1/global/highlights', () => {
     const res = await app.inject({ method: 'GET', url: '/v1/global/highlights' })
     expect(res.statusCode).toBe(200)
     expect(GlobalHighlightsResponseSchema.safeParse(res.json()).success).toBe(true)
-    expect(res.json()).toEqual({ topGroups: [], reactions: { total: 0, topEmojis: [] } })
+    expect(res.json()).toEqual({ topGroups: [] })
   })
 
   it('ranks groups by beers logged', async () => {
@@ -280,20 +260,6 @@ describe('GET /v1/global/highlights', () => {
     await pool.query(`UPDATE groups SET hidden = TRUE WHERE source_group_id = 'group-hidden'`)
     await pool.query(`UPDATE groups SET disabled = TRUE WHERE source_group_id = 'group-off'`)
     expect((await highlights()).topGroups).toEqual([])
-  })
-
-  it('counts current reactions and ranks emojis', async () => {
-    await post('group-tg-1', 'R1')
-    await react('group-tg-1', 'R1', '🍻', 'wa:1')
-    await react('group-tg-1', 'R1', '🍻', 'wa:2')
-    await react('group-tg-1', 'R1', '❤️', 'wa:3')
-    await react('group-tg-1', 'R1', null, 'wa:4')
-    const { reactions } = await highlights()
-    expect(reactions.total).toBe(3)
-    expect(reactions.topEmojis).toEqual([
-      { emoji: '🍻', count: 2 },
-      { emoji: '❤️', count: 1 },
-    ])
   })
 })
 
