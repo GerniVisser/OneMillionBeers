@@ -8,6 +8,8 @@
     GlobalHourlyResponse,
     GlobalMonthlyResponse,
     GlobalCountriesResponse,
+    GlobalHighlightsResponse,
+    LeaderboardResponse,
   } from '@omb/shared'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import {
@@ -19,11 +21,15 @@
     getGlobalMonthly,
     getGlobalCountries,
     getBeerOfTheWeek,
+    getGlobalHighlights,
+    getGlobalLeaderboard,
   } from '$lib/api'
   import { transformSseToFeedItem } from '$lib/utils'
   import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
   import BeerOfTheWeek from '$lib/components/BeerOfTheWeek.svelte'
+  import PaceCard from '$lib/components/PaceCard.svelte'
+  import TopList from '$lib/components/TopList.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
@@ -34,7 +40,7 @@
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import WorldMap from '$lib/components/WorldMap.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
-  import { getThisWeekBreakdown, getThisWeekTotal, getPeakHour } from '$lib/utils'
+  import { getThisWeekBreakdown, getPeakHour } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -50,6 +56,11 @@
   let hourly = $state<GlobalHourlyResponse>({ hours: [] })
   let monthly = $state<GlobalMonthlyResponse>({ months: [] })
   let countries = $state<GlobalCountriesResponse>([])
+  let highlights = $state<GlobalHighlightsResponse>({
+    topGroups: [],
+    reactions: { total: 0, topEmojis: [] },
+  })
+  let leaders = $state<LeaderboardResponse>({ entries: [] })
   let loadingMore = $state(false)
   let sessionCount = $state(0)
 
@@ -72,29 +83,47 @@
 
   const hasMore = $derived(feedOffset < feedTotal)
 
-  const beersThisWeek = $derived(getThisWeekTotal(activity.days))
+  // Activity dates are UTC calendar days; these windows are counted the same way.
+  const DAY_MS = 86_400_000
+  const utcDay = (daysAgo: number) =>
+    new Date(Date.now() - daysAgo * DAY_MS).toISOString().slice(0, 10)
+  const sumDays = (fromDaysAgo: number, toDaysAgo: number) => {
+    const from = utcDay(fromDaysAgo)
+    const to = utcDay(toDaysAgo)
+    return activity.days
+      .filter((d) => d.date >= from && d.date <= to)
+      .reduce((n, d) => n + d.count, 0)
+  }
+  const today = $derived(sumDays(0, 0))
+  const last7 = $derived(sumDays(6, 0))
+  const prev7 = $derived(sumDays(13, 7))
+  const weekChange = $derived(prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null)
+  const thisMonth = $derived.by(() => {
+    const month = utcDay(0).slice(0, 7)
+    return activity.days.filter((d) => d.date.startsWith(month)).reduce((n, d) => n + d.count, 0)
+  })
+  const perDrinker = $derived(
+    stats.activeMemberCount > 0 ? (stats.totalBeers / stats.activeMemberCount).toFixed(1) : '–',
+  )
 
-  // Stat cards for the infinite carousel
-  type StatItem = { value: string; label: string; dim?: boolean }
-  const statItems = $derived(
-    (() => {
-      const items: StatItem[] = [
-        { value: stats.totalBeers.toLocaleString(), label: 'Total Beers' },
-        { value: beersThisWeek.toLocaleString(), label: 'This Week' },
-        { value: stats.activeMemberCount.toLocaleString(), label: 'Contributors' },
-        { value: stats.activeGroupCount.toLocaleString(), label: 'Groups' },
-        { value: String(stats.avgPerDay), label: 'Avg / Day' },
-      ]
-      if (stats.peakDay) {
-        items.push({
-          value: stats.peakDay.count.toLocaleString(),
-          label: 'Record Day',
-        })
-      } else {
-        items.push({ value: String(stats.daysActive), label: 'Days Active', dim: true })
-      }
-      return items
-    })(),
+  const topDrinkers = $derived(
+    leaders.entries.slice(0, 5).map((e) => ({
+      key: e.user.id,
+      href: `/users/${e.user.slug}`,
+      name: e.user.displayName ?? e.user.pseudoName ?? 'Anonymous',
+      countryCode: e.user.countryCode,
+      count: e.beerCount,
+    })),
+  )
+  const topGroups = $derived(
+    highlights.topGroups.map((g) => ({
+      key: g.id,
+      href: `/groups/${g.slug}`,
+      name: g.name,
+      imageUrl: g.avatarUrl,
+      sub: `${g.memberCount.toLocaleString()} drinkers`,
+      count: g.totalBeers,
+    })),
   )
 
   // Derived stats from activity data — no extra endpoint needed
@@ -122,11 +151,20 @@
     }, 1500)
   }
 
+  let highlightsTimer: ReturnType<typeof setTimeout> | null = null
+  function refetchHighlights() {
+    if (highlightsTimer) clearTimeout(highlightsTimer)
+    highlightsTimer = setTimeout(async () => {
+      highlights = await getGlobalHighlights(fetch)
+    }, 1500)
+  }
+
   $effect(() => {
     const event = getLastSseEvent()
     if (!event) return
     if (event.type === 'reactions') {
       refetchBeerOfTheWeek()
+      refetchHighlights()
       return
     }
 
@@ -173,18 +211,23 @@
       // Debounced aggregate refetch — runs for both additions and removals
       if (refetchTimer) clearTimeout(refetchTimer)
       refetchTimer = setTimeout(async () => {
-        const [newStats, newActivity, newHourly, newMonthly, newCountries] = await Promise.all([
-          getGlobalStats(fetch),
-          getGlobalActivity(fetch),
-          getGlobalHourly(fetch),
-          getGlobalMonthly(fetch),
-          getGlobalCountries(fetch),
-        ])
+        const [newStats, newActivity, newHourly, newMonthly, newCountries, newHl, newLeaders] =
+          await Promise.all([
+            getGlobalStats(fetch),
+            getGlobalActivity(fetch),
+            getGlobalHourly(fetch),
+            getGlobalMonthly(fetch),
+            getGlobalCountries(fetch),
+            getGlobalHighlights(fetch),
+            getGlobalLeaderboard(fetch),
+          ])
         stats = newStats
         activity = newActivity
         hourly = newHourly
         monthly = newMonthly
         countries = newCountries
+        highlights = newHl
+        leaders = newLeaders
       }, 1500)
     })
   })
@@ -203,6 +246,8 @@
         newMonthly,
         newCountries,
         newBeerOfTheWeek,
+        newHighlights,
+        newLeaders,
       ] = await Promise.all([
         getGlobalCount(fetch),
         getGlobalFeed(fetch, { limit: 20, offset: 0 }),
@@ -212,6 +257,8 @@
         getGlobalMonthly(fetch),
         getGlobalCountries(fetch),
         getBeerOfTheWeek(fetch),
+        getGlobalHighlights(fetch),
+        getGlobalLeaderboard(fetch),
       ])
       liveCount = countData.count
       feedItems = feedData.items
@@ -224,6 +271,8 @@
       monthly = newMonthly
       countries = newCountries
       beerOfTheWeek = newBeerOfTheWeek.beer
+      highlights = newHighlights
+      leaders = newLeaders
     })
   })
 
@@ -250,14 +299,21 @@
 
   onMount(() => {
     // Resolve deferred chart data (non-blocking; page renders without it)
-    void Promise.all([data.activity, data.hourly, data.monthly, data.countries]).then(
-      ([a, h, m, c]) => {
-        activity = a
-        hourly = h
-        monthly = m
-        countries = c
-      },
-    )
+    void Promise.all([
+      data.activity,
+      data.hourly,
+      data.monthly,
+      data.countries,
+      data.highlights,
+      data.leaders,
+    ]).then(([a, h, m, c, hl, l]) => {
+      activity = a
+      hourly = h
+      monthly = m
+      countries = c
+      highlights = hl
+      leaders = l
+    })
 
     // Establish initial scroll state immediately
     handleScroll()
@@ -443,15 +499,38 @@
     {:else if activeTab === 'stats'}
       <div class="tab-panel" id="panel-stats" role="tabpanel">
         <div class="panel-content">
-          <!-- Summary stat cards — infinite scrolling carousel -->
-          <div class="stats-carousel">
-            <div class="stats-track">
-              {#each [...statItems, ...statItems] as item, i (i)}
-                <div class="stat-card" aria-hidden={i >= statItems.length ? true : undefined}>
-                  <span class="stat-value" class:stat-value--dim={item.dim}>{item.value}</span>
-                  <span class="stat-label">{item.label}</span>
-                </div>
-              {/each}
+          <PaceCard count={liveCount} days={activity.days} />
+
+          <div class="tiles">
+            <div class="tile">
+              <span class="tile-value">{today.toLocaleString()}</span>
+              <span class="tile-label">Today</span>
+            </div>
+            <div class="tile">
+              <span class="tile-value">{last7.toLocaleString()}</span>
+              <span class="tile-label">Last 7 days</span>
+              {#if weekChange !== null}
+                <span class="tile-delta" class:tile-delta--up={weekChange >= 0}>
+                  {weekChange >= 0 ? '▲' : '▼'}
+                  {Math.abs(weekChange)}% vs week before
+                </span>
+              {/if}
+            </div>
+            <div class="tile">
+              <span class="tile-value">{thisMonth.toLocaleString()}</span>
+              <span class="tile-label">This month</span>
+            </div>
+            <div class="tile">
+              <span class="tile-value">{countries.length.toLocaleString()}</span>
+              <span class="tile-label">Countries</span>
+            </div>
+            <div class="tile">
+              <span class="tile-value">{peakHour ?? '–'}</span>
+              <span class="tile-label">Peak hour</span>
+            </div>
+            <div class="tile">
+              <span class="tile-value">{perDrinker}</span>
+              <span class="tile-label">Beers / drinker</span>
             </div>
           </div>
 
@@ -507,6 +586,35 @@
                 <p class="empty-msg">No data yet.</p>
               {/if}
             </div>
+          </div>
+
+          <div class="charts-pair">
+            <div class="chart-card">
+              <TopList title="Top drinkers" unit="Beers" items={topDrinkers} />
+            </div>
+            <div class="chart-card">
+              <TopList title="Top groups" unit="Beers" items={topGroups} />
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <h3 class="chart-title">Reactions</h3>
+            {#if highlights.reactions.total > 0}
+              <p class="reactions-total">
+                <span class="reactions-count">{highlights.reactions.total.toLocaleString()}</span>
+                emoji reactions on beer photos
+              </p>
+              <ul class="reaction-chips">
+                {#each highlights.reactions.topEmojis as r (r.emoji)}
+                  <li class="reaction-chip">
+                    <span class="reaction-emoji">{r.emoji}</span>
+                    <span class="reaction-n">{r.count.toLocaleString()}</span>
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="empty-msg">No reactions yet. React to a beer photo in your group!</p>
+            {/if}
           </div>
 
           <!-- Monthly trend line chart -->
@@ -836,88 +944,107 @@
   }
 
   /* ── Stats carousel ─────────────────────────────── */
-  .stats-carousel {
+  /* Headline numbers, styled like the header stats bars */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
     overflow: hidden;
-    width: 100%;
-    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
-    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
   }
 
-  .stats-track {
-    display: flex;
-    gap: 0.5rem;
-    width: max-content;
-    animation: scroll-carousel 16s linear infinite;
-  }
-
-  .stats-track:hover {
-    animation-play-state: paused;
-  }
-
-  @keyframes scroll-carousel {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-50%);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .stats-track {
-      animation: none;
-    }
-  }
-
-  .stat-card {
-    flex-shrink: 0;
-    width: 96px;
-    background: linear-gradient(160deg, #201508 0%, #150e05 100%);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    border-radius: 0.875rem;
-    padding: 0.65rem 0.5rem 0.6rem;
+  .tile {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
+    justify-content: center;
+    gap: 0.2rem;
+    min-width: 0;
+    padding: 0.8rem 0.35rem;
     text-align: center;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(245, 158, 11, 0.07);
-    transition:
-      border-color 200ms ease,
-      box-shadow 200ms ease;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .stat-card:hover {
-    border-color: rgba(245, 158, 11, 0.45);
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.4),
-      0 0 18px rgba(245, 158, 11, 0.14),
-      inset 0 1px 0 rgba(245, 158, 11, 0.1);
+  .tile:nth-child(3n) {
+    border-right: none;
   }
 
-  .stat-value {
+  .tile:nth-last-child(-n + 3) {
+    border-bottom: none;
+  }
+
+  .tile-value {
     font-family: var(--font-display);
-    font-size: 1.05rem;
+    font-size: clamp(1.1rem, 4.4vw, 1.5rem);
     font-weight: 700;
-    color: var(--color-beer-amber);
     line-height: 1;
+    color: var(--color-beer-amber);
+    font-variant-numeric: tabular-nums;
   }
 
-  .stat-value--dim {
-    color: var(--color-text-muted);
-  }
-
-  .stat-label {
-    font-size: 0.48rem;
+  .tile-label {
+    font-size: 0.55rem;
     font-weight: 700;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-muted);
   }
 
-  /* ── Shared chart card ──────────────────────────── */
+  .tile-delta {
+    font-size: 0.6rem;
+    color: var(--color-text-muted);
+  }
+
+  .tile-delta--up {
+    color: var(--color-positive);
+  }
+
+  .reactions-total {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .reactions-count {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-beer-amber);
+    margin-right: 0.25rem;
+  }
+
+  .reaction-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .reaction-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+  }
+
+  .reaction-emoji {
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+
+  .reaction-n {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
   .chart-card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);

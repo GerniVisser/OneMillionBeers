@@ -21,6 +21,7 @@ import {
   FeedItemSchema,
   LeaderboardResponseSchema,
   BeerOfTheWeekResponseSchema,
+  GlobalHighlightsResponseSchema,
 } from '@omb/shared'
 
 let pool: pg.Pool
@@ -211,6 +212,88 @@ describe('GET /v1/global/beer-of-the-week', () => {
     await react('HIDDEN', ['wa:1', 'wa:2'], '🍻', 'group-hidden')
     await pool.query(`UPDATE groups SET disabled = TRUE WHERE source_group_id = 'group-hidden'`)
     expect(await winner()).toBeNull()
+  })
+})
+
+describe('GET /v1/global/highlights', () => {
+  async function post(sourceGroupId: string, sourceMessageId: string) {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: {
+        sourceGroupId,
+        groupName: sourceGroupId,
+        senderId: `wa:2783${sourceMessageId.length}${sourceGroupId.length}00000`,
+        timestamp: '2024-06-01T12:00:00.000Z',
+        photoUrl: 'https://example.com/beer.jpg',
+        sourceMessageId,
+      },
+    })
+  }
+
+  async function react(
+    sourceGroupId: string,
+    sourceMessageId: string,
+    emoji: string | null,
+    reactorId: string,
+  ) {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log/reaction',
+      headers: internalHeaders,
+      payload: {
+        sourceGroupId,
+        sourceMessageId,
+        reactorId,
+        emoji,
+        timestamp: '2024-06-01T12:05:00.000Z',
+      },
+    })
+  }
+
+  const highlights = async () =>
+    (await app.inject({ method: 'GET', url: '/v1/global/highlights' })).json()
+
+  it('is empty before anything is logged', async () => {
+    const res = await app.inject({ method: 'GET', url: '/v1/global/highlights' })
+    expect(res.statusCode).toBe(200)
+    expect(GlobalHighlightsResponseSchema.safeParse(res.json()).success).toBe(true)
+    expect(res.json()).toEqual({ topGroups: [], reactions: { total: 0, topEmojis: [] } })
+  })
+
+  it('ranks groups by beers logged', async () => {
+    await post('group-small', 'S1')
+    await post('group-big', 'B1')
+    await post('group-big', 'B2')
+    const body = await highlights()
+    expect(body.topGroups.map((g: { name: string }) => g.name)).toEqual([
+      'group-big',
+      'group-small',
+    ])
+    expect(body.topGroups[0].totalBeers).toBe(2)
+  })
+
+  it('leaves out hidden and disabled groups', async () => {
+    await post('group-hidden', 'H1')
+    await post('group-off', 'O1')
+    await pool.query(`UPDATE groups SET hidden = TRUE WHERE source_group_id = 'group-hidden'`)
+    await pool.query(`UPDATE groups SET disabled = TRUE WHERE source_group_id = 'group-off'`)
+    expect((await highlights()).topGroups).toEqual([])
+  })
+
+  it('counts current reactions and ranks emojis', async () => {
+    await post('group-tg-1', 'R1')
+    await react('group-tg-1', 'R1', '🍻', 'wa:1')
+    await react('group-tg-1', 'R1', '🍻', 'wa:2')
+    await react('group-tg-1', 'R1', '❤️', 'wa:3')
+    await react('group-tg-1', 'R1', null, 'wa:4')
+    const { reactions } = await highlights()
+    expect(reactions.total).toBe(3)
+    expect(reactions.topEmojis).toEqual([
+      { emoji: '🍻', count: 2 },
+      { emoji: '❤️', count: 1 },
+    ])
   })
 })
 

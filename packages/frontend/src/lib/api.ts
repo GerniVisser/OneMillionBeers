@@ -6,6 +6,7 @@ import type {
   GlobalMonthlyResponse,
   GlobalCountriesResponse,
   BeerOfTheWeekResponse,
+  GlobalHighlightsResponse,
   FeedItem,
   LeaderboardResponse,
   GroupProfileResponse,
@@ -88,8 +89,18 @@ export function getBeerOfTheWeek(fetch: typeof globalThis.fetch): Promise<BeerOf
   }))
 }
 
+// Stats-tab extras: a failure leaves their cards empty rather than failing the page.
+export function getGlobalHighlights(
+  fetch: typeof globalThis.fetch,
+): Promise<GlobalHighlightsResponse> {
+  return get<GlobalHighlightsResponse>(fetch, '/global/highlights').catch(() => ({
+    topGroups: [],
+    reactions: { total: 0, topEmojis: [] },
+  }))
+}
+
 export function getGlobalLeaderboard(fetch: typeof globalThis.fetch): Promise<LeaderboardResponse> {
-  return get<LeaderboardResponse>(fetch, '/global/leaderboard')
+  return get<LeaderboardResponse>(fetch, '/global/leaderboard').catch(() => ({ entries: [] }))
 }
 
 export function getGlobalStats(fetch: typeof globalThis.fetch): Promise<GlobalStatsResponse> {
