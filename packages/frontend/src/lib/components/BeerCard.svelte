@@ -63,7 +63,6 @@
 <div
   class="card"
   class:card-new={animating}
-  class:has-reactions={reactionTotal > 0}
   class:card-pressed={isPressed}
   onpointerdown={handlePointerDown}
   onpointermove={handlePointerMove}
@@ -358,8 +357,8 @@
   /* ── Reaction bubble ────────────────────────────────────────────────── */
   .reactions {
     position: absolute;
-    right: 0.45rem;
-    bottom: 0.4rem;
+    top: 0.4rem;
+    right: 0.4rem;
     z-index: 3;
     display: flex;
     align-items: center;
@@ -380,11 +379,6 @@
     font-family: var(--font-body);
     font-size: 0.68rem;
     color: var(--color-text-muted);
-  }
-
-  /* Lifts the name and time so the bubble sits just below the time */
-  .has-reactions .meta {
-    padding-bottom: 1.85rem;
   }
 
   @keyframes reaction-pop {
