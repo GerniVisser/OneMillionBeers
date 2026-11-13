@@ -37,7 +37,7 @@
 <!-- Desktop sidebar -->
 <aside class="sidebar">
   <a href="/" class="sidebar-logo">
-    <img class="logo-icon" src="/favicon.svg" alt="" width="32" height="32" />
+    <img class="logo-icon" src="/logo.svg" alt="" width="32" height="32" />
     <span class="logo-text">OneMillionBeers</span>
   </a>
 
