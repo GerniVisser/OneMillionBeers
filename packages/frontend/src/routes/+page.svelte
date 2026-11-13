@@ -105,10 +105,10 @@
   const peakHour = $derived(getPeakHour(hourly.hours))
 
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
-  const PODIUM = [
-    { medal: '🥇', color: 'var(--color-rank-gold)' },
-    { medal: '🥈', color: 'var(--color-rank-silver)' },
-    { medal: '🥉', color: 'var(--color-rank-bronze)' },
+  const PODIUM_COLORS = [
+    'var(--color-rank-gold)',
+    'var(--color-rank-silver)',
+    'var(--color-rank-bronze)',
   ]
 
   let refetchTimer: ReturnType<typeof setTimeout> | null = null
@@ -538,15 +538,13 @@
               <ol class="country-lb-list">
                 {#each countries as country, i}
                   {@const name = regionNames.of(country.countryCode) ?? country.countryCode}
-                  {@const podium = PODIUM[i]}
+                  {@const podiumColor = PODIUM_COLORS[i]}
                   <li
                     class="country-lb-row"
-                    class:country-lb-row--podium={podium}
-                    style={podium ? `--podium-color: ${podium.color}` : undefined}
+                    class:country-lb-row--podium={podiumColor}
+                    style={podiumColor ? `--podium-color: ${podiumColor}` : undefined}
                   >
-                    <span class="country-lb-rank" aria-label="Rank {i + 1}">
-                      {podium ? podium.medal : i + 1}
-                    </span>
+                    <span class="country-lb-rank">{i + 1}</span>
                     <CountryFlag countryCode={country.countryCode} size={16} />
                     <span class="country-lb-name-wrap">
                       <span class="country-lb-name">{name}</span>
@@ -736,7 +734,7 @@
     display: flex;
     align-items: center;
     gap: 0.55rem;
-    padding: 0.45rem 0;
+    padding: 0.3rem 0;
     border-bottom: 1px solid var(--color-border);
   }
 
@@ -745,24 +743,20 @@
   }
 
   .country-lb-row--podium {
-    margin: 0 -0.5rem 0.3rem;
-    padding: 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--podium-color) 45%, transparent);
-    border-radius: 0.5rem;
-    background: color-mix(in srgb, var(--podium-color) 12%, transparent);
+    box-shadow: inset 2px 0 0 var(--podium-color);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--podium-color) 6%, transparent),
+      transparent 60%
+    );
   }
 
   .country-lb-row--podium .country-lb-rank {
-    font-size: 1rem;
-    text-align: center;
+    color: var(--podium-color);
   }
 
   .country-lb-row--podium .country-lb-name {
-    font-weight: 700;
-  }
-
-  .country-lb-row--podium .country-lb-count {
-    color: var(--podium-color);
+    font-weight: 600;
   }
 
   .country-lb-rank {
@@ -782,12 +776,14 @@
   }
 
   .country-lb-users {
-    font-size: 0.68rem;
+    font-size: 0.65rem;
+    line-height: 1.2;
     color: var(--color-text-muted);
   }
 
   .country-lb-name {
     font-size: 0.82rem;
+    line-height: 1.25;
     color: var(--color-beer-foam);
     white-space: nowrap;
     overflow: hidden;
