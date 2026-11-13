@@ -14,10 +14,9 @@
   const TARGET = 1_000_000
   const MILESTONES = [10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000]
 
-  const DIGITS = 7
-  const digits = $derived(String(count).padStart(DIGITS, '0').split(''))
   const pct = $derived(Math.min((count / TARGET) * 100, 100).toFixed(2))
   const formatted = $derived(count.toLocaleString())
+  const remaining = $derived(Math.max(TARGET - count, 0).toLocaleString())
 
   // Bubbles for background decoration
   const bubbles = Array.from({ length: 10 }, (_, i) => ({
@@ -76,19 +75,17 @@
   </div>
 
   <div class="hero-content">
-    <h1 class="hero-title glow-amber">One Million Beers</h1>
-
-    <!-- Counter -->
-    <div aria-live="polite" aria-label="{count} beers logged" class="counter-wrap">
-      <div class="digits" bind:this={countEl}>
-        {#each digits as digit, i (i)}
-          <span class="digit">{digit}</span>
-        {/each}
+    <div class="brand">
+      <img class="brand-logo" src="/logo.svg" alt="" width="80" height="80" />
+      <div class="brand-text">
+        <h1 class="hero-title">One Million Beers</h1>
+        <div aria-live="polite" aria-label="{count} beers logged" class="counter">
+          <span class="count glow-amber" bind:this={countEl}>{formatted}</span>
+          <span class="counter-label">beers and counting</span>
+        </div>
       </div>
-      <p class="counter-label">beers and counting</p>
     </div>
 
-    <!-- Progress bar -->
     <div class="progress-wrap">
       <div
         class="progress-track"
@@ -101,8 +98,8 @@
         <div class="progress-fill" style="width: {pct}%;"></div>
       </div>
       <div class="progress-labels">
-        <span>{formatted} / 1,000,000</span>
-        <span>{pct}%</span>
+        <span><strong>{pct}%</strong> of the way</span>
+        <span>{remaining} to go</span>
       </div>
     </div>
   </div>
@@ -119,8 +116,7 @@
   .hero-card {
     position: relative;
     overflow: hidden;
-    padding: 1.5rem 1rem 1.25rem;
-    text-align: center;
+    padding: 1.25rem 1rem 1.1rem;
     background: linear-gradient(135deg, #0d0803 0%, #1e1005 40%, #2d1a08 75%, #3d2510 100%);
   }
 
@@ -148,45 +144,72 @@
   .hero-content {
     position: relative;
     z-index: 1;
-    max-width: 500px;
+    max-width: 560px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    text-align: left;
+  }
+
+  .brand-logo {
+    width: 4rem;
+    height: 4rem;
+    flex-shrink: 0;
+    filter: drop-shadow(0 4px 16px rgba(245, 158, 11, 0.25));
+  }
+
+  .brand-text {
+    min-width: 0;
   }
 
   .hero-title {
-    font-family: var(--font-display);
-    font-size: clamp(1.25rem, 4vw, 1.75rem);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
     color: var(--color-beer-head);
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
   }
 
-  .counter-wrap {
-    text-align: center;
-    margin-bottom: 0.75rem;
+  .counter {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 0.5rem;
   }
 
-  .digits {
-    display: inline-flex;
-    gap: 0.125rem;
-  }
-
-  .digit {
+  .count {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 7vw, 3.5rem);
-    line-height: 1;
+    font-size: clamp(2.1rem, 9vw, 3.25rem);
+    font-weight: 600;
+    line-height: 1.05;
     color: var(--color-beer-amber);
-    display: inline-block;
-    text-shadow:
-      0 0 20px rgba(245, 158, 11, 0.6),
-      0 0 40px rgba(245, 158, 11, 0.3);
+    font-variant-numeric: tabular-nums;
   }
 
   .counter-label {
     font-family: var(--font-body);
     color: var(--color-text-muted);
     font-size: 0.8rem;
-    margin-top: 0.25rem;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
+  }
+
+  @media (min-width: 600px) {
+    .brand {
+      gap: 1.25rem;
+    }
+
+    .brand-logo {
+      width: 5rem;
+      height: 5rem;
+    }
   }
 
   .progress-wrap {
@@ -215,9 +238,14 @@
   .progress-labels {
     display: flex;
     justify-content: space-between;
-    margin-top: 0.25rem;
-    font-size: 0.7rem;
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
     color: var(--color-text-muted);
+  }
+
+  .progress-labels strong {
+    font-weight: 700;
+    color: var(--color-beer-foam);
   }
 
   .milestone-banner {
