@@ -66,8 +66,8 @@
         }}
       />
       <div class="lightbox-meta">
-        <span class="lmeta-name"
-          >{item.user.displayName ?? item.user.pseudoName ?? 'Anonymous'}</span
+        <a href="/users/{item.user.slug}" class="lmeta-name" onclick={onclose}
+          >{item.user.displayName ?? item.user.pseudoName ?? 'Anonymous'}</a
         >
         <span class="lmeta-group">{item.group.name}</span>
         <span class="lmeta-time">{timeAgo(item.loggedAt)}</span>
@@ -86,6 +86,8 @@
     max-width: min(90vw, 500px);
     width: 100%;
     outline: none;
+    /* Otherwise the dialog's square box shows past the rounded border */
+    border-radius: 1rem;
   }
 
   .lightbox::backdrop {
@@ -99,7 +101,8 @@
     border-radius: 1rem;
     overflow: hidden;
     background: var(--color-bg-card);
-    border: 1px solid var(--color-border);
+    border: 2px solid var(--color-beer-amber);
+    box-shadow: 0 0 24px rgba(245, 158, 11, 0.35);
     animation: lightbox-in 280ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
   }
 
@@ -153,10 +156,19 @@
   }
 
   .lmeta-name {
+    align-self: flex-start;
     font-family: var(--font-body);
     font-weight: 600;
     font-size: 1rem;
     color: var(--color-beer-foam);
+    text-decoration: underline;
+    text-decoration-color: rgba(245, 158, 11, 0.5);
+    text-underline-offset: 3px;
+  }
+
+  .lmeta-name:hover {
+    color: var(--color-beer-head);
+    text-decoration-color: var(--color-beer-head);
   }
 
   .lmeta-group {
