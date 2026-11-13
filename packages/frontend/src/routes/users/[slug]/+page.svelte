@@ -16,8 +16,11 @@
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
+  import BeerLightbox from '$lib/components/BeerLightbox.svelte'
 
   let { data }: { data: PageData } = $props()
+
+  let lightboxItem = $state<FeedItem | null>(null)
 
   onMount(() => {
     addRecentUser({
@@ -279,77 +282,74 @@
   />
 </svelte:head>
 
+<BeerLightbox
+  item={lightboxItem}
+  onclose={() => {
+    lightboxItem = null
+  }}
+/>
+
 <!-- ── Hero ─────────────────────────────────────────────────── -->
 <section class="hero" style="--rank-color: {currentRank.color};">
+  <div class="hero-glow" aria-hidden="true"></div>
+
   <div class="hero-inner">
-    <!-- Avatar -->
-    <div class="hero-avatar">
-      {#if data.profile.countryCode}
-        <CountryFlag countryCode={data.profile.countryCode} size={44} />
-      {:else}
-        <span class="avatar-initials">{initials}</span>
-      {/if}
+    <div class="hero-top">
+      <div class="hero-avatar">
+        {#if data.profile.countryCode}
+          <CountryFlag countryCode={data.profile.countryCode} size={44} />
+        {:else}
+          <span class="avatar-initials">{initials}</span>
+        {/if}
+      </div>
+
+      <div class="hero-identity">
+        <h1 class="hero-name">{displayName}</h1>
+        {#if archetype}
+          <p class="hero-archetype">{archetype.icon} {archetype.title}</p>
+        {/if}
+        <p class="hero-since">since {contributorSince}</p>
+      </div>
+
+      <div class="hero-score">
+        <span class="hero-count">{displayedCount.toLocaleString()}</span>
+        <span class="hero-count-label">beers</span>
+      </div>
     </div>
 
-    <!-- Identity -->
-    <div class="hero-identity">
-      <h1 class="hero-name">{displayName}</h1>
-      {#if archetype}
-        <p class="hero-archetype">{archetype.icon} {archetype.title}</p>
+    <!-- Rank strip: flush onto the tab bar, like the group stats bar -->
+    <div class="rank-strip">
+      <div class="rank-row">
+        <span class="rank-current">
+          <span class="rank-icon" aria-hidden="true">{currentRank.icon}</span>
+          <span class="rank-title">{currentRank.name}</span>
+        </span>
+        {#if nextRank}
+          <span class="rank-next">
+            Next: {nextRank.icon}
+            {nextRank.name}
+          </span>
+        {:else}
+          <span class="rank-next rank-next--max">👑 Max rank</span>
+        {/if}
+      </div>
+      {#if nextRank}
+        <div class="progress-track">
+          <div
+            class="progress-fill"
+            style="--target: {Math.min(rankProgress * 100, 100).toFixed(1)}%;"
+          ></div>
+        </div>
+        <p class="rank-sub">
+          {beersToNext} more {beersToNext === 1 ? 'beer' : 'beers'} to {nextRank.name}
+        </p>
       {/if}
-      <p class="hero-since">since {contributorSince}</p>
-    </div>
-
-    <!-- Score -->
-    <div class="hero-score">
-      <span class="hero-count">{displayedCount.toLocaleString()}</span>
-      <span class="hero-count-label">beers</span>
     </div>
   </div>
 </section>
 
 <!-- ── Body ─────────────────────────────────────────────────── -->
 <div class="body-wrap">
-  <!-- Rank card -->
-  <div class="rank-card card">
-    <div class="rank-top">
-      <div class="rank-badge" style="--rank-color: {currentRank.color};">
-        <span class="rank-icon-big">{currentRank.icon}</span>
-      </div>
-      <div class="rank-info">
-        <span class="stat-label">Rank</span>
-        <p class="rank-title" style="color: {currentRank.color};">{currentRank.name}</p>
-      </div>
-      {#if nextRank}
-        <div class="rank-next-wrap">
-          <span class="stat-label">Next up</span>
-          <p class="rank-next-name">{nextRank.icon} {nextRank.name}</p>
-        </div>
-      {:else}
-        <div class="rank-maxed">
-          <span class="rank-maxed-label">Max rank</span>
-          <p class="rank-maxed-val">👑 Legend</p>
-        </div>
-      {/if}
-    </div>
-
-    {#if nextRank}
-      <div class="rank-progress-wrap">
-        <div class="progress-track">
-          <div
-            class="progress-fill"
-            style="--target: {Math.min(rankProgress * 100, 100).toFixed(
-              1,
-            )}%; background: {currentRank.color};"
-          ></div>
-        </div>
-        <p class="progress-sub stat-label">
-          {beersToNext} more {beersToNext === 1 ? 'beer' : 'beers'} to {nextRank.name}
-        </p>
-      </div>
-    {/if}
-  </div>
-
   <!-- Achievements -->
   <div class="section-header">
     <h2 class="stat-label">Achievements</h2>
@@ -370,19 +370,52 @@
   </div>
 
   <!-- ── Tab bar ───────────────────────────────────────────────── -->
-  <div class="tab-bar">
+  <div class="tab-bar" role="tablist" aria-label="Profile sections">
     <button
       class="tab-btn"
       class:tab-active={activeTab === 'feed'}
+      role="tab"
+      aria-selected={activeTab === 'feed'}
       onclick={() => (activeTab = 'feed')}
     >
+      <svg
+        class="tab-icon"
+        viewBox="0 0 17 17"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.25" />
+        <rect x="10" y="1.5" width="5.5" height="5.5" rx="1.25" />
+        <rect x="1.5" y="10" width="5.5" height="5.5" rx="1.25" />
+        <rect x="10" y="10" width="5.5" height="5.5" rx="1.25" />
+      </svg>
       Photos
     </button>
     <button
       class="tab-btn"
       class:tab-active={activeTab === 'stats'}
+      role="tab"
+      aria-selected={activeTab === 'stats'}
       onclick={() => (activeTab = 'stats')}
     >
+      <svg
+        class="tab-icon"
+        viewBox="0 0 17 17"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="1.5" y="10" width="3.5" height="5.5" rx="0.75" />
+        <rect x="6.75" y="6" width="3.5" height="9.5" rx="0.75" />
+        <rect x="12" y="2" width="3.5" height="13.5" rx="0.75" />
+      </svg>
       Stats
     </button>
   </div>
@@ -390,7 +423,13 @@
   <!-- ── Feed tab ──────────────────────────────────────────────── -->
   {#if activeTab === 'feed'}
     <div class="tab-panel">
-      <FeedGrid items={feedItems} loading={feedLoading && feedItems.length === 0} />
+      <FeedGrid
+        items={feedItems}
+        loading={feedLoading && feedItems.length === 0}
+        onopen={(item) => {
+          lightboxItem = item
+        }}
+      />
       {#if hasMore}
         <div bind:this={sentinel} class="scroll-sentinel" aria-hidden="true"></div>
       {/if}
@@ -464,33 +503,47 @@
 <style>
   /* ── Hero ─────────────────────────────────────────────────── */
   .hero {
-    border-top: 3px solid var(--rank-color);
-    border-bottom: 1px solid var(--color-border);
-    background: linear-gradient(
-      to right,
-      color-mix(in srgb, var(--rank-color) 10%, var(--color-bg-deep)),
-      var(--color-bg-deep) 55%
-    );
-    padding: 2.25rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(165deg, #0d0803 0%, #1e1005 45%, #2d1a08 80%, #3d2510 100%);
+    border-bottom: 1px solid #5c3d1a;
+    padding: 1.1rem 1rem 0;
+  }
+
+  .hero-glow {
+    position: absolute;
+    top: -110px;
+    left: -40px;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(245, 158, 11, 0.16) 0%, transparent 65%);
+    pointer-events: none;
   }
 
   .hero-inner {
+    position: relative;
     max-width: 720px;
     margin: 0 auto;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    grid-template-areas: 'avatar identity score';
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .hero-top {
+    display: flex;
     align-items: center;
-    column-gap: 1.5rem;
+    gap: 0.85rem;
   }
 
   .hero-avatar {
-    grid-area: avatar;
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 3.5rem;
+    height: 3.5rem;
     border-radius: 50%;
     border: 2px solid var(--rank-color);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--rank-color) 18%, transparent);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--rank-color) 18%, transparent),
+      0 0 22px rgba(245, 158, 11, 0.25);
     background: var(--color-bg-surface);
     display: flex;
     align-items: center;
@@ -501,19 +554,19 @@
 
   .avatar-initials {
     font-family: var(--font-display);
-    font-size: 1.375rem;
+    font-size: 1.2rem;
     font-weight: 800;
     color: var(--rank-color);
   }
 
   .hero-identity {
-    grid-area: identity;
+    flex: 1;
     min-width: 0;
   }
 
   .hero-name {
     font-family: var(--font-display);
-    font-size: clamp(1.375rem, 4vw, 2rem);
+    font-size: clamp(1.25rem, 5vw, 2rem);
     font-weight: 800;
     color: var(--color-beer-foam);
     letter-spacing: -0.02em;
@@ -524,24 +577,22 @@
   }
 
   .hero-archetype {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--rank-color);
-    margin-top: 0.3rem;
+    margin-top: 0.15rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .hero-since {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     color: var(--color-text-muted);
-    margin-top: 0.2rem;
+    margin-top: 0.1rem;
   }
 
   .hero-score {
-    grid-area: score;
-    text-align: right;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -550,7 +601,7 @@
 
   .hero-count {
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 8vw, 4rem);
+    font-size: clamp(2rem, 8vw, 3.25rem);
     font-weight: 900;
     color: var(--color-beer-amber);
     letter-spacing: -0.04em;
@@ -566,124 +617,62 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--color-text-muted);
-    margin-top: 0.2rem;
+    margin-top: 0.15rem;
   }
 
-  /* Mobile: avatar + score on top row, identity spans below */
-  @media (max-width: 479px) {
-    .hero-inner {
-      grid-template-columns: auto 1fr auto;
-      grid-template-rows: auto auto;
-      grid-template-areas:
-        'avatar . score'
-        'identity identity identity';
-      row-gap: 0.875rem;
-      column-gap: 0.875rem;
-    }
-
-    .hero-avatar {
-      width: 3.25rem;
-      height: 3.25rem;
-    }
-
-    .hero-score {
-      align-self: center;
-    }
+  /* ── Rank strip ──────────────────────────────────────────── */
+  .rank-strip {
+    background: rgba(26, 18, 9, 0.75);
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    border-radius: 0.85rem 0.85rem 0 0;
+    padding: 0.6rem 0.85rem 0.55rem;
+    backdrop-filter: blur(8px);
   }
 
-  /* ── Body ─────────────────────────────────────────────────── */
-  .body-wrap {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 1.75rem 1.25rem 5rem;
-  }
-
-  /* ── Rank card ───────────────────────────────────────────── */
-  .rank-card {
-    padding: 1.25rem 1.375rem;
-    margin-bottom: 2rem;
-  }
-
-  .rank-top {
+  .rank-row {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: space-between;
+    gap: 0.75rem;
   }
 
-  .rank-badge {
-    flex-shrink: 0;
-    width: 3.5rem;
-    height: 3.5rem;
-    border-radius: 0.875rem;
-    background: color-mix(in srgb, var(--rank-color) 14%, transparent);
-    border: 2px solid color-mix(in srgb, var(--rank-color) 35%, transparent);
-    display: flex;
+  .rank-current {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-  }
-
-  .rank-icon-big {
-    font-size: 1.75rem;
-    line-height: 1;
-  }
-
-  .rank-info {
-    flex: 1;
+    gap: 0.4rem;
     min-width: 0;
+  }
+
+  .rank-icon {
+    font-size: 1.1rem;
+    line-height: 1;
   }
 
   .rank-title {
     font-family: var(--font-display);
-    font-size: 1.375rem;
+    font-size: 1rem;
     font-weight: 700;
-    letter-spacing: -0.01em;
-    margin-top: 0.125rem;
+    color: var(--rank-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .rank-next-wrap {
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  .rank-next-name {
-    font-size: 0.8rem;
+  .rank-next {
+    font-size: 0.72rem;
     font-weight: 600;
-    color: var(--color-beer-foam);
-    margin-top: 0.125rem;
+    color: var(--color-text-muted);
     white-space: nowrap;
   }
 
-  .rank-maxed {
-    text-align: right;
-    flex-shrink: 0;
-  }
-
-  .rank-maxed-label {
-    display: block;
-    font-family: var(--font-body);
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .rank-maxed-val {
-    font-size: 0.85rem;
-    font-weight: 700;
+  .rank-next--max {
     color: var(--color-rank-gold);
-    margin-top: 0.125rem;
-  }
-
-  .rank-progress-wrap {
-    margin-top: 1.125rem;
   }
 
   .progress-track {
     height: 6px;
+    margin-top: 0.45rem;
     background: var(--color-bg-surface);
     border-radius: 999px;
     overflow: hidden;
@@ -694,7 +683,8 @@
     height: 100%;
     width: 0;
     border-radius: 999px;
-    box-shadow: 0 0 8px currentColor;
+    background: var(--rank-color);
+    box-shadow: 0 0 8px var(--rank-color);
     animation: bar-fill 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards;
   }
 
@@ -707,8 +697,39 @@
     }
   }
 
-  .progress-sub {
-    margin-top: 0.5rem;
+  .rank-sub {
+    margin-top: 0.3rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  @media (min-width: 640px) {
+    .hero {
+      padding: 1.6rem 2rem 0;
+    }
+
+    .hero-top {
+      gap: 1.25rem;
+    }
+
+    .hero-avatar {
+      width: 4.5rem;
+      height: 4.5rem;
+    }
+
+    .avatar-initials {
+      font-size: 1.375rem;
+    }
+  }
+
+  /* ── Body ─────────────────────────────────────────────────── */
+  .body-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0.9rem 1rem 5rem;
   }
 
   /* ── Achievements ────────────────────────────────────────── */
@@ -716,25 +737,26 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
   }
 
   .badges-scroll {
     display: flex;
-    gap: 0.625rem;
+    gap: 0.5rem;
     overflow-x: auto;
-    padding-bottom: 0.5rem;
-    margin-bottom: 2rem;
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.9rem;
+    scrollbar-width: none;
   }
 
   .badge-tile {
     flex-shrink: 0;
-    width: 5.25rem;
-    padding: 0.875rem 0.5rem 0.75rem;
+    width: 4.5rem;
+    padding: 0.55rem 0.35rem 0.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     text-align: center;
     transition:
       box-shadow 150ms ease,
@@ -761,7 +783,7 @@
   }
 
   .badge-icon {
-    font-size: 1.875rem;
+    font-size: 1.45rem;
     line-height: 1;
   }
 
@@ -773,7 +795,7 @@
   }
 
   .badge-name {
-    font-size: 0.67rem;
+    font-size: 0.6rem;
     font-weight: 700;
     color: var(--color-text-muted);
     line-height: 1.2;
@@ -782,28 +804,39 @@
 
   /* ── Tabs ────────────────────────────────────────────────── */
   .tab-bar {
-    display: flex;
-    gap: 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 -1rem 1rem;
+    background: var(--color-bg-nav);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
-    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
   }
 
   .tab-btn {
-    flex: 1;
-    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.8rem 0.5rem;
+    background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    padding: 0.625rem 1rem;
-    font-family: var(--font-display);
-    font-size: 0.9rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
     color: var(--color-text-muted);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
+    white-space: nowrap;
     transition:
       color 150ms ease,
       border-color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .tab-btn:hover {
@@ -813,6 +846,12 @@
   .tab-active {
     color: var(--color-beer-amber);
     border-bottom-color: var(--color-beer-amber);
+  }
+
+  .tab-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
   }
 
   .tab-panel {
