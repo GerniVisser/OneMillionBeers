@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type pg from 'pg'
-import { BeerLogRequestSchema } from '@omb/shared'
+import { BeerLogRequestSchema, BeerLogReactionRequestSchema } from '@omb/shared'
 import {
   findOrCreateGroup,
   upsertUser,
@@ -8,6 +8,8 @@ import {
   revokeBeerLog,
   getGlobalCount,
   getLatestBeer,
+  findBeerLogIdByMessage,
+  upsertBeerLogReaction,
 } from '../db/queries.js'
 import { hashIdentity } from '../lib/hash.js'
 import { extractCountryCode } from '../lib/phone.js'
@@ -66,6 +68,38 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
 
     return reply.status(201).send({ ok: true, outcome })
   })
+
+  app.post(
+    '/v1/internal/beer-log/reaction',
+    { config: { rateLimit: false } },
+    async (request, reply) => {
+      const parse = BeerLogReactionRequestSchema.safeParse(request.body)
+      if (!parse.success) {
+        return reply.status(400).send({ error: 'Invalid request', issues: parse.error.issues })
+      }
+
+      const { sourceGroupId, sourceMessageId, reactorId, emoji, timestamp } = parse.data
+
+      // Checked before the user upsert so a reaction to a text message creates no user.
+      const beerLogId = await findBeerLogIdByMessage(pool, sourceGroupId, sourceMessageId)
+      if (!beerLogId) return reply.status(200).send({ ok: true, outcome: 'not-a-beer' })
+
+      const user = await upsertUser(pool, {
+        identityHash: hashIdentity(reactorId),
+        phoneNumber: reactorId.startsWith('wa:') ? reactorId.slice(3) : null,
+        pushName: null,
+        countryCode: extractCountryCode(reactorId),
+      })
+
+      const outcome = await upsertBeerLogReaction(pool, {
+        beerLogId,
+        userId: user.id,
+        emoji,
+        reactedAt: timestamp,
+      })
+      return reply.status(200).send({ ok: true, outcome })
+    },
+  )
 
   app.delete(
     '/v1/internal/beer-log/by-message/:sourceMessageId',

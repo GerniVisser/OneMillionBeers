@@ -160,3 +160,41 @@ describe('forwardDeleteBeerLog', () => {
     )
   })
 })
+
+describe('forwardBeerLogReaction', () => {
+  let fetchSpy: ReturnType<typeof vi.fn> & { mockRestore: () => void }
+
+  const reaction = {
+    sourceGroupId: 'wa:120363XXXX@g.us',
+    sourceMessageId: 'MSGID001',
+    reactorId: 'wa:27831234567',
+    emoji: '🍻',
+    timestamp: '2026-03-18T14:05:00.000Z',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    fetchSpy = vi.spyOn(globalThis, 'fetch') as unknown as typeof fetchSpy
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+  })
+
+  it('POSTs the reaction and returns the outcome the backend reports', async () => {
+    fetchSpy.mockResolvedValue(new Response('{"ok":true,"outcome":"stored"}', { status: 200 }))
+
+    const { forwardBeerLogReaction } = await import('../forwarder.js')
+    expect(await forwardBeerLogReaction(reaction)).toBe('stored')
+
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3000/v1/internal/beer-log/reaction')
+    expect(JSON.parse(init.body as string)).toEqual(reaction)
+  })
+
+  it('throws when the backend rejects the reaction', async () => {
+    fetchSpy.mockResolvedValue(new Response('nope', { status: 500 }))
+    const { forwardBeerLogReaction } = await import('../forwarder.js')
+    await expect(forwardBeerLogReaction(reaction)).rejects.toThrow('Backend returned 500')
+  })
+})

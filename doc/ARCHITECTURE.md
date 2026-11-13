@@ -46,17 +46,28 @@ The Collector is not exposed via nginx — it has no public interface.
 9. Backend API broadcasts the updated count to all connected SSE clients
 10. Backend API returns 201
 
+### Reactions
+
+The collector also forwards emoji reactions in groups to `POST /v1/internal/beer-log/reaction`.
+The backend stores a reaction only when its target is a beer log, so reactions to anything
+else are dropped. WhatsApp names the reactor only by LID (a device-linked id, not a phone
+number). The collector maps it to a phone from the LID and `participantAlt` pairs it sees on
+group messages. Failing that, it uses the group's participant list (`/groups/{id}/participants/v2`).
+A reactor it cannot map is dropped.
+
 ---
 
 ## Data model
 
-Three entities. See `db/migrations/` for schemas.
+Four entities. See `db/migrations/` for schemas.
 
 **Group** — a messaging group connected to the platform. Has a slug used in public URLs (`/groups/[slug]`). Identified internally by the platform-specific group ID (`source_group_id`).
 
-**User** — a participant who has logged at least one beer. Identified by a SHA-256 hash of their platform identity (e.g. phone number) — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on first beer log — no signup.
+**User** — a participant who has logged a beer or reacted to one. Identified by a SHA-256 hash of their platform identity (e.g. phone number) — plaintext is never stored or logged at any point. Has a slug for public URLs (`/users/[slug]`). Created automatically on their first beer log or reaction — no signup.
 
 **BeerLog** — a single beer photo. Belongs to one User and one Group. Stores the public photo URL and two timestamps: when the WhatsApp message was sent, and when the record was inserted.
+
+**BeerLogReaction** — one User's emoji reaction to a BeerLog. Each person has at most one per photo: a new reaction replaces the old one, and a removed one is kept with a null emoji. Deleted along with its BeerLog.
 
 ---
 
