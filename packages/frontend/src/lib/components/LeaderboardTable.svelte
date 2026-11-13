@@ -5,133 +5,104 @@
 
   let {
     entries = [],
-    title = 'Leaderboard',
+    total = entries.length,
+    loading = false,
+    onloadmore,
   }: {
     entries: LeaderboardEntry[]
-    title?: string
+    total?: number
+    loading?: boolean
+    onloadmore?: () => void
   } = $props()
 
-  const RANK_COLORS: Record<number, string> = {
+  const PODIUM_COLORS: Record<number, string> = {
     1: 'var(--color-rank-gold)',
     2: 'var(--color-rank-silver)',
     3: 'var(--color-rank-bronze)',
   }
 
   const name = (e: LeaderboardEntry) => e.user.displayName ?? e.user.pseudoName ?? 'Anonymous'
-  const rankColor = (rank: number) => RANK_COLORS[rank] ?? 'var(--color-text-muted)'
+  const hasMore = $derived(entries.length < total)
 
-  const podium = $derived(entries.slice(0, 3))
-  const rest = $derived(entries.slice(3))
-  const leaderCount = $derived(entries[0]?.beerCount ?? 0)
-
-  // Shown left to right as 2nd, 1st, 3rd so the leader stands in the middle.
-  const podiumOrder = $derived(
-    [podium[1], podium[0], podium[2]].filter((e): e is LeaderboardEntry => !!e),
-  )
+  function standing(i: number): string {
+    if (i === 0) return entries[0].rank === 1 ? 'Leading the group' : ''
+    const above = entries[i - 1]
+    const gap = above.beerCount - entries[i].beerCount
+    return gap > 0 ? `${gap.toLocaleString()} behind #${above.rank}` : `Level with #${above.rank}`
+  }
 </script>
 
-<section class="board" aria-label={title}>
-  <header class="board-head">
-    <h2 class="board-title">{title}</h2>
-    {#if entries.length > 0}
-      <span class="board-meta">Top {entries.length} · all time</span>
-    {/if}
-  </header>
+<div class="board">
+  <div class="board-head">
+    <h3 class="board-title">Leaderboard</h3>
+    <span class="board-title">Beers</span>
+  </div>
 
   {#if entries.length === 0}
     <p class="empty">No beers logged yet. Be the first!</p>
   {:else}
-    <ol class="podium" aria-label="Top three">
-      {#each podiumOrder as entry (entry.user.id)}
-        <li
-          class="podium-spot"
-          class:podium-spot--first={entry === podium[0]}
-          class:podium-spot--third={entry === podium[2]}
-          style="--rank-color: {rankColor(entry.rank)}"
-        >
-          <a href="/users/{entry.user.slug}" class="podium-person">
-            <span class="ring">
-              <span class="ring-inner">
-                {#if entry.user.countryCode}
-                  <CountryFlag countryCode={entry.user.countryCode} size={72} />
-                {:else}
-                  <span class="initials">{getInitials(name(entry))}</span>
-                {/if}
-              </span>
-              <span class="rank-chip" aria-label="Rank {entry.rank}">{entry.rank}</span>
+    <ol class="board-list">
+      {#each entries as entry, i (entry.user.id)}
+        {@const podiumColor = PODIUM_COLORS[entry.rank]}
+        <li>
+          <a
+            href="/users/{entry.user.slug}"
+            class="row"
+            class:row--podium={podiumColor}
+            style={podiumColor ? `--podium-color: ${podiumColor}` : undefined}
+          >
+            <span class="rank">{entry.rank}</span>
+            <span class="avatar">
+              {#if entry.user.countryCode}
+                <CountryFlag countryCode={entry.user.countryCode} size={22} />
+              {:else}
+                <span class="initials">{getInitials(name(entry))}</span>
+              {/if}
             </span>
-            <span class="podium-name">{name(entry)}</span>
-            <span class="podium-count">{entry.beerCount.toLocaleString()}</span>
-            <span class="podium-unit">beers</span>
+            <span class="name-wrap">
+              <span class="name">{name(entry)}</span>
+              <span class="sub">{standing(i)}</span>
+            </span>
+            <span class="count">{entry.beerCount.toLocaleString()}</span>
           </a>
-          <span class="pedestal" aria-hidden="true"></span>
         </li>
       {/each}
     </ol>
 
-    {#if rest.length > 0}
-      <ol class="rows" start={rest[0].rank}>
-        {#each rest as entry, i (entry.user.id)}
-          {@const above = i === 0 ? podium[podium.length - 1] : rest[i - 1]}
-          {@const gap = above.beerCount - entry.beerCount}
-          <li>
-            <a href="/users/{entry.user.slug}" class="row">
-              <span class="row-rank">{entry.rank}</span>
-              <span class="row-avatar">
-                {#if entry.user.countryCode}
-                  <CountryFlag countryCode={entry.user.countryCode} size={28} />
-                {:else}
-                  <span class="initials initials--small">{getInitials(name(entry))}</span>
-                {/if}
-              </span>
-              <span class="row-main">
-                <span class="row-name">{name(entry)}</span>
-                <span class="row-bar" aria-hidden="true">
-                  <span
-                    class="row-bar-fill"
-                    style="width: {leaderCount ? (entry.beerCount / leaderCount) * 100 : 0}%"
-                  ></span>
-                </span>
-              </span>
-              <span class="row-score">
-                <span class="row-count">{entry.beerCount.toLocaleString()}</span>
-                {#if gap > 0}
-                  <span class="row-gap">{gap.toLocaleString()} behind #{above.rank}</span>
-                {/if}
-              </span>
-            </a>
-          </li>
-        {/each}
-      </ol>
-    {/if}
+    <div class="board-foot">
+      <span class="foot-count">
+        Showing {entries.length.toLocaleString()} of {total.toLocaleString()}
+        {total === 1 ? 'drinker' : 'drinkers'}
+      </span>
+      {#if hasMore && onloadmore}
+        <button class="more-btn" onclick={onloadmore} disabled={loading}>
+          {loading ? 'Loading…' : 'Show more'}
+        </button>
+      {/if}
+    </div>
   {/if}
-</section>
+</div>
 
 <style>
   .board {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
-    border-radius: 0.85rem;
-    padding: 1rem 0.85rem 0.75rem;
+    border-radius: 0.75rem;
+    padding: 0.875rem 1rem 0;
   }
 
   .board-head {
     display: flex;
-    align-items: baseline;
     justify-content: space-between;
-    margin-bottom: 1.1rem;
+    align-items: baseline;
+    margin-bottom: 0.6rem;
   }
 
   .board-title {
     font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.16em;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--color-beer-amber);
-  }
-
-  .board-meta {
-    font-size: 0.68rem;
     color: var(--color-text-muted);
   }
 
@@ -141,266 +112,142 @@
     color: var(--color-text-muted);
   }
 
-  /* ── Podium ─────────────────────────────────────────────── */
-  .podium {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: end;
-    gap: 0.5rem;
+  .board-list {
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .podium-spot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 0;
-  }
-
-  .podium-person {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    min-width: 0;
-    text-decoration: none;
-    padding-bottom: 0.55rem;
-  }
-
-  .ring {
-    position: relative;
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
-    padding: 2px;
-    background: color-mix(in srgb, var(--rank-color) 70%, transparent);
-    margin-bottom: 0.6rem;
-  }
-
-  .podium-spot--first .ring {
-    width: 3.6rem;
-    height: 3.6rem;
-  }
-
-  .ring-inner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    overflow: hidden;
-    background: radial-gradient(circle at 40% 35%, #2d1a08, #1a0f05);
-  }
-
-  .initials {
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: var(--color-beer-head);
-  }
-
-  .rank-chip {
-    position: absolute;
-    left: 50%;
-    bottom: -0.55rem;
-    transform: translateX(-50%);
-    min-width: 1.15rem;
-    height: 1.15rem;
-    padding: 0 0.25rem;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-bg-card);
-    border: 1px solid color-mix(in srgb, var(--rank-color) 70%, transparent);
-    color: var(--rank-color);
-    font-family: var(--font-display);
-    font-size: 0.65rem;
-    font-weight: 700;
-  }
-
-  .podium-name {
-    max-width: 100%;
-    font-size: 0.74rem;
-    font-weight: 600;
-    color: var(--color-beer-foam);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .podium-person:hover .podium-name {
-    color: var(--color-beer-head);
-  }
-
-  .podium-count {
-    margin-top: 0.1rem;
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    line-height: 1.1;
-    color: var(--color-beer-amber);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .podium-spot--first .podium-count {
-    font-size: 1.3rem;
-  }
-
-  .podium-unit {
-    font-size: 0.58rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .pedestal {
-    width: 100%;
-    height: 1rem;
-    border-radius: 0.4rem 0.4rem 0 0;
-    border-top: 1px solid color-mix(in srgb, var(--rank-color) 55%, transparent);
-    background: var(--color-bg-surface);
-  }
-
-  .podium-spot--first .pedestal {
-    height: 1.6rem;
-  }
-
-  .podium-spot--third .pedestal {
-    height: 0.6rem;
-  }
-
-  /* ── Ranks 4+ ──────────────────────────────────────────── */
-  .rows {
-    margin: 0.5rem 0 0;
-    padding: 0;
-    list-style: none;
+  .board-list li + li {
     border-top: 1px solid var(--color-border);
-  }
-
-  .rows li + li {
-    border-top: 1px solid var(--color-border-muted);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 0.15rem;
+    gap: 0.55rem;
+    padding: 0.35rem 0;
     text-decoration: none;
   }
 
-  .row-rank {
-    width: 1.3rem;
-    flex-shrink: 0;
-    text-align: right;
-    font-family: var(--font-display);
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--color-text-muted);
+  /* Same treatment as the top three in the map's country list */
+  .row--podium {
+    box-shadow: inset 2px 0 0 var(--podium-color);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--podium-color) 6%, transparent),
+      transparent 60%
+    );
   }
 
-  .row-avatar {
+  .rank {
+    width: 1.6rem;
     flex-shrink: 0;
-    width: 1.75rem;
-    height: 1.75rem;
+    text-align: right;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row--podium .rank {
+    color: var(--podium-color);
+  }
+
+  .avatar {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--color-bg-surface);
-    border: 1px solid var(--color-border);
   }
 
-  .initials--small {
-    font-size: 0.65rem;
+  .initials {
+    font-family: var(--font-display);
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--color-beer-head);
   }
 
-  .row-main {
+  .name-wrap {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
   }
 
-  .row-name {
-    font-size: 0.85rem;
-    font-weight: 500;
+  .name {
+    font-size: 0.82rem;
+    line-height: 1.25;
     color: var(--color-beer-foam);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .row:hover .row-name {
+  .row:hover .name {
     color: var(--color-beer-head);
   }
 
-  .row-bar {
-    height: 3px;
-    border-radius: 999px;
-    background: var(--color-bg-surface);
-    overflow: hidden;
+  .row--podium .name {
+    font-weight: 600;
   }
 
-  .row-bar-fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--color-beer-amber) 70%, transparent);
+  .sub {
+    font-size: 0.65rem;
+    line-height: 1.2;
+    color: var(--color-text-muted);
   }
 
-  .row-score {
+  .count {
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    min-width: 4.5rem;
-  }
-
-  .row-count {
     font-family: var(--font-display);
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     font-weight: 700;
     color: var(--color-beer-amber);
     font-variant-numeric: tabular-nums;
   }
 
-  .row-gap {
-    font-size: 0.6rem;
-    color: var(--color-text-muted);
-    white-space: nowrap;
+  .board-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0 0.75rem;
+    border-top: 1px solid var(--color-border);
   }
 
-  @media (min-width: 640px) {
-    .board {
-      padding: 1.25rem 1.5rem 1rem;
-    }
+  .foot-count {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
 
-    .podium {
-      gap: 1rem;
-      max-width: 560px;
-      margin: 0 auto;
-    }
+  .more-btn {
+    padding: 0.35rem 0.9rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    color: var(--color-beer-amber);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      border-color 120ms ease,
+      color 120ms ease;
+  }
 
-    .ring {
-      width: 3.6rem;
-      height: 3.6rem;
-    }
+  .more-btn:hover:not(:disabled) {
+    border-color: var(--color-beer-amber);
+    color: var(--color-beer-head);
+  }
 
-    .podium-spot--first .ring {
-      width: 4.3rem;
-      height: 4.3rem;
-    }
-
-    .podium-name {
-      font-size: 0.85rem;
-    }
+  .more-btn:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 </style>

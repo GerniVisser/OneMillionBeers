@@ -645,8 +645,17 @@ export async function getGlobalLeaderboard(pool: pg.Pool, limit = 10): Promise<L
 export async function getGroupLeaderboard(
   pool: pg.Pool,
   groupId: string,
-  limit = 10,
-): Promise<LeaderboardEntry[]> {
+  limit: number,
+  offset: number,
+): Promise<{ items: LeaderboardEntry[]; total: number }> {
+  const { rows: countRows } = await pool.query<{ count: string }>(
+    `SELECT COUNT(DISTINCT user_id)::text AS count FROM beer_logs WHERE group_id = $1`,
+    [groupId],
+  )
+  const total = parseInt(countRows[0].count, 10)
+
+  // RANK() runs before LIMIT/OFFSET, so ranks are group-wide on every page.
+  // Ties are ordered by user id so pages don't overlap or skip.
   const { rows } = await pool.query<{
     rank: string
     beerCount: string
@@ -668,11 +677,11 @@ export async function getGroupLeaderboard(
      JOIN users u ON bl.user_id = u.id
      WHERE bl.group_id = $1
      GROUP BY u.id, u.display_name, u.pseudo_name, u.slug, u.country_code
-     ORDER BY COUNT(*) DESC
-     LIMIT $2`,
-    [groupId, limit],
+     ORDER BY COUNT(*) DESC, u.id
+     LIMIT $2 OFFSET $3`,
+    [groupId, limit, offset],
   )
-  return rows.map((r) => ({
+  const items = rows.map((r) => ({
     rank: parseInt(r.rank, 10),
     beerCount: parseInt(r.beerCount, 10),
     user: {
@@ -683,6 +692,7 @@ export async function getGroupLeaderboard(
       countryCode: r.countryCode,
     },
   }))
+  return { items, total }
 }
 
 export async function getUserFeed(

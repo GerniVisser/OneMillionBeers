@@ -16,7 +16,7 @@ import {
   GroupInviteResponseSchema,
   PaginatedResponseSchema,
   FeedItemSchema,
-  LeaderboardResponseSchema,
+  GroupLeaderboardResponseSchema,
   GroupStatsResponseSchema,
   GroupActivityResponseSchema,
   GroupHourlyResponseSchema,
@@ -202,7 +202,21 @@ describe('GET /v1/groups/:groupId/feed', () => {
 })
 
 describe('GET /v1/groups/:groupId/leaderboard', () => {
-  it('returns leaderboard matching LeaderboardResponseSchema', async () => {
+  async function seedCounts(counts: number[]) {
+    for (const [i, n] of counts.entries()) {
+      for (let j = 0; j < n; j++) await seedBeerLog(`+1555000${String(i).padStart(4, '0')}`)
+    }
+  }
+
+  const board = async (query = '') =>
+    (
+      await app.inject({
+        method: 'GET',
+        url: `/v1/groups/${await getGroupSlug()}/leaderboard${query}`,
+      })
+    ).json()
+
+  it('returns a page matching GroupLeaderboardResponseSchema', async () => {
     await seedBeerLog('+15551234567', '2024-06-01T10:00:00.000Z')
     await seedBeerLog('+15551234567', '2024-06-01T11:00:00.000Z')
     await seedBeerLog('+15559999999', '2024-06-01T12:00:00.000Z')
@@ -211,10 +225,45 @@ describe('GET /v1/groups/:groupId/leaderboard', () => {
     const res = await app.inject({ method: 'GET', url: `/v1/groups/${slug}/leaderboard` })
     expect(res.statusCode).toBe(200)
 
-    const parsed = LeaderboardResponseSchema.safeParse(res.json())
+    const parsed = GroupLeaderboardResponseSchema.safeParse(res.json())
     expect(parsed.success).toBe(true)
-    expect(parsed.data?.entries[0].beerCount).toBe(2)
-    expect(parsed.data?.entries[0].rank).toBe(1)
+    expect(parsed.data?.items[0].beerCount).toBe(2)
+    expect(parsed.data?.items[0].rank).toBe(1)
+    expect(parsed.data?.total).toBe(2)
+  })
+
+  it('includes everyone who has posted, beyond the old top 10', async () => {
+    await seedCounts(Array.from({ length: 12 }, () => 1))
+    const body = await board('?limit=100')
+    expect(body.items).toHaveLength(12)
+    expect(body.total).toBe(12)
+  })
+
+  it('ranks across the whole group on later pages', async () => {
+    await seedCounts([5, 4, 3, 2, 1])
+    const page2 = await board('?limit=2&offset=2')
+    expect(page2.items.map((e: { rank: number }) => e.rank)).toEqual([3, 4])
+    expect(page2.items.map((e: { beerCount: number }) => e.beerCount)).toEqual([3, 2])
+    expect(page2.total).toBe(5)
+  })
+
+  it('pages through tied users without repeating or skipping anyone', async () => {
+    await seedCounts([1, 1, 1, 1, 1])
+    const ids = []
+    for (let offset = 0; offset < 5; offset += 2) {
+      const page = await board(`?limit=2&offset=${offset}`)
+      ids.push(...page.items.map((e: { user: { id: string } }) => e.user.id))
+    }
+    expect(new Set(ids).size).toBe(5)
+  })
+
+  it('returns 400 on an invalid page size', async () => {
+    await seedCounts([1])
+    const res = await app.inject({
+      method: 'GET',
+      url: `/v1/groups/${await getGroupSlug()}/leaderboard?limit=0`,
+    })
+    expect(res.statusCode).toBe(400)
   })
 })
 

@@ -37,7 +37,8 @@ export const PaginatedResponseSchema = <T extends z.ZodTypeAny>(itemSchema: T) =
     offset: z.number().int().nonnegative(),
   })
 
-// Leaderboard — not paginated at MVP (top-N array; offset pagination has rank-consistency issues)
+// Leaderboard entries. The global board is a top-N array; the group board pages
+// with offsets, so a rank can shift between pages and clients dedupe by user id.
 export const LeaderboardEntrySchema = z.object({
   rank: z.number().int().positive(),
   user: UserSummarySchema,
@@ -49,6 +50,10 @@ export const LeaderboardResponseSchema = z.object({
   entries: z.array(LeaderboardEntrySchema),
 })
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponseSchema>
+
+// GET /v1/groups/:slug/leaderboard — everyone who has posted in the group, ranked
+export const GroupLeaderboardResponseSchema = PaginatedResponseSchema(LeaderboardEntrySchema)
+export type GroupLeaderboardResponse = z.infer<typeof GroupLeaderboardResponseSchema>
 
 // GET /v1/global/count
 export const GlobalCountResponseSchema = z.object({

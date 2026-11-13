@@ -15,7 +15,7 @@ export const load: PageLoad = async ({ fetch, params }) => {
     const [profile, feed, leaderboard, stats] = await Promise.all([
       getGroupProfile(fetch, params.slug),
       getGroupFeed(fetch, params.slug, { limit: 20, offset: 0 }),
-      getGroupLeaderboard(fetch, params.slug),
+      getGroupLeaderboard(fetch, params.slug, { limit: 20, offset: 0 }),
       getGroupStats(fetch, params.slug),
     ])
     return {
