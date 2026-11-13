@@ -690,7 +690,7 @@
     z-index: 50;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    background: rgba(18, 12, 5, 0.97);
+    background: var(--color-bg-nav);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);

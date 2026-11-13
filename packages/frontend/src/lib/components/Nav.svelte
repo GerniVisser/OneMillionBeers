@@ -381,7 +381,7 @@
       left: 0;
       bottom: 0;
       width: 220px;
-      background-color: rgba(18, 12, 5, 0.97);
+      background-color: var(--color-bg-nav);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-right: 1px solid var(--color-border);
@@ -450,7 +450,7 @@
 
   .sidebar-link:hover {
     color: var(--color-beer-foam);
-    background-color: var(--color-bg-surface);
+    background-color: rgba(255, 255, 255, 0.05);
   }
 
   .sidebar-link.active {
@@ -481,7 +481,7 @@
   }
 
   .join-cta:hover {
-    background: var(--color-bg-surface);
+    background: rgba(255, 255, 255, 0.05);
     color: var(--color-beer-amber);
   }
 
@@ -522,7 +522,7 @@
       align-items: flex-end;
       justify-content: space-around;
       padding: 0.25rem 0.25rem calc(0.25rem + env(safe-area-inset-bottom));
-      background-color: rgba(18, 12, 5, 0.97);
+      background-color: var(--color-bg-nav);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-top: 1px solid var(--color-border);
@@ -536,7 +536,7 @@
     align-items: center;
     gap: 0.2rem;
     padding: 0.25rem 0.5rem;
-    color: var(--color-cream-faint);
+    color: var(--color-text-muted);
     text-decoration: none;
     background: none;
     border: none;

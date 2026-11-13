@@ -784,6 +784,8 @@
   .tab-bar {
     display: flex;
     gap: 0;
+    background: var(--color-bg-nav);
+    border-radius: 0.5rem 0.5rem 0 0;
     border-bottom: 1px solid var(--color-border);
     margin-bottom: 1.5rem;
   }

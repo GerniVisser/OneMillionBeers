@@ -76,14 +76,6 @@
   </div>
 
   <div class="hero-content">
-    <!-- Live badge -->
-    <div class="badge-wrap">
-      <span class="live-badge">
-        <span class="live-dot"></span>
-        LIVE
-      </span>
-    </div>
-
     <h1 class="hero-title glow-amber">One Million Beers</h1>
 
     <!-- Counter -->
@@ -164,34 +156,6 @@
     z-index: 1;
     max-width: 500px;
     margin: 0 auto;
-  }
-
-  .badge-wrap {
-    margin-bottom: 0.5rem;
-  }
-
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    background-color: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.4);
-    border-radius: 9999px;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: var(--color-beer-amber);
-    text-transform: uppercase;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
-  }
-
-  .live-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-beer-amber);
-    animation: pulse-dot 1.5s ease-in-out infinite;
   }
 
   .hero-title {
