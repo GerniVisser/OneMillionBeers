@@ -32,7 +32,7 @@
   </button>
 
   <div class="modal-header">
-    <img class="beer-icon" src="/logo.svg" alt="" width="56" height="56" />
+    <img class="beer-icon" src="/logo.png" alt="" width="56" height="56" />
     <h2 class="modal-title">OneMillionBeers</h2>
     <p class="modal-tagline">One mission. One million beers.</p>
   </div>
@@ -152,6 +152,8 @@
   .beer-icon {
     width: 3.5rem;
     height: 3.5rem;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--color-beer-amber);
     margin: 0 auto 0.5rem;
     display: block;
     filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.4));

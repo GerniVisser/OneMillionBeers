@@ -83,7 +83,7 @@
     <div class="hero-layout">
       <div class="avatar-ring">
         <div class="avatar-inner">
-          <img class="avatar-img" src="/logo-mark.svg" alt="" width="80" height="74" />
+          <img class="avatar-img" src="/logo.png" alt="" width="104" height="104" />
         </div>
       </div>
 
@@ -234,15 +234,13 @@
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background: radial-gradient(circle at 40% 35%, #fde68a, #fbbf24 55%, #f59e0b);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
   }
 
   .avatar-img {
-    width: 80%;
-    height: auto;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .hero-text {

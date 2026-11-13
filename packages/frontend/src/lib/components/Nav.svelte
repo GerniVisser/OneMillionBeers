@@ -37,7 +37,7 @@
 <!-- Desktop sidebar -->
 <aside class="sidebar">
   <a href="/" class="sidebar-logo">
-    <img class="logo-icon" src="/logo.svg" alt="" width="32" height="32" />
+    <img class="logo-icon" src="/logo.png" alt="" width="32" height="32" />
     <span class="logo-text">OneMillionBeers</span>
   </a>
 
@@ -403,6 +403,8 @@
     width: 2rem;
     height: 2rem;
     flex-shrink: 0;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--color-beer-amber);
   }
 
   .logo-text {
