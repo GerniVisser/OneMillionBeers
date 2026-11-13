@@ -122,12 +122,6 @@
     padding: 1.5rem 1rem 1.25rem;
     text-align: center;
     background: linear-gradient(135deg, #0d0803 0%, #1e1005 40%, #2d1a08 75%, #3d2510 100%);
-    border-radius: 1rem;
-    border: 1px solid #5c3d1a;
-    box-shadow:
-      0 0 0 1px rgba(245, 158, 11, 0.08),
-      0 8px 48px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 rgba(245, 158, 11, 0.12);
   }
 
   .bubbles-wrap {

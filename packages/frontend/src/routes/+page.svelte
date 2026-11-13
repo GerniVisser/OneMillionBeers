@@ -556,8 +556,9 @@
     gap: 1rem;
   }
 
+  /* Full-bleed: cancels .page's padding and the gap above the tab bar */
   .hero-wrap {
-    width: 100%;
+    margin: -1.25rem -1rem -1rem;
   }
 
   /* ── Tab bar ────────────────────────────────────── */
@@ -567,7 +568,7 @@
     z-index: 50;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    background: var(--color-bg-nav);
+    background: var(--color-bg-tabs);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);
