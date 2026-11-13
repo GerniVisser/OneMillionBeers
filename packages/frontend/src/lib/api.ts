@@ -8,6 +8,7 @@ import type {
   BeerOfTheWeekResponse,
   FeedItem,
   LeaderboardResponse,
+  GroupLeaderboardResponse,
   GroupProfileResponse,
   GroupListItem,
   GroupInviteResponse,
@@ -147,8 +148,12 @@ export function getGroupFeed(
 export function getGroupLeaderboard(
   fetch: typeof globalThis.fetch,
   slug: string,
-): Promise<LeaderboardResponse> {
-  return get<LeaderboardResponse>(fetch, `/groups/${slug}/leaderboard`)
+  pagination?: Pagination,
+): Promise<GroupLeaderboardResponse> {
+  return get<GroupLeaderboardResponse>(fetch, `/groups/${slug}/leaderboard`, {
+    limit: pagination?.limit ?? 20,
+    offset: pagination?.offset ?? 0,
+  })
 }
 
 export function getGroupStats(

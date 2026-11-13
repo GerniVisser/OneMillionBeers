@@ -56,8 +56,12 @@ export const groupRoutes: FastifyPluginAsync<{ pool: pg.Pool }> = async (app, { 
     const group = await findGroupBySlug(pool, groupId)
     if (!group) return reply.status(404).send({ error: 'Group not found' })
 
-    const entries = await getGroupLeaderboard(pool, group.id)
-    return reply.send({ entries })
+    const parse = PaginationQuerySchema.safeParse(request.query)
+    if (!parse.success) return reply.status(400).send({ error: 'Invalid query params' })
+    const { limit, offset } = parse.data
+
+    const { items, total } = await getGroupLeaderboard(pool, group.id, limit, offset)
+    return reply.send({ items, total, limit, offset })
   })
 
   app.get('/v1/groups/:groupId/stats', async (request, reply) => {

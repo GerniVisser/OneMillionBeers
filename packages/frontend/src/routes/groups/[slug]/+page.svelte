@@ -53,6 +53,32 @@
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
   let leaderboard = $state(untrack(() => data.leaderboard))
+  let leaderboardLoading = $state(false)
+
+  // Refreshes cover what is already on screen, up to the API's page cap.
+  const leaderboardWindow = () => ({
+    limit: Math.min(Math.max(leaderboard.items.length, 20), 100),
+    offset: 0,
+  })
+
+  async function loadMoreLeaderboard() {
+    if (leaderboardLoading) return
+    leaderboardLoading = true
+    try {
+      const page = await getGroupLeaderboard(fetch, data.profile.slug, {
+        limit: 20,
+        offset: leaderboard.items.length,
+      })
+      // Ranks can move between pages while beers arrive; never show a person twice.
+      const seen = new Set(leaderboard.items.map((e) => e.user.id))
+      leaderboard = {
+        ...page,
+        items: [...leaderboard.items, ...page.items.filter((e) => !seen.has(e.user.id))],
+      }
+    } finally {
+      leaderboardLoading = false
+    }
+  }
   // Deferred chart data — populated after initial render
   let activity = $state<GroupActivityResponse>({ days: [] })
   let hourly = $state<GroupHourlyResponse>({ hours: [] })
@@ -141,7 +167,7 @@
         const slug = data.profile.slug
         const [newStats, newLeaderboard, newActivity, newHourly, newMonthly] = await Promise.all([
           getGroupStats(fetch, slug),
-          getGroupLeaderboard(fetch, slug),
+          getGroupLeaderboard(fetch, slug, leaderboardWindow()),
           getGroupActivity(fetch, slug),
           getGroupHourly(fetch, slug),
           getGroupMonthly(fetch, slug),
@@ -163,7 +189,7 @@
         await Promise.all([
           getGroupFeed(fetch, slug, { limit: 20, offset: 0 }),
           getGroupStats(fetch, slug),
-          getGroupLeaderboard(fetch, slug),
+          getGroupLeaderboard(fetch, slug, leaderboardWindow()),
           getGroupActivity(fetch, slug),
           getGroupHourly(fetch, slug),
           getGroupMonthly(fetch, slug),
@@ -462,7 +488,12 @@
   {:else}
     <div class="tab-panel" id="panel-leaderboard" role="tabpanel">
       <div class="panel-content">
-        <LeaderboardTable entries={leaderboard.entries} title="Group Leaders" />
+        <LeaderboardTable
+          entries={leaderboard.items}
+          total={leaderboard.total}
+          loading={leaderboardLoading}
+          onloadmore={loadMoreLeaderboard}
+        />
       </div>
     </div>
   {/if}
