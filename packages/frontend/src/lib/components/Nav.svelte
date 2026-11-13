@@ -525,7 +525,7 @@
       background-color: var(--color-bg-nav);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-top: 1px solid var(--color-border);
+      border-top: 1px solid var(--color-beer-dark);
       box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
     }
   }
