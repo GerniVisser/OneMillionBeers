@@ -7,7 +7,7 @@
     UserHourlyResponse,
     UserMonthlyResponse,
   } from '@omb/shared'
-  import { getInitials, formatHour, getThisWeekBreakdown, getThisWeekTotal } from '$lib/utils'
+  import { getInitials, formatHour, getThisWeekBreakdown, lastSevenDays } from '$lib/utils'
   import { getLastSseEvent, getResyncCount } from '$lib/sse.svelte'
   import { getUserStats, getUserFeed } from '$lib/api'
   import { addRecentUser } from '$lib/recents'
@@ -17,6 +17,9 @@
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
+  import PaceCard from '$lib/components/PaceCard.svelte'
+  import StatTiles from '$lib/components/StatTiles.svelte'
+  import ContributionGraph from '$lib/components/ContributionGraph.svelte'
 
   let { data }: { data: PageData } = $props()
 
@@ -135,29 +138,6 @@
     return { icon: '🍻', title: 'The Night Cap', desc: 'Ending every day right' }
   })
 
-  // ── Pace projection ──────────────────────────────────────────
-  const paceProjection = $derived.by((): { milestone: number; label: string } | null => {
-    if (stats.totalBeers < 3) return null
-    const created = new Date(data.profile.createdAt)
-    const now = new Date()
-    const monthsActive = Math.max(
-      1,
-      (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth()),
-    )
-    const rate = stats.totalBeers / monthsActive
-    if (rate < 0.5) return null
-    const milestones = [50, 100, 250, 500, 1000, 2500, 5000, 10000]
-    const next = milestones.find((m) => m > stats.totalBeers)
-    if (!next) return null
-    const monthsLeft = (next - stats.totalBeers) / rate
-    const target = new Date(now)
-    target.setMonth(target.getMonth() + Math.round(monthsLeft))
-    return {
-      milestone: next,
-      label: target.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-    }
-  })
-
   // ── Achievements ─────────────────────────────────────────────
   type Badge = { icon: string; name: string; desc: string; unlocked: boolean }
 
@@ -227,7 +207,32 @@
       ? weekdayEntries.reduce((a, b) => (b.count > a.count ? b : a))
       : undefined,
   )
-  const beersThisWeek = $derived(getThisWeekTotal(activity.days))
+  // The next rank, or once ranks run out, the next round number.
+  const MILESTONES = [2_500, 5_000, 10_000, 25_000, 50_000]
+  const paceGoal = $derived.by(() => {
+    if (nextRank)
+      return { target: nextRank.min, title: `Road to ${nextRank.icon} ${nextRank.name}` }
+    const milestone = MILESTONES.find((m) => m > stats.totalBeers)
+    return milestone ? { target: milestone, title: undefined } : null
+  })
+
+  const week = $derived(lastSevenDays(activity.days))
+  const tiles = $derived([
+    {
+      label: 'Last 7 days',
+      value: week.total.toLocaleString(),
+      note:
+        week.change === null
+          ? null
+          : `${week.change >= 0 ? '▲' : '▼'} ${Math.abs(week.change)}% vs week before`,
+      trend: week.change !== null && week.change >= 0 ? ('up' as const) : ('down' as const),
+    },
+    { label: 'This month', value: stats.thisMonth.toLocaleString() },
+    { label: 'This year', value: stats.thisYear.toLocaleString() },
+    { label: 'Current streak', value: `${stats.currentStreak}d` },
+    { label: 'Longest streak', value: `${stats.longestStreak}d` },
+    { label: 'Favourite hour', value: formatFavoriteHour(stats.favoriteHour) },
+  ])
 
   // ── Tabs ──────────────────────────────────────────────────────
   let activeTab = $state<'feed' | 'stats'>('feed')
@@ -441,8 +446,34 @@
 
   <!-- ── Stats tab ─────────────────────────────────────────────── -->
   {#if activeTab === 'stats'}
-    <div class="tab-panel">
-      <!-- Monthly trend -->
+    <div class="tab-panel stats-panel">
+      {#if paceGoal}
+        <PaceCard
+          count={stats.totalBeers}
+          days={activity.days}
+          target={paceGoal.target}
+          title={paceGoal.title}
+        />
+      {/if}
+
+      <StatTiles {tiles} />
+
+      <div class="chart-card card">
+        <span class="stat-label chart-label">Activity — Past 6 Months</span>
+        {#if activity.days.length > 0}
+          <ContributionGraph days={activity.days} />
+          <div class="heatmap-legend">
+            <span class="legend-label">Less</span>
+            {#each ['#2a1e0e', '#5c3d1a', '#d97706', '#f59e0b', '#fbbf24'] as c}
+              <span class="legend-swatch" style="background:{c};"></span>
+            {/each}
+            <span class="legend-label">More</span>
+          </div>
+        {:else}
+          <p class="empty-msg">No beers in the last 6 months.</p>
+        {/if}
+      </div>
+
       {#if monthly.months.length > 1}
         <div class="chart-card card">
           <span class="stat-label chart-label">Your Journey</span>
@@ -450,7 +481,6 @@
         </div>
       {/if}
 
-      <!-- Hourly + Weekday -->
       <div class="charts-row">
         <div class="chart-card card">
           <span class="stat-label chart-label">Peak Hours</span>
@@ -460,41 +490,6 @@
           <span class="stat-label chart-label">This Week by Day</span>
           <WeekdayBars days={weekdayEntries} peakDay={peakWeekday} />
         </div>
-      </div>
-
-      <!-- Numbers -->
-      <div class="stats-grid">
-        <div class="card stat-box">
-          <span class="stat-label">This Week</span>
-          <span class="stat-val">{beersThisWeek.toLocaleString()}</span>
-        </div>
-        <div class="card stat-box">
-          <span class="stat-label">This Month</span>
-          <span class="stat-val">{stats.thisMonth.toLocaleString()}</span>
-        </div>
-        <div class="card stat-box">
-          <span class="stat-label">This Year</span>
-          <span class="stat-val">{stats.thisYear.toLocaleString()}</span>
-        </div>
-        <div class="card stat-box">
-          <span class="stat-label">Current Streak</span>
-          <span class="stat-val">{stats.currentStreak}<span class="stat-unit">d</span></span>
-        </div>
-        <div class="card stat-box">
-          <span class="stat-label">Longest Streak</span>
-          <span class="stat-val">{stats.longestStreak}<span class="stat-unit">d</span></span>
-        </div>
-        <div class="card stat-box">
-          <span class="stat-label">Favourite Hour</span>
-          <span class="stat-val">{formatFavoriteHour(stats.favoriteHour)}</span>
-        </div>
-        {#if paceProjection}
-          <div class="card stat-box">
-            <span class="stat-label">Next Milestone</span>
-            <span class="stat-val pace-val">{paceProjection.milestone.toLocaleString()}</span>
-            <span class="pace-sub">by {paceProjection.label}</span>
-          </div>
-        {/if}
       </div>
     </div>
   {/if}
@@ -882,52 +877,41 @@
     }
   }
 
-  /* ── Stats grid ──────────────────────────────────────────── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-    margin-top: 0.75rem;
-  }
-
-  @media (min-width: 480px) {
-    .stats-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  .stat-box {
-    padding: 1rem 1.125rem;
+  .stats-panel {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.75rem;
   }
 
-  .stat-val {
-    font-family: var(--font-display);
-    font-size: 1.875rem;
-    font-weight: 700;
-    color: var(--color-beer-amber);
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-    margin-top: 0.125rem;
+  .stats-panel .chart-card,
+  .stats-panel .charts-row {
+    margin-bottom: 0;
   }
 
-  .stat-unit {
-    font-size: 1.1rem;
-    font-weight: 600;
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    margin-top: 0.6rem;
+  }
+
+  .legend-label {
+    margin: 0 2px;
+    font-size: 0.65rem;
     color: var(--color-text-muted);
   }
 
-  .pace-val {
-    color: var(--color-beer-amber);
+  .legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
   }
 
-  .pace-sub {
-    font-size: 0.72rem;
+  .empty-msg {
+    font-size: 0.8rem;
     color: var(--color-text-muted);
-    font-family: var(--font-body);
-    margin-top: 0.1rem;
   }
 
   .scroll-sentinel {

@@ -18,10 +18,15 @@
   import HourlyChart from '$lib/components/HourlyChart.svelte'
   import MonthlyChart from '$lib/components/MonthlyChart.svelte'
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
+  import PaceCard from '$lib/components/PaceCard.svelte'
+  import StatTiles from '$lib/components/StatTiles.svelte'
   import {
     formatDate,
     getInitials,
     getThisWeekBreakdown,
+    sumDays,
+    sumThisMonth,
+    lastSevenDays,
     getPeakHour,
     transformSseToFeedItem,
   } from '$lib/utils'
@@ -180,6 +185,33 @@
   })
 
   const peakHour = $derived(getPeakHour(hourly.hours))
+
+  const MILESTONES = [
+    1_000, 2_500, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000,
+  ]
+  const nextMilestone = $derived(MILESTONES.find((m) => m > stats.totalBeers) ?? null)
+
+  const week = $derived(lastSevenDays(activity.days))
+  const tiles = $derived([
+    { label: 'Today', value: sumDays(activity.days, 0, 0).toLocaleString() },
+    {
+      label: 'Last 7 days',
+      value: week.total.toLocaleString(),
+      note:
+        week.change === null
+          ? null
+          : `${week.change >= 0 ? '▲' : '▼'} ${Math.abs(week.change)}% vs week before`,
+      trend: week.change !== null && week.change >= 0 ? ('up' as const) : ('down' as const),
+    },
+    { label: 'This month', value: sumThisMonth(activity.days).toLocaleString() },
+    { label: 'Peak hour', value: peakHour ?? '–' },
+    { label: 'Days active', value: stats.daysActive.toLocaleString() },
+    {
+      label: 'Beers / drinker',
+      value:
+        stats.activeMemberCount > 0 ? (stats.totalBeers / stats.activeMemberCount).toFixed(1) : '–',
+    },
+  ])
   const weekdayData = $derived(getThisWeekBreakdown(activity.days))
   const peakWeekday = $derived(
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
@@ -398,6 +430,12 @@
   {:else if activeTab === 'stats'}
     <div class="tab-panel" id="panel-stats" role="tabpanel">
       <div class="panel-content">
+        {#if nextMilestone}
+          <PaceCard count={stats.totalBeers} days={activity.days} target={nextMilestone} />
+        {/if}
+
+        <StatTiles {tiles} />
+
         <!-- Contribution heatmap -->
         <div class="chart-card">
           <h3 class="chart-title">Activity — Past 6 Months</h3>

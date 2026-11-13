@@ -28,6 +28,7 @@
   import BeerOfTheWeek from '$lib/components/BeerOfTheWeek.svelte'
   import PaceCard from '$lib/components/PaceCard.svelte'
   import TopList from '$lib/components/TopList.svelte'
+  import StatTiles from '$lib/components/StatTiles.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
@@ -38,7 +39,13 @@
   import WeekdayBars from '$lib/components/WeekdayBars.svelte'
   import WorldMap from '$lib/components/WorldMap.svelte'
   import CountryFlag from '$lib/components/CountryFlag.svelte'
-  import { getThisWeekBreakdown, getPeakHour } from '$lib/utils'
+  import {
+    getThisWeekBreakdown,
+    getPeakHour,
+    sumDays,
+    sumThisMonth,
+    lastSevenDays,
+  } from '$lib/utils'
 
   let { data }: { data: PageData } = $props()
 
@@ -77,25 +84,6 @@
 
   const hasMore = $derived(feedOffset < feedTotal)
 
-  // Activity dates are UTC calendar days; these windows are counted the same way.
-  const DAY_MS = 86_400_000
-  const utcDay = (daysAgo: number) =>
-    new Date(Date.now() - daysAgo * DAY_MS).toISOString().slice(0, 10)
-  const sumDays = (fromDaysAgo: number, toDaysAgo: number) => {
-    const from = utcDay(fromDaysAgo)
-    const to = utcDay(toDaysAgo)
-    return activity.days
-      .filter((d) => d.date >= from && d.date <= to)
-      .reduce((n, d) => n + d.count, 0)
-  }
-  const today = $derived(sumDays(0, 0))
-  const last7 = $derived(sumDays(6, 0))
-  const prev7 = $derived(sumDays(13, 7))
-  const weekChange = $derived(prev7 > 0 ? Math.round(((last7 - prev7) / prev7) * 100) : null)
-  const thisMonth = $derived.by(() => {
-    const month = utcDay(0).slice(0, 7)
-    return activity.days.filter((d) => d.date.startsWith(month)).reduce((n, d) => n + d.count, 0)
-  })
   const perDrinker = $derived(
     stats.activeMemberCount > 0 ? (stats.totalBeers / stats.activeMemberCount).toFixed(1) : '–',
   )
@@ -117,6 +105,24 @@
     weekdayData.reduce((a, b) => (b.count > a.count ? b : a), weekdayData[0]),
   )
   const peakHour = $derived(getPeakHour(hourly.hours))
+
+  const week = $derived(lastSevenDays(activity.days))
+  const tiles = $derived([
+    { label: 'Today', value: sumDays(activity.days, 0, 0).toLocaleString() },
+    {
+      label: 'Last 7 days',
+      value: week.total.toLocaleString(),
+      note:
+        week.change === null
+          ? null
+          : `${week.change >= 0 ? '▲' : '▼'} ${Math.abs(week.change)}% vs week before`,
+      trend: week.change !== null && week.change >= 0 ? ('up' as const) : ('down' as const),
+    },
+    { label: 'This month', value: sumThisMonth(activity.days).toLocaleString() },
+    { label: 'Countries', value: countries.length.toLocaleString() },
+    { label: 'Peak hour', value: peakHour ?? '–' },
+    { label: 'Beers / drinker', value: perDrinker },
+  ])
 
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
   const PODIUM_COLORS = [
@@ -470,38 +476,7 @@
         <div class="panel-content">
           <PaceCard count={liveCount} days={activity.days} />
 
-          <div class="tiles">
-            <div class="tile">
-              <span class="tile-value">{today.toLocaleString()}</span>
-              <span class="tile-label">Today</span>
-            </div>
-            <div class="tile">
-              <span class="tile-value">{last7.toLocaleString()}</span>
-              <span class="tile-label">Last 7 days</span>
-              {#if weekChange !== null}
-                <span class="tile-delta" class:tile-delta--up={weekChange >= 0}>
-                  {weekChange >= 0 ? '▲' : '▼'}
-                  {Math.abs(weekChange)}% vs week before
-                </span>
-              {/if}
-            </div>
-            <div class="tile">
-              <span class="tile-value">{thisMonth.toLocaleString()}</span>
-              <span class="tile-label">This month</span>
-            </div>
-            <div class="tile">
-              <span class="tile-value">{countries.length.toLocaleString()}</span>
-              <span class="tile-label">Countries</span>
-            </div>
-            <div class="tile">
-              <span class="tile-value">{peakHour ?? '–'}</span>
-              <span class="tile-label">Peak hour</span>
-            </div>
-            <div class="tile">
-              <span class="tile-value">{perDrinker}</span>
-              <span class="tile-label">Beers / drinker</span>
-            </div>
-          </div>
+          <StatTiles {tiles} />
 
           <!-- Contribution heatmap — 1 year -->
           <div class="chart-card">
@@ -888,63 +863,6 @@
   }
 
   /* ── Stats carousel ─────────────────────────────── */
-  /* Headline numbers, styled like the header stats bars */
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    background: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    border-radius: 0.75rem;
-    overflow: hidden;
-  }
-
-  .tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    min-width: 0;
-    padding: 0.8rem 0.35rem;
-    text-align: center;
-    border-right: 1px solid var(--color-border);
-    border-bottom: 1px solid var(--color-border);
-  }
-
-  .tile:nth-child(3n) {
-    border-right: none;
-  }
-
-  .tile:nth-last-child(-n + 3) {
-    border-bottom: none;
-  }
-
-  .tile-value {
-    font-family: var(--font-display);
-    font-size: clamp(1.1rem, 4.4vw, 1.5rem);
-    font-weight: 700;
-    line-height: 1;
-    color: var(--color-beer-amber);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .tile-label {
-    font-size: 0.55rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-  }
-
-  .tile-delta {
-    font-size: 0.6rem;
-    color: var(--color-text-muted);
-  }
-
-  .tile-delta--up {
-    color: var(--color-positive);
-  }
-
   .chart-card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
