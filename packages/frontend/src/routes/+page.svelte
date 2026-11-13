@@ -18,10 +18,12 @@
     getGlobalHourly,
     getGlobalMonthly,
     getGlobalCountries,
+    getBeerOfTheWeek,
   } from '$lib/api'
   import { transformSseToFeedItem } from '$lib/utils'
   import HeroCard from '$lib/components/HeroCard.svelte'
   import FeedGrid from '$lib/components/FeedGrid.svelte'
+  import BeerOfTheWeek from '$lib/components/BeerOfTheWeek.svelte'
   import BeerFlash from '$lib/components/BeerFlash.svelte'
   import StatsStrip from '$lib/components/StatsStrip.svelte'
   import BeerLightbox from '$lib/components/BeerLightbox.svelte'
@@ -42,6 +44,7 @@
   let feedOffset = $state(untrack(() => data.feed.items.length))
   let feedTotal = $state(untrack(() => data.feed.total))
   let stats = $state(untrack(() => data.stats))
+  let beerOfTheWeek = $state(untrack(() => data.beerOfTheWeek))
   // Deferred chart data — populated after initial render (see onMount)
   let activity = $state<GlobalActivityResponse>({ days: [] })
   let hourly = $state<GlobalHourlyResponse>({ hours: [] })
@@ -102,12 +105,30 @@
   const peakHour = $derived(getPeakHour(hourly.hours))
 
   const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
+  const PODIUM_COLORS = [
+    'var(--color-rank-gold)',
+    'var(--color-rank-silver)',
+    'var(--color-rank-bronze)',
+  ]
 
   let refetchTimer: ReturnType<typeof setTimeout> | null = null
+  let beerOfTheWeekTimer: ReturnType<typeof setTimeout> | null = null
+
+  // A reaction anywhere can change which beer leads the week.
+  function refetchBeerOfTheWeek() {
+    if (beerOfTheWeekTimer) clearTimeout(beerOfTheWeekTimer)
+    beerOfTheWeekTimer = setTimeout(async () => {
+      beerOfTheWeek = (await getBeerOfTheWeek(fetch)).beer
+    }, 1500)
+  }
 
   $effect(() => {
     const event = getLastSseEvent()
-    if (!event || event.type === 'reactions') return
+    if (!event) return
+    if (event.type === 'reactions') {
+      refetchBeerOfTheWeek()
+      return
+    }
 
     // untrack: only lastEvent should be a reactive dependency.
     // Reads of feedItems, pendingItems, isNearTop etc. inside here must not
@@ -122,6 +143,7 @@
         pendingItems = pendingItems.filter((p) => p.id !== event.id)
         feedTotal = Math.max(0, feedTotal - 1)
         if (wasInFeed) feedOffset = Math.max(0, feedOffset - 1)
+        if (event.id === beerOfTheWeek?.id) refetchBeerOfTheWeek()
       } else {
         sessionCount += 1
         flashCount += 1
@@ -172,16 +194,25 @@
     // Reads getResyncCount() as the sole dependency; everything else is untracked.
     getResyncCount()
     untrack(async () => {
-      const [countData, feedData, newStats, newActivity, newHourly, newMonthly, newCountries] =
-        await Promise.all([
-          getGlobalCount(fetch),
-          getGlobalFeed(fetch, { limit: 20, offset: 0 }),
-          getGlobalStats(fetch),
-          getGlobalActivity(fetch),
-          getGlobalHourly(fetch),
-          getGlobalMonthly(fetch),
-          getGlobalCountries(fetch),
-        ])
+      const [
+        countData,
+        feedData,
+        newStats,
+        newActivity,
+        newHourly,
+        newMonthly,
+        newCountries,
+        newBeerOfTheWeek,
+      ] = await Promise.all([
+        getGlobalCount(fetch),
+        getGlobalFeed(fetch, { limit: 20, offset: 0 }),
+        getGlobalStats(fetch),
+        getGlobalActivity(fetch),
+        getGlobalHourly(fetch),
+        getGlobalMonthly(fetch),
+        getGlobalCountries(fetch),
+        getBeerOfTheWeek(fetch),
+      ])
       liveCount = countData.count
       feedItems = feedData.items
       feedOffset = feedData.items.length
@@ -192,6 +223,7 @@
       hourly = newHourly
       monthly = newMonthly
       countries = newCountries
+      beerOfTheWeek = newBeerOfTheWeek.beer
     })
   })
 
@@ -381,11 +413,19 @@
         <div class="content-grid">
           <!-- Feed -->
           <section class="feed-section">
+            {#if beerOfTheWeek}
+              <BeerOfTheWeek
+                beer={beerOfTheWeek}
+                onopen={(item) => {
+                  lightboxItem = item
+                }}
+              />
+            {/if}
             <FeedGrid
               items={feedItems}
               loading={loadingMore && feedItems.length === 0}
               {newestId}
-              onlongpress={(item) => {
+              onopen={(item) => {
                 lightboxItem = item
               }}
             />
@@ -491,14 +531,28 @@
 
           {#if countries.length > 0}
             <div class="country-leaderboard">
-              <h3 class="country-lb-title">Countries</h3>
+              <div class="country-lb-head">
+                <h3 class="country-lb-title">Countries</h3>
+                <span class="country-lb-title">Beers</span>
+              </div>
               <ol class="country-lb-list">
                 {#each countries as country, i}
                   {@const name = regionNames.of(country.countryCode) ?? country.countryCode}
-                  <li class="country-lb-row">
+                  {@const podiumColor = PODIUM_COLORS[i]}
+                  <li
+                    class="country-lb-row"
+                    class:country-lb-row--podium={podiumColor}
+                    style={podiumColor ? `--podium-color: ${podiumColor}` : undefined}
+                  >
                     <span class="country-lb-rank">{i + 1}</span>
                     <CountryFlag countryCode={country.countryCode} size={16} />
-                    <span class="country-lb-name">{name}</span>
+                    <span class="country-lb-name-wrap">
+                      <span class="country-lb-name">{name}</span>
+                      <span class="country-lb-users">
+                        {country.userCount.toLocaleString()}
+                        {country.userCount === 1 ? 'user' : 'users'}
+                      </span>
+                    </span>
                     <span class="country-lb-count">{country.beerCount.toLocaleString()}</span>
                   </li>
                 {/each}
@@ -521,8 +575,9 @@
     gap: 1rem;
   }
 
+  /* Full-bleed: cancels .page's padding and the gap above the tab bar */
   .hero-wrap {
-    width: 100%;
+    margin: -1.25rem -1rem -1rem;
   }
 
   /* ── Tab bar ────────────────────────────────────── */
@@ -532,7 +587,7 @@
     z-index: 50;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    background: rgba(18, 12, 5, 0.97);
+    background: var(--color-bg-tabs);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--color-border);
@@ -650,14 +705,20 @@
     overflow: hidden;
   }
 
+  .country-lb-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.6rem;
+    flex-shrink: 0;
+  }
+
   .country-lb-title {
     font-size: 0.65rem;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-text-muted);
-    margin-bottom: 0.6rem;
-    flex-shrink: 0;
   }
 
   .country-lb-list {
@@ -673,12 +734,29 @@
     display: flex;
     align-items: center;
     gap: 0.55rem;
-    padding: 0.45rem 0;
+    padding: 0.3rem 0;
     border-bottom: 1px solid var(--color-border);
   }
 
   .country-lb-row:last-child {
     border-bottom: none;
+  }
+
+  .country-lb-row--podium {
+    box-shadow: inset 2px 0 0 var(--podium-color);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--podium-color) 6%, transparent),
+      transparent 60%
+    );
+  }
+
+  .country-lb-row--podium .country-lb-rank {
+    color: var(--podium-color);
+  }
+
+  .country-lb-row--podium .country-lb-name {
+    font-weight: 600;
   }
 
   .country-lb-rank {
@@ -690,9 +768,22 @@
     flex-shrink: 0;
   }
 
-  .country-lb-name {
+  .country-lb-name-wrap {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .country-lb-users {
+    font-size: 0.65rem;
+    line-height: 1.2;
+    color: var(--color-text-muted);
+  }
+
+  .country-lb-name {
     font-size: 0.82rem;
+    line-height: 1.25;
     color: var(--color-beer-foam);
     white-space: nowrap;
     overflow: hidden;
@@ -727,11 +818,11 @@
     }
 
     .country-leaderboard {
-      width: 220px;
+      width: 260px;
       flex-shrink: 0;
       margin: 0;
       /* Match the map's natural height: (available width - leaderboard - gap) × 500/960 */
-      max-height: calc((min(100vw, 1200px) - 2rem - 220px - 1rem) * 500 / 960);
+      max-height: calc((min(100vw, 1200px) - 2rem - 260px - 1rem) * 500 / 960);
       overflow: hidden;
       display: flex;
       flex-direction: column;

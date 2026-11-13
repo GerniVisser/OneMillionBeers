@@ -7,18 +7,21 @@ import {
   getGlobalHourly,
   getGlobalMonthly,
   getGlobalCountries,
+  getBeerOfTheWeek,
 } from '$lib/api'
 
 export const load: PageLoad = async ({ fetch }) => {
-  const [countData, feedData, stats] = await Promise.all([
+  const [countData, feedData, stats, beerOfTheWeek] = await Promise.all([
     getGlobalCount(fetch),
     getGlobalFeed(fetch, { limit: 20, offset: 0 }),
     getGlobalStats(fetch),
+    getBeerOfTheWeek(fetch),
   ])
   return {
     count: countData.count,
     feed: feedData,
     stats,
+    beerOfTheWeek: beerOfTheWeek.beer,
     // Deferred: resolved in the page component after initial render
     activity: getGlobalActivity(fetch),
     hourly: getGlobalHourly(fetch),

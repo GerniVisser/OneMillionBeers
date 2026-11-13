@@ -7,11 +7,11 @@
   let {
     item,
     isNew = false,
-    onlongpress,
+    onopen,
   }: {
     item: FeedItem
     isNew?: boolean
-    onlongpress?: (item: FeedItem) => void
+    onopen?: (item: FeedItem) => void
   } = $props()
 
   const displayName = $derived(item.user.displayName ?? item.user.pseudoName ?? 'Anonymous')
@@ -26,37 +26,27 @@
     if (isNew) animating = true
   })
 
-  // Long-press
-  let pressTimer: ReturnType<typeof setTimeout> | null = null
-  let isPressed = $state(false)
-  let startX = 0
-  let startY = 0
+  // Browsers withhold `click` when a touch becomes a scroll, or stops a fling.
+  // The slop check also drops a short drag that ends on the card it started on.
+  const TAP_SLOP_PX = 10
+  let downX = 0
+  let downY = 0
 
   function handlePointerDown(e: PointerEvent) {
-    if (e.button !== 0 && e.pointerType === 'mouse') return
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    startX = e.clientX
-    startY = e.clientY
-    isPressed = true
-    pressTimer = setTimeout(() => {
-      isPressed = false
-      onlongpress?.(item)
-    }, 500)
+    downX = e.clientX
+    downY = e.clientY
   }
 
-  function handlePointerMove(e: PointerEvent) {
-    if (!pressTimer) return
-    const dx = e.clientX - startX
-    const dy = e.clientY - startY
-    if (Math.sqrt(dx * dx + dy * dy) > 10) cancelPress()
+  function handleClick(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('a')) return
+    if (Math.hypot(e.clientX - downX, e.clientY - downY) > TAP_SLOP_PX) return
+    onopen?.(item)
   }
 
-  function cancelPress() {
-    if (pressTimer) {
-      clearTimeout(pressTimer)
-      pressTimer = null
-    }
-    isPressed = false
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    onopen?.(item)
   }
 </script>
 
@@ -64,16 +54,13 @@
   <div
     class="card"
     class:card-new={animating}
-    class:card-pressed={isPressed}
     onpointerdown={handlePointerDown}
-    onpointermove={handlePointerMove}
-    onpointerup={cancelPress}
-    onpointercancel={cancelPress}
-    onpointerleave={cancelPress}
+    onclick={handleClick}
+    onkeydown={handleKeydown}
     onanimationend={() => (animating = false)}
     role="button"
     tabindex="0"
-    aria-label="Beer photo by {displayName} — long press to enlarge"
+    aria-label="Beer photo by {displayName} — tap to enlarge"
   >
     <!--
     photo-wrap is the container query root. Its fixed 3:4 aspect-ratio gives
@@ -141,18 +128,21 @@
     overflow: hidden;
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
-    cursor: pointer;
+    cursor: zoom-in;
     user-select: none;
     transition:
       transform 150ms ease,
       box-shadow 150ms ease;
   }
 
-  .card-pressed {
-    transform: scale(0.97);
-    box-shadow:
-      0 0 0 2px var(--color-beer-amber),
-      0 0 12px rgba(212, 136, 58, 0.4);
+  /* Mouse only: on touch it would flash whenever a finger lands to scroll */
+  @media (hover: hover) {
+    .card:active {
+      transform: scale(0.97);
+      box-shadow:
+        0 0 0 2px var(--color-beer-amber),
+        0 0 12px rgba(212, 136, 58, 0.4);
+    }
   }
 
   /* Container query root — also the fixed-ratio anchor for Masonry */

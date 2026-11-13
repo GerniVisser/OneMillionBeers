@@ -5,6 +5,7 @@ import type {
   GlobalHourlyResponse,
   GlobalMonthlyResponse,
   GlobalCountriesResponse,
+  BeerOfTheWeekResponse,
   FeedItem,
   LeaderboardResponse,
   GroupProfileResponse,
@@ -78,6 +79,13 @@ export function getGlobalFeed(
     limit: pagination?.limit ?? 20,
     offset: pagination?.offset ?? 0,
   })
+}
+
+// A failure hides the card rather than failing the home page with it.
+export function getBeerOfTheWeek(fetch: typeof globalThis.fetch): Promise<BeerOfTheWeekResponse> {
+  return get<BeerOfTheWeekResponse>(fetch, '/global/beer-of-the-week').catch(() => ({
+    beer: null,
+  }))
 }
 
 export function getGlobalLeaderboard(fetch: typeof globalThis.fetch): Promise<LeaderboardResponse> {

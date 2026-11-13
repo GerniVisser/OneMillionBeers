@@ -20,6 +20,7 @@ import {
   PaginatedResponseSchema,
   FeedItemSchema,
   LeaderboardResponseSchema,
+  BeerOfTheWeekResponseSchema,
 } from '@omb/shared'
 
 let pool: pg.Pool
@@ -115,6 +116,101 @@ describe('GET /v1/global/feed', () => {
     expect(body.items).toHaveLength(2)
     expect(body.total).toBe(5)
     expect(body.offset).toBe(1)
+  })
+})
+
+describe('GET /v1/global/beer-of-the-week', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString()
+
+  async function postBeer(sourceMessageId: string, loggedAt: string, sourceGroupId = 'group-tg-1') {
+    await app.inject({
+      method: 'POST',
+      url: '/v1/internal/beer-log',
+      headers: internalHeaders,
+      payload: {
+        sourceGroupId,
+        groupName: 'Test Group',
+        senderId: 'wa:27831234567',
+        timestamp: loggedAt,
+        photoUrl: `https://example.com/${sourceMessageId}.jpg`,
+        sourceMessageId,
+      },
+    })
+  }
+
+  async function react(
+    sourceMessageId: string,
+    reactors: string[],
+    emoji: string | null = '🍻',
+    sourceGroupId = 'group-tg-1',
+  ) {
+    for (const reactorId of reactors) {
+      await app.inject({
+        method: 'POST',
+        url: '/v1/internal/beer-log/reaction',
+        headers: internalHeaders,
+        payload: { sourceGroupId, sourceMessageId, reactorId, emoji, timestamp: daysAgo(0) },
+      })
+    }
+  }
+
+  const winner = async () =>
+    (await app.inject({ method: 'GET', url: '/v1/global/beer-of-the-week' })).json().beer
+
+  it('returns null when no recent beer has a reaction', async () => {
+    await postBeer('QUIET', daysAgo(1))
+    const res = await app.inject({ method: 'GET', url: '/v1/global/beer-of-the-week' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ beer: null })
+  })
+
+  it('returns the beer with the most reactions, with its reaction summary', async () => {
+    await postBeer('LIKED', daysAgo(2))
+    await postBeer('LOVED', daysAgo(3))
+    await react('LIKED', ['wa:1'])
+    await react('LOVED', ['wa:1', 'wa:2'], '❤️')
+    await react('LOVED', ['wa:3'], '🔥')
+
+    const res = await app.inject({ method: 'GET', url: '/v1/global/beer-of-the-week' })
+    const parsed = BeerOfTheWeekResponseSchema.safeParse(res.json())
+    expect(parsed.success).toBe(true)
+    expect(parsed.data?.beer?.photoUrl).toBe('https://example.com/LOVED.jpg')
+    expect(parsed.data?.beer?.reactions).toEqual([
+      { emoji: '❤️', count: 2 },
+      { emoji: '🔥', count: 1 },
+    ])
+  })
+
+  it('ignores beers posted more than 7 days ago', async () => {
+    await postBeer('OLD', daysAgo(8))
+    await postBeer('NEW', daysAgo(1))
+    await react('OLD', ['wa:1', 'wa:2', 'wa:3'])
+    await react('NEW', ['wa:1'])
+    expect((await winner()).photoUrl).toBe('https://example.com/NEW.jpg')
+  })
+
+  it('does not count removed reactions', async () => {
+    await postBeer('FADED', daysAgo(1))
+    await postBeer('STEADY', daysAgo(1))
+    await react('FADED', ['wa:1', 'wa:2'])
+    await react('FADED', ['wa:1', 'wa:2'], null)
+    await react('STEADY', ['wa:1'])
+    expect((await winner()).photoUrl).toBe('https://example.com/STEADY.jpg')
+  })
+
+  it('gives a tie to the newer beer', async () => {
+    await postBeer('OLDER', daysAgo(3))
+    await postBeer('NEWER', daysAgo(1))
+    await react('OLDER', ['wa:1'])
+    await react('NEWER', ['wa:1'])
+    expect((await winner()).photoUrl).toBe('https://example.com/NEWER.jpg')
+  })
+
+  it('skips beers in disabled groups', async () => {
+    await postBeer('HIDDEN', daysAgo(1), 'group-hidden')
+    await react('HIDDEN', ['wa:1', 'wa:2'], '🍻', 'group-hidden')
+    await pool.query(`UPDATE groups SET disabled = TRUE WHERE source_group_id = 'group-hidden'`)
+    expect(await winner()).toBeNull()
   })
 })
 

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { UuidSchema, IsoDatetimeSchema } from './primitives.js'
 import { UserSummarySchema } from './user.js'
-import { ReactionSummarySchema } from './beer.js'
+import { FeedItemSchema, ReactionSummarySchema } from './beer.js'
 
 // GET /v1/users/search
 export const UserSearchQuerySchema = z.object({
@@ -55,6 +55,12 @@ export const GlobalCountResponseSchema = z.object({
   count: z.number().int().nonnegative(),
 })
 export type GlobalCountResponse = z.infer<typeof GlobalCountResponseSchema>
+
+// GET /v1/global/beer-of-the-week — null until a beer from the last 7 days gets a reaction
+export const BeerOfTheWeekResponseSchema = z.object({
+  beer: FeedItemSchema.nullable(),
+})
+export type BeerOfTheWeekResponse = z.infer<typeof BeerOfTheWeekResponseSchema>
 
 // GET /v1/users/:userId/feed — re-uses the same FeedItem / paginated shape as group feed
 // (no new schema needed; callers use PaginatedResponseSchema(FeedItemSchema))

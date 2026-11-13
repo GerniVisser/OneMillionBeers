@@ -32,7 +32,7 @@
   </button>
 
   <div class="modal-header">
-    <div class="beer-icon">🍺</div>
+    <img class="beer-icon" src="/favicon.svg" alt="" width="56" height="56" />
     <h2 class="modal-title">OneMillionBeers</h2>
     <p class="modal-tagline">One mission. One million beers.</p>
   </div>
@@ -150,9 +150,9 @@
   }
 
   .beer-icon {
-    font-size: 2rem;
-    line-height: 1;
-    margin-bottom: 0.5rem;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: 0 auto 0.5rem;
     display: block;
     filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.4));
     animation: bob 3s ease-in-out infinite;
