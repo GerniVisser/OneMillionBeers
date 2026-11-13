@@ -28,8 +28,8 @@
     return all
   })()
 
-  // ── Mode (name is the default) ───────────────────────────
-  let mode = $state<Mode>('name')
+  // Most people know their number but not their generated beer name.
+  let mode = $state<Mode>('phone')
 
   // ── Shared results state ────────────────────────────────
   let results = $state<UserSummary[]>([])
@@ -43,7 +43,7 @@
 
   // ── Phone mode ──────────────────────────────────────────
   let localNumber = $state('')
-  let selectedCountry = $state<Country | null>(null)
+  let selectedCountry = $state<Country | null>(COUNTRIES[0])
   let countryOpen = $state(false)
   let phoneInputRef: HTMLInputElement | undefined = $state()
 
@@ -181,50 +181,28 @@
 <svelte:window onclick={onWindowClick} onkeydown={onWindowKeydown} />
 
 <div class="search-wrap" bind:this={containerRef}>
-  <!-- ── Name mode ─────────────────────────────────────── -->
-  {#if mode === 'name'}
-    <div class="input-row">
-      <svg
-        class="input-icon"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.8"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="10.5" cy="10.5" r="6.5" />
-        <path d="M15.5 15.5L20 20" />
-      </svg>
-      <input
-        bind:this={nameInputRef}
-        type="search"
-        placeholder="Search by beer name…"
-        value={nameQuery}
-        oninput={onNameInput}
-        onfocus={() => {
-          if (nameQuery && results.length) open = true
-        }}
-        class="search-input"
-        aria-label="Search by beer name"
-        aria-haspopup="listbox"
-        autocomplete="off"
-      />
-      {#if loading}
-        <div class="spinner" aria-hidden="true"></div>
-      {/if}
-    </div>
-
-    <p class="mode-switch">
-      Can't find yourself?
-      <button class="mode-link" onclick={() => switchMode('phone')}>
-        Search by phone number instead
-      </button>
-    </p>
-  {/if}
+  <div class="tabs" role="tablist" aria-label="Search by">
+    <button
+      type="button"
+      role="tab"
+      class="tab"
+      class:tab--active={mode === 'phone'}
+      aria-selected={mode === 'phone'}
+      onclick={() => switchMode('phone')}
+    >
+      Phone number
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab"
+      class:tab--active={mode === 'name'}
+      aria-selected={mode === 'name'}
+      onclick={() => switchMode('name')}
+    >
+      Beer name
+    </button>
+  </div>
 
   <!-- ── Phone mode ────────────────────────────────────── -->
   {#if mode === 'phone'}
@@ -330,11 +308,51 @@
       {/if}
     </div>
 
-    <p class="mode-switch">
-      {#if phoneReady}
-        {selectedCountry!.name} · leading 0 is fine ·
+    <p class="search-help">
+      Pick your country code, then type the number you use on WhatsApp. A leading 0 is fine.
+    </p>
+  {/if}
+
+  <!-- ── Name mode ─────────────────────────────────────── -->
+  {#if mode === 'name'}
+    <div class="input-row">
+      <svg
+        class="input-icon"
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="M15.5 15.5L20 20" />
+      </svg>
+      <input
+        bind:this={nameInputRef}
+        type="search"
+        placeholder="Search by beer name…"
+        value={nameQuery}
+        oninput={onNameInput}
+        onfocus={() => {
+          if (nameQuery && results.length) open = true
+        }}
+        class="search-input"
+        aria-label="Search by beer name"
+        aria-haspopup="listbox"
+        autocomplete="off"
+      />
+      {#if loading}
+        <div class="spinner" aria-hidden="true"></div>
       {/if}
-      <button class="mode-link" onclick={() => switchMode('name')}> Search by name instead </button>
+    </div>
+
+    <p class="search-help">
+      Type at least 4 letters of your beer name: the made-up name shown on your photos, like
+      <em>HoppyGoldenLager</em>.
     </p>
   {/if}
 
@@ -378,7 +396,11 @@
           </a>
         {/each}
       {:else if noResults}
-        <p class="no-results">No profile found — try a different spelling or phone number</p>
+        <p class="no-results">
+          {mode === 'phone'
+            ? 'No profile found for this number. Check the country code.'
+            : 'No profile found. Try a different spelling.'}
+        </p>
       {/if}
     </div>
   {/if}
@@ -465,33 +487,59 @@
     }
   }
 
-  /* ── Mode switcher ──────────────────────────────────────── */
+  /* ── Tabs ───────────────────────────────────────────────── */
 
-  .mode-switch {
-    margin: 0.45rem 0.25rem 0;
+  .tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.6rem;
+    padding: 0.2rem;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 0.45rem 0.75rem;
+    background: none;
+    border: none;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    transition:
+      background 120ms ease,
+      color 120ms ease;
+  }
+
+  .tab:hover {
+    color: var(--color-beer-foam);
+  }
+
+  .tab--active {
+    background: rgba(212, 136, 58, 0.18);
+    color: var(--color-beer-amber);
+  }
+
+  .tab--active:hover {
+    color: var(--color-beer-amber);
+  }
+
+  /* ── Usage hint ─────────────────────────────────────────── */
+
+  .search-help {
+    margin: 0.5rem 0.25rem 0;
     font-size: 0.75rem;
+    line-height: 1.4;
     color: var(--color-text-muted);
   }
 
-  .mode-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: inherit;
-    font-family: inherit;
-    color: var(--color-beer-amber);
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: rgba(212, 136, 58, 0.4);
-    text-underline-offset: 2px;
-    transition:
-      color 120ms ease,
-      text-decoration-color 120ms ease;
-  }
-
-  .mode-link:hover {
+  .search-help em {
+    font-style: normal;
     color: var(--color-beer-foam);
-    text-decoration-color: var(--color-beer-foam);
   }
 
   /* ── Country prefix ─────────────────────────────────────── */

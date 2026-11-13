@@ -38,7 +38,7 @@
 <div class="page-wrap">
   <div class="page-header">
     <h1 class="page-title">Find a Profile</h1>
-    <p class="page-subtitle">Search for your profile by beer name or phone number</p>
+    <p class="page-subtitle">Search for your profile by phone number or beer name</p>
   </div>
 
   {#if recentUsers.length > 0}
