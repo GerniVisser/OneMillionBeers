@@ -64,6 +64,41 @@ Access: security group allows port 5432 from EC2 security group only.
 | Versioning   | Disabled (photos are immutable)                                                          |
 | CORS         | GET allowed from `https://onemillionbeers.co.za` and `https://www.onemillionbeers.co.za` |
 
+### Photo CDN — CloudFront
+
+`img.onemillionbeers.co.za` is a CloudFront distribution in front of the photos bucket (`infra/cdn.tf`).
+
+| Property       | Value                                                                             |
+| -------------- | --------------------------------------------------------------------------------- |
+| Photos         | Edge copy kept 30 days, browser copy 1 day                                        |
+| Group avatars  | Edge and browser copy kept 1 hour — the object is overwritten on every group sync |
+| Revoked photos | Collector deletes the S3 object, then invalidates the path on the distribution    |
+| Bucket access  | Still public — rows logged before the CDN hold direct S3 URLs                     |
+
+The collector uses the CDN only when these SSM parameters exist; without them it behaves as before:
+
+| Parameter                          | Effect                                         |
+| ---------------------------------- | ---------------------------------------------- |
+| `/omb/STORAGE_CDN_DISTRIBUTION_ID` | Photo deletes also invalidate the edge copy    |
+| `/omb/STORAGE_CDN_URL`             | New photo and avatar URLs are built on the CDN |
+
+Rollout order:
+
+1. Apply the CDN resources only — an untargeted apply is not safe on this stack:
+
+   ```bash
+   terraform apply \
+     -target=aws_cloudfront_distribution.photos \
+     -target=aws_route53_record.cdn \
+     -target=aws_iam_policy.s3_photos
+   ```
+
+2. Check that an existing photo loads from `https://img.onemillionbeers.co.za/photos/...`.
+3. Create `/omb/STORAGE_CDN_DISTRIBUTION_ID` from the `cdn_distribution_id` output and deploy.
+4. Create `/omb/STORAGE_CDN_URL` (`https://img.onemillionbeers.co.za`) and deploy. Revoke a test photo and confirm both the S3 and the CDN URL stop serving it.
+
+To roll back, delete `/omb/STORAGE_CDN_URL` and deploy. Rows already written with CDN URLs keep working while the distribution exists.
+
 ### Security Groups
 
 **sg-ec2-omb**
@@ -194,6 +229,8 @@ STORAGE_BUCKET=onemillionbeers-photos-prod
 STORAGE_KEY=        # empty — IAM instance profile provides credentials
 STORAGE_SECRET=     # empty — IAM instance profile provides credentials
 STORAGE_REGION=us-east-1
+STORAGE_CDN_URL=              # optional — see Photo CDN
+STORAGE_CDN_DISTRIBUTION_ID=  # optional — see Photo CDN
 ORIGIN=https://onemillionbeers.co.za
 BACKEND_INTERNAL_URL=http://backend:3000
 INTERNAL_API_TOKEN=   # 32+ byte random shared secret for /v1/internal/*
@@ -226,6 +263,7 @@ infra/
   ec2.tf              — EC2 instance, Elastic IP, key pair
   rds.tf              — DB subnet group, RDS instance
   s3.tf               — Photos bucket, bucket policy, CORS
+  cdn.tf              — CloudFront distribution for photos, certificate, DNS
   outputs.tf          — ec2_public_ip, rds_endpoint, s3_bucket_name
 ```
 

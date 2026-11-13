@@ -19,6 +19,7 @@ data "aws_iam_policy_document" "s3_photos" {
     actions = [
       "s3:PutObject",
       "s3:GetObject",
+      "s3:DeleteObject",
     ]
     resources = ["${aws_s3_bucket.photos.arn}/*"]
   }
@@ -26,6 +27,12 @@ data "aws_iam_policy_document" "s3_photos" {
   statement {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.photos.arn]
+  }
+
+  # Purge the edge copy of a photo whose message was revoked
+  statement {
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = [aws_cloudfront_distribution.photos.arn]
   }
 }
 

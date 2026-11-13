@@ -288,14 +288,14 @@ async function handleReaction(
   }
 }
 
-function extractS3Key(photoUrl: string, storagePublicUrl: string, bucket: string): string | null {
-  try {
-    const prefix = `${storagePublicUrl.replace(/\/$/, '')}/${bucket}/`
-    if (!photoUrl.startsWith(prefix)) return null
-    return photoUrl.slice(prefix.length)
-  } catch {
-    return null
+// Rows hold whichever URL shape was current when the photo was logged.
+function extractS3Key(photoUrl: string): string | null {
+  const prefixes = [`${config.STORAGE_PUBLIC_URL.replace(/\/$/, '')}/${config.STORAGE_BUCKET}/`]
+  if (config.STORAGE_CDN_URL) {
+    prefixes.push(`${config.STORAGE_CDN_URL.replace(/\/$/, '')}/`)
   }
+  const prefix = prefixes.find((p) => photoUrl.startsWith(p))
+  return prefix ? photoUrl.slice(prefix.length) : null
 }
 
 async function handleRevokedMessage(body: Record<string, unknown>, logger: Logger): Promise<void> {
@@ -340,9 +340,9 @@ async function handleRevokedMessage(body: Record<string, unknown>, logger: Logge
     return
   }
 
-  const key = extractS3Key(photoUrl, config.STORAGE_PUBLIC_URL, config.STORAGE_BUCKET)
+  const key = extractS3Key(photoUrl)
   if (!key) {
-    logger.warn({ photoUrl }, 'Could not extract S3 key from photo URL — skipping S3 delete')
+    logger.error({ photoUrl }, 'Could not extract S3 key from photo URL — skipping S3 delete')
     return
   }
 

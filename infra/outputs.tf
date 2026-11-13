@@ -22,3 +22,13 @@ output "s3_deploy_bucket_name" {
   description = "Deploy artifacts S3 bucket name"
   value       = aws_s3_bucket.deploy.id
 }
+
+output "cdn_url" {
+  description = "Photo CDN base URL — set as /omb/STORAGE_CDN_URL in SSM"
+  value       = "https://${local.cdn_domain}"
+}
+
+output "cdn_distribution_id" {
+  description = "CloudFront distribution ID — set as /omb/STORAGE_CDN_DISTRIBUTION_ID in SSM"
+  value       = aws_cloudfront_distribution.photos.id
+}

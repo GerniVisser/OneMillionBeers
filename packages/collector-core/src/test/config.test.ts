@@ -40,6 +40,28 @@ describe('shared config', () => {
     expect(config.LOG_LEVEL).toBe('info')
   })
 
+  it('treats empty CDN variables as not set', async () => {
+    stubValidEnv()
+    vi.stubEnv('STORAGE_CDN_URL', '')
+    vi.stubEnv('STORAGE_CDN_DISTRIBUTION_ID', '')
+
+    const { config } = await import('../config.js')
+
+    expect(config.STORAGE_CDN_URL).toBeUndefined()
+    expect(config.STORAGE_CDN_DISTRIBUTION_ID).toBeUndefined()
+  })
+
+  it('reads the CDN variables when set', async () => {
+    stubValidEnv()
+    vi.stubEnv('STORAGE_CDN_URL', 'https://img.example.com')
+    vi.stubEnv('STORAGE_CDN_DISTRIBUTION_ID', 'E123EXAMPLE')
+
+    const { config } = await import('../config.js')
+
+    expect(config.STORAGE_CDN_URL).toBe('https://img.example.com')
+    expect(config.STORAGE_CDN_DISTRIBUTION_ID).toBe('E123EXAMPLE')
+  })
+
   it('calls process.exit(1) when BACKEND_URL is missing', async () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called')

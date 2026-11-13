@@ -33,6 +33,7 @@ vi.mock('../config.js', () => ({
     WAHA_API_KEY: 'test-key',
     STORAGE_PUBLIC_URL: 'https://s3.example.com',
     STORAGE_BUCKET: 'omb-bucket',
+    STORAGE_CDN_URL: 'https://img.example.com',
   },
 }))
 
@@ -432,6 +433,26 @@ describe('webhook', () => {
 
       expect(mockForwardDeleteBeerLog).toHaveBeenCalledWith('MSGID123', 'wa:120363XXXX@g.us')
       expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+    })
+
+    it('deletes the photo of a beer log whose URL is on the CDN', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://img.example.com/photos/120363XXXX/MSGID123.jpg',
+      )
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeRevokedPayload(), logger)
+
+      expect(mockDeletePhoto).toHaveBeenCalledWith('photos/120363XXXX/MSGID123.jpg')
+    })
+
+    it('does not delete anything when the photo URL matches no known storage URL', async () => {
+      mockForwardDeleteBeerLog.mockResolvedValue(
+        'https://elsewhere.example.com/photos/120363XXXX/MSGID123.jpg',
+      )
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeRevokedPayload(), logger)
+
+      expect(mockDeletePhoto).not.toHaveBeenCalled()
     })
 
     it('falls back to before.id when revokedMessageId is absent (WAHA Plus/WEBJS)', async () => {
