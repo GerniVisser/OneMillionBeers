@@ -8,6 +8,7 @@ import type {
   BeerLogOutcome,
   BeerLogReactionOutcome,
   FeedItem,
+  ReactionSummary,
   LeaderboardEntry,
   UserStatsResponse,
   GroupStatsResponse,
@@ -484,6 +485,29 @@ export async function upsertBeerLogReaction(
   }
 }
 
+// Removed reactions keep their row with a NULL emoji, so they are left out here.
+const REACTION_SUMMARY_SQL = `
+  COALESCE((
+    SELECT json_agg(json_build_object('emoji', s.emoji, 'count', s.n) ORDER BY s.n DESC, s.first)
+    FROM (
+      SELECT emoji, COUNT(*)::int AS n, MIN(reacted_at) AS first
+      FROM beer_log_reactions
+      WHERE beer_log_id = bl.id AND emoji IS NOT NULL
+      GROUP BY emoji
+    ) s
+  ), '[]'::json)`
+
+export async function getReactionSummary(
+  pool: pg.Pool,
+  beerLogId: string,
+): Promise<ReactionSummary> {
+  const { rows } = await pool.query<{ reactions: ReactionSummary }>(
+    `SELECT ${REACTION_SUMMARY_SQL} AS reactions FROM beer_logs bl WHERE bl.id = $1`,
+    [beerLogId],
+  )
+  return rows[0]?.reactions ?? []
+}
+
 // ─── Feed ────────────────────────────────────────────────────────────────────
 
 export async function getGlobalFeed(
@@ -505,7 +529,8 @@ export async function getGlobalFeed(
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
        json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
-       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
+       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group,
+       ${REACTION_SUMMARY_SQL} AS reactions
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
@@ -535,7 +560,8 @@ export async function getGroupFeed(
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
        json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
-       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
+       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group,
+       ${REACTION_SUMMARY_SQL} AS reactions
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id
@@ -653,7 +679,8 @@ export async function getUserFeed(
        bl.photo_url AS "photoUrl",
        bl.logged_at AS "loggedAt",
        json_build_object('id', u.id, 'displayName', u.display_name, 'pseudoName', u.pseudo_name, 'slug', u.slug, 'countryCode', u.country_code) AS user,
-       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group
+       json_build_object('id', g.id, 'name', g.name, 'slug', g.slug) AS group,
+       ${REACTION_SUMMARY_SQL} AS reactions
      FROM beer_logs bl
      JOIN users u ON bl.user_id = u.id
      JOIN groups g ON bl.group_id = g.id

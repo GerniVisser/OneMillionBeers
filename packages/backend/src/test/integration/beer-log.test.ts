@@ -505,6 +505,60 @@ describe('POST /v1/internal/beer-log/reaction', () => {
   })
 })
 
+describe('reaction summary', () => {
+  const feedReactions = async () =>
+    (await app.inject({ method: 'GET', url: '/v1/global/feed' })).json().items[0].reactions
+
+  it('is empty for a beer nobody reacted to', async () => {
+    await post(validPayload)
+    expect(await feedReactions()).toEqual([])
+  })
+
+  it('counts each emoji, most used first, and leaves out removed reactions', async () => {
+    await post(validPayload)
+    await react({ ...reaction, reactorId: 'wa:1', emoji: '🍻' })
+    await react({ ...reaction, reactorId: 'wa:2', emoji: '❤️' })
+    await react({ ...reaction, reactorId: 'wa:3', emoji: '❤️' })
+    await react({ ...reaction, reactorId: 'wa:4', emoji: '👍' })
+    await react({
+      ...reaction,
+      reactorId: 'wa:4',
+      emoji: null,
+      timestamp: '2024-06-01T12:06:00.000Z',
+    })
+
+    expect(await feedReactions()).toEqual([
+      { emoji: '❤️', count: 2 },
+      { emoji: '🍻', count: 1 },
+    ])
+  })
+
+  it('is pushed to stream subscribers when a reaction changes', async () => {
+    await post(validPayload)
+    const beerId = (await pool.query('SELECT id FROM beer_logs')).rows[0].id
+
+    const sseApp = await buildApp(pool, 'silent', 'test', INTERNAL_TEST_TOKEN)
+    const baseUrl = await sseApp.listen({ port: 0, host: '127.0.0.1' })
+    const controller = new AbortController()
+    try {
+      const res = await fetch(`${baseUrl}/v1/global/stream`, { signal: controller.signal })
+      const reader = res.body!.getReader()
+      await reader.read() // initial count event
+
+      await react(reaction)
+      const text = new TextDecoder().decode((await reader.read()).value)
+      expect(JSON.parse(text.replace(/^data: /, ''))).toEqual({
+        type: 'reactions',
+        id: beerId,
+        reactions: [{ emoji: '🍻', count: 1 }],
+      })
+    } finally {
+      controller.abort()
+      await sseApp.close()
+    }
+  }, 30000)
+})
+
 describe('pseudo_name generation', () => {
   it('sets pseudo_name on new user creation', async () => {
     await app.inject({

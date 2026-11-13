@@ -10,6 +10,7 @@ import {
   getLatestBeer,
   findBeerLogIdByMessage,
   upsertBeerLogReaction,
+  getReactionSummary,
 } from '../db/queries.js'
 import { hashIdentity } from '../lib/hash.js'
 import { extractCountryCode } from '../lib/phone.js'
@@ -97,6 +98,13 @@ export const beerLogRoutes: FastifyPluginAsync<{ pool: pg.Pool; internalToken: s
         emoji,
         reactedAt: timestamp,
       })
+      if (outcome === 'stored') {
+        broadcast({
+          type: 'reactions',
+          id: beerLogId,
+          reactions: await getReactionSummary(pool, beerLogId),
+        })
+      }
       return reply.status(200).send({ ok: true, outcome })
     },
   )
