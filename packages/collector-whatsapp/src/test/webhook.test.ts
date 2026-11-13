@@ -5,21 +5,27 @@ const mockUploadPhoto = vi.fn()
 const mockDeletePhoto = vi.fn()
 const mockForwardBeerLog = vi.fn()
 const mockForwardDeleteBeerLog = vi.fn()
+const mockForwardBeerLogReaction = vi.fn()
 const mockHandleSessionStatusChange = vi.fn()
 const mockGetGroupName = vi.fn()
 const mockSyncGroup = vi.fn()
+const mockGetGroupParticipants = vi.fn()
 
 vi.mock('@omb/collector-core', () => ({
   uploadPhoto: mockUploadPhoto,
   deletePhoto: mockDeletePhoto,
   forwardBeerLog: mockForwardBeerLog,
   forwardDeleteBeerLog: mockForwardDeleteBeerLog,
+  forwardBeerLogReaction: mockForwardBeerLogReaction,
   coreConfig: { LOG_LEVEL: 'silent' },
 }))
 vi.mock('../session-monitor.js', () => ({
   handleSessionStatusChange: mockHandleSessionStatusChange,
 }))
-vi.mock('../waha-client.js', () => ({ getGroupName: mockGetGroupName }))
+vi.mock('../waha-client.js', () => ({
+  getGroupName: mockGetGroupName,
+  getGroupParticipants: mockGetGroupParticipants,
+}))
 vi.mock('../group-sync.js', () => ({ syncGroup: mockSyncGroup }))
 vi.mock('../config.js', () => ({
   config: {
@@ -86,6 +92,10 @@ describe('webhook', () => {
     mockForwardBeerLog.mockResolvedValue('created')
     mockDeletePhoto.mockResolvedValue(undefined)
     mockForwardDeleteBeerLog.mockResolvedValue(null)
+    mockForwardBeerLogReaction.mockReset()
+    mockForwardBeerLogReaction.mockResolvedValue('stored')
+    mockGetGroupParticipants.mockReset()
+    mockGetGroupParticipants.mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -507,6 +517,129 @@ describe('webhook', () => {
         logger,
       )
       expect(mockForwardDeleteBeerLog).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('message.reaction', () => {
+    function makeReactionPayload(overrides?: Record<string, unknown>) {
+      return {
+        event: 'message.reaction',
+        session: 'default',
+        payload: {
+          id: 'false_120363XXXX@g.us_REACTID_189468321554607@lid',
+          timestamp: 1742306500,
+          from: '120363XXXX@g.us',
+          fromMe: false,
+          participant: '189468321554607@lid',
+          reaction: {
+            text: '🍻',
+            messageId: 'false_120363XXXX@g.us_MSGID123_101593877881022@lid',
+          },
+          ...overrides,
+        },
+      }
+    }
+
+    it('forwards the reaction with the reactor phone from the group participants', async () => {
+      mockGetGroupParticipants.mockResolvedValue([
+        { id: '189468321554607@lid', pn: '27831234567@c.us' },
+      ])
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeReactionPayload(), logger)
+
+      expect(mockGetGroupParticipants).toHaveBeenCalledWith('default', '120363XXXX@g.us')
+      expect(mockForwardBeerLogReaction).toHaveBeenCalledWith({
+        sourceGroupId: 'wa:120363XXXX@g.us',
+        sourceMessageId: 'MSGID123',
+        reactorId: 'wa:27831234567',
+        emoji: '🍻',
+        timestamp: new Date(1742306500 * 1000).toISOString(),
+      })
+    })
+
+    it('resolves the reactor from a message they sent, without asking WAHA', async () => {
+      mockImageFetch()
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        makeImagePayload({
+          participant: '189468321554607@lid',
+          _data: { key: { id: 'MSGID123', participantAlt: '27831234567@s.whatsapp.net' } },
+        }),
+        logger,
+      )
+      await handleWebhookEvent(makeReactionPayload(), logger)
+
+      expect(mockGetGroupParticipants).not.toHaveBeenCalled()
+      expect(mockForwardBeerLogReaction.mock.calls[0]![0].reactorId).toBe('wa:27831234567')
+    })
+
+    it('learns the reactor from a text message too', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        makeImagePayload({
+          hasMedia: false,
+          media: null,
+          participant: '189468321554607@lid',
+          _data: { key: { id: 'TEXT1', participantAlt: '27831234567@s.whatsapp.net' } },
+        }),
+        logger,
+      )
+      await handleWebhookEvent(makeReactionPayload(), logger)
+
+      expect(mockForwardBeerLogReaction.mock.calls[0]![0].reactorId).toBe('wa:27831234567')
+    })
+
+    it('uses a phone JID participant as is', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        makeReactionPayload({ participant: '27831234567@s.whatsapp.net' }),
+        logger,
+      )
+      expect(mockGetGroupParticipants).not.toHaveBeenCalled()
+      expect(mockForwardBeerLogReaction.mock.calls[0]![0].reactorId).toBe('wa:27831234567')
+    })
+
+    it('sends a null emoji when the reaction is removed', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(
+        makeReactionPayload({
+          participant: '27831234567@s.whatsapp.net',
+          reaction: { text: '', messageId: 'false_120363XXXX@g.us_MSGID123_1@lid' },
+        }),
+        logger,
+      )
+      expect(mockForwardBeerLogReaction.mock.calls[0]![0].emoji).toBeNull()
+    })
+
+    it('ignores a reaction outside a group', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeReactionPayload({ from: '27831234567@s.whatsapp.net' }), logger)
+      expect(mockForwardBeerLogReaction).not.toHaveBeenCalled()
+    })
+
+    it('ignores a reactor whose LID no source knows', async () => {
+      const { handleWebhookEvent } = await import('../webhook.js')
+      await handleWebhookEvent(makeReactionPayload(), logger)
+      expect(mockForwardBeerLogReaction).not.toHaveBeenCalled()
+    })
+
+    it('asks for redelivery when WAHA cannot list the participants', async () => {
+      mockGetGroupParticipants.mockRejectedValue(new Error('WAHA down'))
+      const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+      await expect(handleWebhookEvent(makeReactionPayload(), logger)).rejects.toBeInstanceOf(
+        RetryLater,
+      )
+    })
+
+    it('asks for redelivery when the backend cannot store the reaction', async () => {
+      mockForwardBeerLogReaction.mockRejectedValue(new Error('network error'))
+      const { handleWebhookEvent, RetryLater } = await import('../webhook.js')
+      await expect(
+        handleWebhookEvent(
+          makeReactionPayload({ participant: '27831234567@s.whatsapp.net' }),
+          logger,
+        ),
+      ).rejects.toBeInstanceOf(RetryLater)
     })
   })
 })

@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto'
 import { type Logger } from 'pino'
-import { uploadPhoto, deletePhoto, forwardBeerLog, forwardDeleteBeerLog } from '@omb/collector-core'
+import {
+  uploadPhoto,
+  deletePhoto,
+  forwardBeerLog,
+  forwardBeerLogReaction,
+  forwardDeleteBeerLog,
+} from '@omb/collector-core'
 import { type BeerLogOutcome } from '@omb/shared'
 import { handleSessionStatusChange } from './session-monitor.js'
 import { syncGroup } from './group-sync.js'
+import { rememberLid, resolveLid } from './lid-resolver.js'
 import { config } from './config.js'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024 // 20 MB
@@ -39,6 +46,11 @@ export async function handleWebhookEvent(body: unknown, logger: Logger): Promise
     return
   }
 
+  if (event === 'message.reaction') {
+    await handleReaction(body as Record<string, unknown>, session, logger.child({ session }))
+    return
+  }
+
   if (event === 'group.v2.join') {
     // Sync now rather than at the next poll.
     const group = ((body as Record<string, unknown>).payload as Record<string, unknown> | undefined)
@@ -65,6 +77,13 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
   const chatId = (payload.chatId ?? payload.to) as string | undefined
   if (!chatId?.endsWith('@g.us')) return
 
+  const data = payload._data as Record<string, unknown> | undefined
+  const dataKey = data?.key as Record<string, unknown> | undefined
+  rememberLid(
+    payload.participant as string | undefined,
+    dataKey?.participantAlt as string | undefined,
+  )
+
   const hasMedia = payload.hasMedia
   const media = payload.media as Record<string, unknown> | undefined
   const mimetype = media?.mimetype as string | undefined
@@ -82,9 +101,6 @@ async function handleMessage(body: Record<string, unknown>, logger: Logger): Pro
     logger.info({ chatId }, 'HD copy of an already-received photo — discarding')
     return
   }
-
-  const data = payload._data as Record<string, unknown> | undefined
-  const dataKey = data?.key as Record<string, unknown> | undefined
 
   // NOWEB's payload.id embeds the receiving participant, so it can differ between
   // our numbers. _data.key.id is the bare hash: the same for all, and what revokes carry.
@@ -213,6 +229,63 @@ function isHdChild(payload: Record<string, unknown>): boolean {
   const contextInfo = message?.messageContextInfo as Record<string, unknown> | undefined
   const association = contextInfo?.messageAssociation as Record<string, unknown> | undefined
   return association?.associationType === 'HD_IMAGE_DUAL_UPLOAD'
+}
+
+async function handleReaction(
+  body: Record<string, unknown>,
+  session: string,
+  logger: Logger,
+): Promise<void> {
+  const payload = body.payload as Record<string, unknown> | undefined
+  const reaction = payload?.reaction as Record<string, unknown> | undefined
+  if (!payload || !reaction) return
+
+  const chatId = payload.from as string | undefined
+  if (!chatId?.endsWith('@g.us')) return
+
+  // `{fromMe}_{chat}_{keyId}_{participant}`: keyId is the bare id a beer log is stored under.
+  const targetMessageId = (reaction.messageId as string | undefined)?.split('_')[2]
+  if (!targetMessageId) {
+    logger.warn({ chatId }, 'Reaction has no target message ID — ignoring')
+    return
+  }
+
+  const participant = payload.participant as string | undefined
+  if (!participant) {
+    logger.warn({ chatId }, 'Reaction has no participant — ignoring')
+    return
+  }
+
+  let phone: string | null
+  if (participant.endsWith('@lid')) {
+    try {
+      phone = await resolveLid(session, chatId, participant)
+    } catch (err) {
+      logger.error({ err, chatId }, 'Failed to resolve reactor LID')
+      throw new RetryLater()
+    }
+  } else {
+    phone = participant.split('@')[0]
+  }
+  if (!phone) {
+    logger.warn({ chatId, participant }, 'Reactor LID has no known phone number — ignoring')
+    return
+  }
+
+  const emoji = (reaction.text as string | undefined) || null
+  try {
+    const outcome = await forwardBeerLogReaction({
+      sourceGroupId: 'wa:' + chatId,
+      sourceMessageId: targetMessageId,
+      reactorId: 'wa:' + phone,
+      emoji,
+      timestamp: new Date((payload.timestamp as number) * 1000).toISOString(),
+    })
+    logger.debug({ chatId, targetMessageId, outcome }, 'Reaction forwarded')
+  } catch (err) {
+    logger.error({ err, chatId }, 'Failed to forward reaction')
+    throw new RetryLater()
+  }
 }
 
 function extractS3Key(photoUrl: string, storagePublicUrl: string, bucket: string): string | null {

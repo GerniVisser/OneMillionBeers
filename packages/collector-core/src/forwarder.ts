@@ -2,8 +2,12 @@ import {
   BeerLogRequestSchema,
   BeerLogResponseSchema,
   BeerLogDeleteResponseSchema,
+  BeerLogReactionRequestSchema,
+  BeerLogReactionResponseSchema,
   type BeerLogRequest,
   type BeerLogOutcome,
+  type BeerLogReactionRequest,
+  type BeerLogReactionOutcome,
 } from '@omb/shared'
 import { config } from './config.js'
 import { pino } from 'pino'
@@ -34,6 +38,28 @@ export async function forwardBeerLog(payload: BeerLogRequest): Promise<BeerLogOu
   }
 
   return BeerLogResponseSchema.parse(await response.json()).outcome
+}
+
+export async function forwardBeerLogReaction(
+  payload: BeerLogReactionRequest,
+): Promise<BeerLogReactionOutcome> {
+  BeerLogReactionRequestSchema.parse(payload)
+
+  const url = `${config.BACKEND_URL}/v1/internal/beer-log/reaction`
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...internalAuthHeader() },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10_000),
+  })
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '(unreadable)')
+    logger.error({ status: response.status, body: text }, 'Backend rejected reaction')
+    throw new Error(`Backend returned ${response.status}`)
+  }
+
+  return BeerLogReactionResponseSchema.parse(await response.json()).outcome
 }
 
 /** Returns the photo URL to delete, or null if no beer log matched. */

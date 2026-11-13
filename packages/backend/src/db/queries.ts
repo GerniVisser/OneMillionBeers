@@ -6,6 +6,7 @@ import type {
   GroupListItem,
   User,
   BeerLogOutcome,
+  BeerLogReactionOutcome,
   FeedItem,
   LeaderboardEntry,
   UserStatsResponse,
@@ -441,6 +442,46 @@ export async function revokeBeerLog(
     )
     return rows[0] ?? null
   })
+}
+
+// ─── Reactions ───────────────────────────────────────────────────────────────
+
+export async function findBeerLogIdByMessage(
+  pool: pg.Pool,
+  sourceGroupId: string,
+  sourceMessageId: string,
+): Promise<string | null> {
+  const { rows } = await pool.query<{ id: string }>(
+    `SELECT bl.id FROM beer_logs bl
+       JOIN groups g ON g.id = bl.group_id
+      WHERE g.source_group_id = $1 AND bl.source_message_id = $2`,
+    [sourceGroupId, sourceMessageId],
+  )
+  return rows[0]?.id ?? null
+}
+
+// Redeliveries arrive out of order, so only a change at least as recent as the
+// stored one is applied.
+export async function upsertBeerLogReaction(
+  pool: pg.Pool,
+  p: { beerLogId: string; userId: string; emoji: string | null; reactedAt: string },
+): Promise<BeerLogReactionOutcome> {
+  try {
+    await pool.query(
+      `INSERT INTO beer_log_reactions (beer_log_id, user_id, emoji, reacted_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (beer_log_id, user_id) DO UPDATE SET
+         emoji      = EXCLUDED.emoji,
+         reacted_at = EXCLUDED.reacted_at
+       WHERE beer_log_reactions.reacted_at <= EXCLUDED.reacted_at`,
+      [p.beerLogId, p.userId, p.emoji, p.reactedAt],
+    )
+    return 'stored'
+  } catch (err) {
+    // The beer was revoked after it was looked up.
+    if ((err as { code?: string }).code === '23503') return 'not-a-beer'
+    throw err
+  }
 }
 
 // ─── Feed ────────────────────────────────────────────────────────────────────

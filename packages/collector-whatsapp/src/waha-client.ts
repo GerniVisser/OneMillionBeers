@@ -93,3 +93,17 @@ export async function listAllGroups(
     return []
   }
 }
+
+/** Each member's LID paired with their phone JID (`<digits>@c.us`), when WAHA knows it. */
+export async function getGroupParticipants(
+  session: string,
+  groupId: string,
+): Promise<Array<{ id: string; pn: string | null }>> {
+  const res = await fetch(
+    `${config.WAHA_BASE_URL}/api/${encodeURIComponent(session)}/groups/${groupId}/participants/v2`,
+    { headers: wahaHeaders(), signal: AbortSignal.timeout(15_000) },
+  )
+  if (!res.ok) throw new Error(`WAHA getGroupParticipants returned ${res.status}`)
+  const data = (await res.json()) as Array<{ id: string; pn?: string | null }>
+  return data.map(({ id, pn }) => ({ id, pn: pn ?? null }))
+}

@@ -44,6 +44,24 @@ export const BeerLogDeleteResponseSchema = z.object({
 })
 export type BeerLogDeleteResponse = z.infer<typeof BeerLogDeleteResponseSchema>
 
+// POST /v1/internal/beer-log/reaction (Collector → Backend)
+// emoji is null when the reactor removed their reaction
+export const BeerLogReactionRequestSchema = z.object({
+  sourceGroupId: z.string().min(1),
+  sourceMessageId: z.string().min(1), // the photo reacted to
+  reactorId: z.string().min(1),
+  emoji: z.string().min(1).max(64).nullable(),
+  timestamp: IsoDatetimeSchema,
+})
+export type BeerLogReactionRequest = z.infer<typeof BeerLogReactionRequestSchema>
+
+export const BeerLogReactionResponseSchema = z.object({
+  ok: z.literal(true),
+  outcome: z.enum(['stored', 'not-a-beer']),
+})
+export type BeerLogReactionResponse = z.infer<typeof BeerLogReactionResponseSchema>
+export type BeerLogReactionOutcome = BeerLogReactionResponse['outcome']
+
 // Feed item — used for both group feed and global feed
 // createdAt excluded (DB bookkeeping, not displayed)
 export const FeedItemSchema = z.object({

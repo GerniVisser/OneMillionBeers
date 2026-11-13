@@ -86,7 +86,7 @@ services:
       # needs nothing else. The collector answers 503 when it could not store an
       # event; retries back off from 4 s over ~17 min.
       WHATSAPP_HOOK_URL: http://collector-whatsapp:8080/webhook
-      WHATSAPP_HOOK_EVENTS: message,message.revoked,session.status,group.v2.join
+      WHATSAPP_HOOK_EVENTS: message,message.revoked,message.reaction,session.status,group.v2.join
       WHATSAPP_HOOK_RETRIES_POLICY: exponential
       WHATSAPP_HOOK_RETRIES_DELAY_SECONDS: '2'
       WHATSAPP_HOOK_RETRIES_ATTEMPTS: '8'

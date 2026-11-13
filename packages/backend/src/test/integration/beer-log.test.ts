@@ -399,6 +399,112 @@ describe('DELETE /v1/internal/beer-log/by-message/:sourceMessageId', () => {
   })
 })
 
+const reaction = {
+  sourceGroupId: validPayload.sourceGroupId,
+  sourceMessageId: validPayload.sourceMessageId,
+  reactorId: 'wa:27831234567',
+  emoji: '🍻',
+  timestamp: '2024-06-01T12:05:00.000Z',
+}
+
+const react = (payload: Record<string, unknown>) =>
+  app.inject({
+    method: 'POST',
+    url: '/v1/internal/beer-log/reaction',
+    headers: internalHeaders,
+    payload,
+  })
+
+const reactions = async () =>
+  (await pool.query('SELECT emoji, reacted_at FROM beer_log_reactions')).rows
+
+describe('POST /v1/internal/beer-log/reaction', () => {
+  it('stores a reaction to a beer photo', async () => {
+    await post(validPayload)
+    const res = await react(reaction)
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ ok: true, outcome: 'stored' })
+    expect((await reactions()).map((r) => r.emoji)).toEqual(['🍻'])
+  })
+
+  it('creates a user for a reactor who never posted a beer', async () => {
+    await post(validPayload)
+    await react(reaction)
+    const { rows } = await pool.query(
+      `SELECT u.phone_number, u.country_code FROM beer_log_reactions r
+         JOIN users u ON u.id = r.user_id`,
+    )
+    expect(rows).toEqual([{ phone_number: '27831234567', country_code: 'ZA' }])
+  })
+
+  it('links the reaction to the existing user when the reactor has posted', async () => {
+    await post({ ...zaPayload, sourceMessageId: 'OTHER' })
+    await post(validPayload)
+    await react(reaction)
+    const { rows } = await pool.query('SELECT * FROM users')
+    expect(rows).toHaveLength(2)
+  })
+
+  it('replaces the emoji when the reactor changes it', async () => {
+    await post(validPayload)
+    await react(reaction)
+    await react({ ...reaction, emoji: '❤️', timestamp: '2024-06-01T12:06:00.000Z' })
+    expect((await reactions()).map((r) => r.emoji)).toEqual(['❤️'])
+  })
+
+  it('keeps a removed reaction as a null emoji', async () => {
+    await post(validPayload)
+    await react(reaction)
+    await react({ ...reaction, emoji: null, timestamp: '2024-06-01T12:06:00.000Z' })
+    expect((await reactions()).map((r) => r.emoji)).toEqual([null])
+  })
+
+  it('ignores a redelivery older than the stored reaction', async () => {
+    await post(validPayload)
+    await react({ ...reaction, emoji: null, timestamp: '2024-06-01T12:06:00.000Z' })
+    await react(reaction)
+    expect((await reactions()).map((r) => r.emoji)).toEqual([null])
+  })
+
+  it('keeps one row per reactor for a redelivered reaction', async () => {
+    await post(validPayload)
+    await react(reaction)
+    await react(reaction)
+    expect(await reactions()).toHaveLength(1)
+  })
+
+  it('stores one reaction per reactor', async () => {
+    await post(validPayload)
+    await react(reaction)
+    await react({ ...reaction, reactorId: 'wa:447700900123', emoji: '👍' })
+    expect((await reactions()).map((r) => r.emoji).sort()).toEqual(['👍', '🍻'].sort())
+  })
+
+  it('reports not-a-beer and creates no user for a message that is not a beer', async () => {
+    const res = await react({ ...reaction, sourceMessageId: 'TEXT-MESSAGE' })
+    expect(res.json()).toEqual({ ok: true, outcome: 'not-a-beer' })
+    expect((await pool.query('SELECT * FROM users')).rows).toHaveLength(0)
+  })
+
+  it('only matches the beer in the group it names', async () => {
+    await post(validPayload)
+    const res = await react({ ...reaction, sourceGroupId: 'group-tg-2' })
+    expect(res.json().outcome).toBe('not-a-beer')
+  })
+
+  it('drops the reactions when the beer is revoked', async () => {
+    await post(validPayload)
+    await react(reaction)
+    await revoke(validPayload.sourceMessageId)
+    expect(await reactions()).toHaveLength(0)
+  })
+
+  it('returns 400 on invalid body', async () => {
+    const res = await react({ ...reaction, emoji: '' })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
 describe('pseudo_name generation', () => {
   it('sets pseudo_name on new user creation', async () => {
     await app.inject({

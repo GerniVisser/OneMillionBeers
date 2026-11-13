@@ -39,12 +39,17 @@ export {
   BeerLogRequestSchema,
   BeerLogResponseSchema,
   BeerLogDeleteResponseSchema,
+  BeerLogReactionRequestSchema,
+  BeerLogReactionResponseSchema,
   FeedItemSchema,
   type BeerLog,
   type BeerLogRequest,
   type BeerLogResponse,
   type BeerLogOutcome,
   type BeerLogDeleteResponse,
+  type BeerLogReactionRequest,
+  type BeerLogReactionResponse,
+  type BeerLogReactionOutcome,
   type FeedItem,
 } from './beer.js'
 
